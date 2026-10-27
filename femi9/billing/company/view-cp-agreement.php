@@ -184,7 +184,7 @@ ob_start();
                         }
                         ?>
                         <?php if ($__companySigSrc): ?>
-                        <div class="agr-field-row"><label>Signature:</label><span class="agr-value"><img src="<?php echo $__companySigSrc; ?>" class="agr-sig-img"></span></div>
+                        <div class="agr-field-row"><label>Signature:</label><span class="agr-value"><img src="<?php echo htmlspecialchars((string)($__companySigSrc), ENT_QUOTES, 'UTF-8', false); ?>" class="agr-sig-img"></span></div>
                         <?php endif; ?>
 
                         <p style="margin-top:18px;"><strong>FOR THE CHANNEL PARTNER</strong></p>

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -12,7 +12,7 @@ $invid = $ret['invnumber'];
 $user  = $ret['from_usertype'];
 
 $inv_table = ($user === 'customer') ? 'invoice' : 'user_invoice';
-$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $inv_table WHERE inv_id='$invid'"));
+$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $inv_table WHERE inv_id='".db_esc($invid)."'"));
 
 $displaytitle = "Stock Return (Credit Note) Details";
 ?>
@@ -90,14 +90,14 @@ while ($item = mysqli_fetch_array($items)) {
 ?>
     <tr>
         <th><?php echo ++$rd; ?></th>
-        <td><?php echo $product['productName']; ?></td>
-        <td><?php echo $item['qty']; ?></td>
+        <td><?php echo htmlspecialchars((string)($product['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+        <td><?php echo htmlspecialchars((string)($item['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
         <td>&#8377;<?php echo inr_format($item['amount'], 2); ?></td>
         <td align="right"><?php echo inr_format($item['subtotal'], 2); ?></td>
-        <td><?php echo inr_format($item['gstamount_total'], 2); ?> (<?php echo $item['gst_percentage']; ?>%)</td>
+        <td><?php echo inr_format($item['gstamount_total'], 2); ?> (<?php echo htmlspecialchars((string)($item['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
         <td align="right"><?php echo inr_format($item['total'], 2); ?></td>
         <td>
-            <a href="cnote_delete.php?returnid=<?php echo $enc_returnid; ?>&rowid=<?php echo $ItemRowid; ?>&redirurl=cnote_details"
+            <a href="cnote_delete.php?returnid=<?php echo htmlspecialchars((string)($enc_returnid), ENT_QUOTES, 'UTF-8', false); ?>&rowid=<?php echo $ItemRowid; ?>&redirurl=cnote_details"
                onclick="return confirm('Delete this item?');">
                 <span class="badge bg-danger">Remove</span>
             </a>
@@ -113,7 +113,7 @@ while ($item = mysqli_fetch_array($items)) {
 <div class="row invoice-summary">
     <?php if ($count_products_return == 0) { ?>
     <div class="col-lg-12" style="text-align:center;">
-        <a href="cnote_del.php?returnid=<?php echo $_REQUEST['returnid']; ?>"
+        <a href="cnote_del.php?returnid=<?php echo htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false); ?>"
            class="btn btn-primary badge badge-style-bordered badge-danger"
            onclick="return confirm('Delete this credit note?');">Delete Credit Note</a>
     </div>
@@ -134,7 +134,7 @@ while ($item = mysqli_fetch_array($items)) {
         <div class="invoice-info">
             <form action="cnote_finish.php" method="post" enctype="multipart/form-data"
                   onsubmit="return confirm('Complete this return?');">
-                <input type="hidden" name="returnid" value="<?php echo $_REQUEST['returnid']; ?>">
+                <input type="hidden" name="returnid" value="<?php echo htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false); ?>">
                 <input type="hidden" name="SubTotal" value="<?php echo $TotalAMount123; ?>">
 
                 <p class="bold">Subtotal
@@ -172,7 +172,7 @@ while ($item = mysqli_fetch_array($items)) {
     <?php if ($ret['status'] !== 'pending') {
         $cn_receiptid = 'CN-' . $returnid;
         $cn_row = mysqli_fetch_array(mysqli_query($db_conn,
-            "SELECT id FROM receipt WHERE receiptid='$cn_receiptid' AND payment_type='credit_note' LIMIT 1"));
+            "SELECT id FROM receipt WHERE receiptid='".db_esc($cn_receiptid)."' AND payment_type='credit_note' LIMIT 1"));
         if ($cn_row) {
             $cn_print_page = ($user === 'customer') ? 'customer-invoice-print.php' : 'shop-invoice-print.php';
             $cn_dlrow = mysqli_fetch_array(mysqli_query($db_conn,

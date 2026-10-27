@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -111,11 +111,11 @@ $successMessage = $_SESSION['successMessage'];
            <select required="" name="stockist_tempid" class="form-control">
 							   <option value="" hidden="">Select</option>
 <?php 
-$select_stcatlist="select temp_id,name from stockiest where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' order by name asc";
+$select_stcatlist="select temp_id,name from stockiest where onboard_userTYPE='".db_esc($onboard_userTYPE)."' and onboard_userID='".db_esc($onboard_userID)."' order by name asc";
    $fetch_stcatlist=mysqli_query($db_conn,$select_stcatlist);
 							   while($result_stcatlist=mysqli_fetch_array($fetch_stcatlist))
 							   {?>
-	<option value="<?php echo $result_stcatlist['temp_id'];?>"><?php echo strtoupper($result_stcatlist['name']);?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_stcatlist['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)(strtoupper($result_stcatlist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>
@@ -210,7 +210,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-	<option value="<?php echo $result_stateList['id'];?>"><?php echo $result_stateList['st_name'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 			<br/>

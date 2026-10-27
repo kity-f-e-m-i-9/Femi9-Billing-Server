@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -86,7 +86,7 @@ $seuser=$_REQUEST['seuser'];
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report_outlet?frdate=<?=$start_date;?>&&todate=<?=$endDate;?>&&lable=<?=$_REQUEST['lable'];?>&&rptlable=<?=$_REQUEST['rptlable'];?>&&out1=<?=$_REQUEST['out1'];?>&&out2=<?=$_REQUEST['out2'];?>&&out3=<?=$_REQUEST['out3'];?>&&out4=<?=$_REQUEST['out4'];?>&&seuser=<?=$seuser;?>&&indistinct=<?=$indistinct;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report_outlet?frdate=<?=htmlspecialchars((string)($start_date), ENT_QUOTES, 'UTF-8', false);?>&&todate=<?=htmlspecialchars((string)($endDate), ENT_QUOTES, 'UTF-8', false);?>&&lable=<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>&&rptlable=<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>&&out2=<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>&&out3=<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>&&out4=<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?>&&seuser=<?=htmlspecialchars((string)($seuser), ENT_QUOTES, 'UTF-8', false);?>&&indistinct=<?=$indistinct;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -104,19 +104,19 @@ $seuser=$_REQUEST['seuser'];
 												<table id="reportdash">
 												<tr>
 												<th>Today</th>
-												<td>:&nbsp;<?=$_REQUEST['out1'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Yesterday</th>
-												<td>:&nbsp;<?=$_REQUEST['out2'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>This&nbsp;Month</th>
-												<td>:&nbsp;<?=$_REQUEST['out3'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Last&nbsp;Month&nbsp;Till&nbsp;Date</th>
-												<td>:&nbsp;<?=$_REQUEST['out4'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												</table>
                                             </div>
@@ -154,27 +154,27 @@ $i= $start_from;
 <!-----------------------DISTRIBUTOR-------------------------------->
 									<?PHP if($_REQUEST['lable']==3){?>
 									
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="lable" value="<?=$_REQUEST['lable'];?>"/>
-<input type="hidden" name="rptlable" value="<?=$_REQUEST['rptlable'];?>"/>
-<input type="hidden" name="out1" value="<?=$_REQUEST['out1'];?>"/>
-<input type="hidden" name="out2" value="<?=$_REQUEST['out2'];?>"/>
-<input type="hidden" name="out3" value="<?=$_REQUEST['out3'];?>"/>
-<input type="hidden" name="out4" value="<?=$_REQUEST['out4'];?>"/>
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="lable" value="<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="rptlable" value="<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out1" value="<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out2" value="<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out3" value="<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out4" value="<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="seaction" value="searchfilter"/>
 
 <div class="overviewcontainar">
 <div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$start_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($start_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$endDate;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($endDate), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">Distributor</label>
-<input type="text" name="seuser" placeholder="%Like%" value="<?=$seuser;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="text" name="seuser" placeholder="%Like%" value="<?=htmlspecialchars((string)($seuser), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchcheckbox">
 <label class="form-label">indistinct</label>
@@ -210,11 +210,11 @@ $i= $start_from;
 										<tbody>
 <?php
 if($seuser==NULL){	
-$select_records="select * from distributor where onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl' order by id asc";
+$select_records="select * from distributor where onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' and onboard_userID='".db_esc($Login_user_IDvl)."' order by id asc";
 }else{
-$select_records="select * from distributor where name LIKE '%$seuser%' and onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl' order by id asc";	
+$select_records="select * from distributor where name LIKE '%".db_esc($seuser)."%' and onboard_userTYPE=? and onboard_userID=? order by id asc";	
 }	
-$exe_records=mysqli_query($db_conn,$select_records);
+$exe_records=db_q($db_conn,$select_records,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while($fetch_records=mysqli_fetch_array($exe_records))
 {
 	
@@ -222,11 +222,11 @@ while($fetch_records=mysqli_fetch_array($exe_records))
 	//
 	if($_REQUEST['indistinct']==NULL)
 	{
-	$select_visitcnt="select count(distinct date) numvstoutlet from user_invoice where to_user_type='shop' and from_user_type='distributor' and from_user_id='$distributorID'";
+	$select_visitcnt="select count(distinct date) numvstoutlet from user_invoice where to_user_type='shop' and from_user_type='distributor' and from_user_id='".db_esc($distributorID)."'";
 	}else{
-	$select_visitcnt="select count(*) numvstoutlet from user_invoice where to_user_type='shop' and from_user_type='distributor' and from_user_id='$distributorID'";	
+	$select_visitcnt="select count(*) numvstoutlet from user_invoice where to_user_type='shop' and from_user_type='distributor' and from_user_id=?";	
 	}
-	$exe_visitcnt=mysqli_query($db_conn,$select_visitcnt);
+	$exe_visitcnt=db_q($db_conn,$select_visitcnt,[$distributorID]);
 	$fetch_visitcnt=mysqli_fetch_array($exe_visitcnt);
 	$Total_Visit_Count=$fetch_visitcnt['numvstoutlet'];
 	
@@ -237,22 +237,22 @@ $stateid=$fetch_records['state_id'];
 $distid=$fetch_records['district_id'];
 						
 //District Details						
-$selectrecords_VLSS1="select * from district where state_id='$stateid' and id='$distid'";
-$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$stateid,$distid]);
 $resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 $district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 				
 //Taluk Details				
 $talukid=$fetch_records['taluk_id'];
-$selectrecordstaluk="select * from taluk where state_id='$stateid' and dist_id='$distid' and id='$talukid'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecordstaluk);
+$selectrecordstaluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecordstaluk,[$stateid,$distid,$talukid]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
 //Pincode Details				
 $pincodeid=$fetch_records['pincode_id'];
-$selectrecordspincode="select * from pincode where state_id='$stateid' and dist_id='$distid' and taluk_id='$talukid' and id='$pincodeid'";
-$exerecordspincode=mysqli_query($db_conn,$selectrecordspincode);
+$selectrecordspincode="select * from pincode where state_id=? and dist_id=? and taluk_id=? and id=?";
+$exerecordspincode=db_q($db_conn,$selectrecordspincode,[$stateid,$distid,$talukid,$pincodeid]);
 $fetchrecordspincode=mysqli_fetch_array($exerecordspincode);
 $pincodeshow=$fetchrecordspincode['pincode'];
 
@@ -264,7 +264,7 @@ if($Total_Visit_Count>0)
                             <td><?php echo ++$i; ?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$fetch_records["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($fetch_records["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td style="background:#EEE;font-weight:bold;"><?=$Total_Visit_Count;?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>

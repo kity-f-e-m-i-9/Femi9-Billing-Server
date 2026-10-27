@@ -1,8 +1,9 @@
 name: Publish Website to CPanel
+# The server now PULLS from GitHub on its own (cron -> deploy/pull-deploy.sh), so this FTP
+# deploy no longer runs on push. It stays here as a manual fallback only: GitHub -> Actions
+# -> this workflow -> Run workflow (needs FTP open on the server's firewall).
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 concurrency:
   group: production-deploy
   cancel-in-progress: false
@@ -51,3 +52,18 @@ jobs:
             **/.env
             **/.env.*
             !**/.env.example
+            # Uploaded user files (payment proofs, signatures, logos) are no longer in git.
+            # Without these excludes the sync-state diff treats them as "removed from the
+            # repo" and DELETES them from production on the next deploy.
+            femi9/billing/stockist/screenshot/**
+            femi9/billing/super-stockist/screenshot/**
+            femi9/billing/c-and-f/screenshot/**
+            femi9/billing/distributor/screenshot/**
+            femi9/billing/territory-partner/advance_payment_screenshots/**
+            femi9/billing/territory-partner/po_screenshots/**
+            femi9/billing/company/company_signature/**
+            femi9/billing/company/bussiness_logo/**
+            # Runtime state written by the app (login rate limits, logs).
+            **/logs/**
+            **/error_log
+

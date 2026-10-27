@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -109,22 +109,22 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-				<?php $select_product_list="select * from stockiest where (ss_id='$loguser_tempid' OR onboard_userID='$loguser_tempid') AND account_status = 'active' order by id desc";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+				<?php $select_product_list="select * from stockiest where (ss_id=? OR onboard_userID=?) AND account_status = 'active' order by id desc";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$loguser_tempid,$loguser_tempid]);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 									//
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 //
 $taluk_id=$result_product_list['taluk_id'];
-$select_Taluk12="select * from taluk where id='$taluk_id'";
-	$fetch_Taluk12=mysqli_query($db_conn,$select_Taluk12);
+$select_Taluk12="select * from taluk where id=?";
+	$fetch_Taluk12=db_q($db_conn,$select_Taluk12,[$taluk_id]);
 	$result_Taluk12=mysqli_fetch_array($fetch_Taluk12);
 $taluk_name=$result_Taluk12['taluk'];
 											
@@ -132,35 +132,35 @@ $taluk_name=$result_Taluk12['taluk'];
 					
 					//CATEGORY
 					$stockistid=$result_product_list['temp_id'];
-					$select_RFRDtailsCNG="select * from stockist_referral where stockist_id='$stockistid'";
-$fetch_RFRDtailsCNG=mysqli_query($db_conn,$select_RFRDtailsCNG);
+					$select_RFRDtailsCNG="select * from stockist_referral where stockist_id=?";
+$fetch_RFRDtailsCNG=db_q($db_conn,$select_RFRDtailsCNG,[$stockistid]);
 $result_RFRDtailsCNG=mysqli_fetch_array($fetch_RFRDtailsCNG);
 $CNG_catID=$result_RFRDtailsCNG['st_cat_id'];
 
-$select_RFRDtailsCNG_CAT="select * from stockist_category where id='$CNG_catID'";
-$fetch_RFRDtailsCNG_CAT=mysqli_query($db_conn,$select_RFRDtailsCNG_CAT);
+$select_RFRDtailsCNG_CAT="select * from stockist_category where id=?";
+$fetch_RFRDtailsCNG_CAT=db_q($db_conn,$select_RFRDtailsCNG_CAT,[$CNG_catID]);
 $result_RFRDtailsCNG_CAT=mysqli_fetch_array($fetch_RFRDtailsCNG_CAT);
 $Login_person_CAT=$result_RFRDtailsCNG_CAT['catname'];
 						?>
                                             
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_product_list["useridtext"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					D:&nbsp;<?php echo $district_name;?><br/>T:&nbsp;<?php echo $taluk_name;?>
 					</td>
-					<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<?php /*?>
-					<td><b><?php echo $result_product_list["username"];?></b></td>
-					<td>&#8377; <?php echo $result_product_list["plan_amount"];?><br/>
-					<?php echo $result_product_list["valid_months"];?> Days<br/>
+					<td><b><?php echo htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
+					<td>&#8377; <?php echo htmlspecialchars((string)($result_product_list["plan_amount"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?php echo htmlspecialchars((string)($result_product_list["valid_months"]), ENT_QUOTES, 'ISO-8859-1', false);?> Days<br/>
 					<?php echo date("d/m/Y",strtotime($result_product_list["valid_from"]));?>
 					(to) <?php echo date("d/m/Y",strtotime($result_product_list["valid_to"]));?>
 					</td>
 					
-					<td><?php echo $result_product_list["ref_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["ref_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<?php */?>
 					
 			<td>
@@ -178,7 +178,7 @@ $Login_person_CAT=$result_RFRDtailsCNG_CAT['catname'];
 			?>
 </td>
 
-<td style="font-weight:bold;"><?=$Login_person_CAT;?><br/>(&#8377;&nbsp;<?=$result_RFRDtailsCNG_CAT['target_amount'];?>)</td>
+<td style="font-weight:bold;"><?=$Login_person_CAT;?><br/>(&#8377;&nbsp;<?=htmlspecialchars((string)($result_RFRDtailsCNG_CAT['target_amount']), ENT_QUOTES, 'ISO-8859-1', false);?>)</td>
 
 <td>
 			<a href="JavaScript:newPopup('details-ss.php?prid=<?php echo $rowid;?>&&actiondetails');" data-bs-toggle="tooltip" data-bs-placement="top" title="View Details">

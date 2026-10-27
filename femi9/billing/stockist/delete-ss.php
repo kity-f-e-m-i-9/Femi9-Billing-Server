@@ -1,12 +1,12 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
 
 //user details
-$select_userdetails="select * from distributor where id='$prid'";
-$fetch_userdtails=mysqli_query($db_conn,$select_userdetails);
+$select_userdetails="select * from distributor where id=?";
+$fetch_userdtails=db_q($db_conn,$select_userdetails,[$prid]);
 $result_useradetails=mysqli_fetch_array($fetch_userdtails);
 
 $usericon=$result_useradetails['user_icon'];
@@ -24,14 +24,14 @@ unlink("".$usericon."");
 if($usertype=="Distributor")
 {
 //un assigned pincode to distributor
-$UnassignedDST="update pincode set assigned_DID='Nil' where assigned_DID='$Distributor_ID'";
-mysqli_query($db_conn,$UnassignedDST);
+$UnassignedDST="update pincode set assigned_DID='Nil' where assigned_DID=?";
+db_q($db_conn,$UnassignedDST,[$Distributor_ID]);
 }
 */
 
 //delete distributor details
-$del_product="delete from distributor where id='$prid'";
-mysqli_query($db_conn,$del_product);
+$del_product="delete from distributor where id=?";
+db_q($db_conn,$del_product,[$prid]);
 
 echo "<script>window.location='manage_ss.php?deletedDone';</script>";
 ?>

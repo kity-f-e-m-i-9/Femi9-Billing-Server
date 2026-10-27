@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $title="Other Channel Sales Report";
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");
@@ -88,7 +88,7 @@ error_reporting(0);
 									}
 									?>
 									
-<form action="<?=$_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data">
+<form action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" method="post" enctype="multipart/form-data">
 
                                         <div class="example-container">
                                             <div class="example-content">
@@ -98,14 +98,14 @@ error_reporting(0);
 							   <?php if($get_catname==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$get_catname;?>" hidden=""><?=$get_catname;?></option>
+							   <option value="<?=htmlspecialchars((string)($get_catname), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=htmlspecialchars((string)($get_catname), ENT_QUOTES, 'UTF-8', false);?></option>
 							   <?php }?>
 							   <option value="">--All--</option>
 							   <?php $select_stateList="select distinct cat from ot_sales order by cat asc";
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-						   <option value="<?=$result_stateList['cat'];?>"><?=$result_stateList['cat'];?></option>
+						   <option value="<?=htmlspecialchars((string)($result_stateList['cat']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_stateList['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   
@@ -139,22 +139,22 @@ error_reporting(0);
 										<?php 
 										if($get_from_date!=NULL && $get_to_date!=NULL && $get_catname==NULL)
 										{
-						$select_picnode_list="select * from ot_sales where date between '$get_from_date' and '$get_to_date' order by id asc";
+						$select_picnode_list="select * from ot_sales where date between '".db_esc($get_from_date)."' and '".db_esc($get_to_date)."' order by id asc";
 										}
 										if($get_from_date!=NULL && $get_to_date!=NULL && $get_catname!=NULL)
 										{
-						$select_picnode_list="select * from ot_sales where date between '$get_from_date' and '$get_to_date' and cat='$get_catname' order by id asc";
+						$select_picnode_list="select * from ot_sales where date between ? and ? and cat=? order by id asc";
 										}
 										
 										
-										$fetch_picnode_list=mysqli_query($db_conn,$select_picnode_list);
+										$fetch_picnode_list=db_q($db_conn,$select_picnode_list,[$get_from_date,$get_to_date,$get_catname]);
 										while($result_pincode_list=mysqli_fetch_array($fetch_picnode_list))
 										{
 											
 											//state details
 											$prid=$result_pincode_list['prid'];
-								$select_stateList="select * from products where id='$prid'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+								$select_stateList="select * from products where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$prid]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $productname=$result_stateList['productName'];
 							   
@@ -164,7 +164,7 @@ error_reporting(0);
 											?>
                                                 <tr>
                                            <td><?=$i=$i+1; ?></td>
-										<td><?=$result_pincode_list['cat'];?></td>
+										<td><?=htmlspecialchars((string)($result_pincode_list['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						<td><?=date("d/m/Y",strtotime($result_pincode_list['date']));?></td>
                                                     <td><?=$productname;?></td>
 													<td style="text-align:right;"><?=$slsqty;?></td>

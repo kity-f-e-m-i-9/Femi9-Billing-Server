@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 //insert details
@@ -14,27 +14,27 @@ if(isset($_REQUEST['add-record']))
 	$remarks=str_replace("'","&#39;",$_REQUEST['remarks']);
 	$input_date=date("Y-m-d",strtotime($_REQUEST['input_date']));
 	
-	$select_count_product="select count(*) as numCountRcds from input_stock_users where tempid='$tempid'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	$select_count_product="select count(*) as numCountRcds from input_stock_users where tempid=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$tempid]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numCountRcds']==0)
 	{
 		//insert input stock
 		$insert_products="insert into input_stock_users (tempid,usertype,userid,product_id,input_qty,input_date,remarks)
-		values ('$tempid','$usertype','$userid','$product_id','$input_qty','$input_date','$remarks')";
-		mysqli_query($db_conn,$insert_products);
+		values (?,?,?,?,?,?,?)";
+		db_q($db_conn,$insert_products,[$tempid,$usertype,$userid,$product_id,$input_qty,$input_date,$remarks]);
 		
 		
 		//update stock
-		$select_stockDetails="select * from stock where product_id='$product_id' and user_type='$usertype' and user_id='$userid'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
+		$select_stockDetails="select * from stock where product_id=? and user_type=? and user_id=?";
+		$fetch_stockDetails=db_q($db_conn,$select_stockDetails,[$product_id,$usertype,$userid]);
 		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
 		
 		$update_Input_stock=$result_stockDetails['input_qty']+$input_qty;
 		$update_Closing_stock=$result_stockDetails['closing_qty']+$input_qty;
 		
-		$update_stockDetails="update stock set input_qty='$update_Input_stock',closing_qty='$update_Closing_stock' where product_id='$product_id' and user_type='$usertype' and user_id='$userid'";
-		mysqli_query($db_conn,$update_stockDetails);
+		$update_stockDetails="update stock set input_qty=?,closing_qty=? where product_id=? and user_type=? and user_id=?";
+		db_q($db_conn,$update_stockDetails,[$update_Input_stock,$update_Closing_stock,$product_id,$usertype,$userid]);
 		
 		
 		echo "<script>window.location='manage-input?addesuccess';</script>";

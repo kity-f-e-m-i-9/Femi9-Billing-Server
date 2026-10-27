@@ -91,7 +91,7 @@ $message_title="Taluk";
 <?php include("validate-scripts.php");?>
 	
 <form action="product-action" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!')">
-			<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+			<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <div class="example-container">
                                             <div class="example-content">
                                                 
@@ -116,7 +116,7 @@ xmlhttp.send();}
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-						   <option value="<?php echo $result_stateList['id'];?>"><?php echo $result_stateList['st_name'];?></option>
+						   <option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   

@@ -278,7 +278,7 @@ $grandTotalAmt = array_sum(array_column($lines, 'amount'));
                                             <tr><td colspan="7" class="text-center text-muted">No invoices in this date range.</td></tr>
                                             <?php else: foreach ($lines as $l): ?>
                                             <tr>
-                                                <td><span class="gir-type-pill gir-type-<?php echo strtolower($l['type']); ?>"><?php echo htmlspecialchars($l['type']); ?></span></td>
+                                                <td><span class="gir-type-pill gir-type-<?php echo htmlspecialchars((string)(strtolower($l['type'])), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars($l['type']); ?></span></td>
                                                 <td><code><?php echo htmlspecialchars($l['invoice_number']); ?></code></td>
                                                 <td><?php echo htmlspecialchars($l['date']); ?></td>
                                                 <td><?php echo htmlspecialchars($l['partner']); ?></td>

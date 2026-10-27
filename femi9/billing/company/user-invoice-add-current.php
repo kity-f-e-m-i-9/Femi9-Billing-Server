@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 /**
  * Invoice Creation & Management - Enhanced with Advance Payment
  * Femi9 Billing Application
@@ -186,7 +186,7 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                     <div class="invoice-card">
                                         <form action="user-invoice-action.php" method="POST" id="invoiceForm">
                                             <!-- CSRF Token -->
-                                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                             <input type="hidden" name="invuser" value="<?php echo htmlspecialchars($getinvuser); ?>">
                                             <input type="hidden" name="username" value="<?php echo htmlspecialchars($_SESSION['LOGIN_USER'] ?? ''); ?>">
                                             <input type="hidden" name="usertype" value="<?php echo htmlspecialchars($_SESSION['LOGIN_USER_TYPE'] ?? ''); ?>">
@@ -199,7 +199,7 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                             $temp_time = date("gis");
                                             $inv_id = $inv_randum_number . $invidprefix . $temp_date . $temp_time;
                                             ?>
-                                            <input type="hidden" name="inv_id" value="<?php echo $inv_id; ?>">
+                                            <input type="hidden" name="inv_id" value="<?php echo htmlspecialchars((string)($inv_id), ENT_QUOTES, 'UTF-8', false); ?>">
                                             <input type="hidden" name="randum_number" value="<?php echo $randum_number; ?>">
                                             
                                             <!-- Step 1: Company Profile -->
@@ -217,7 +217,7 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                                         $fetch_Godown = mysqli_query($db_conn, $select_Godown);
                                                         while ($row_Godown = mysqli_fetch_array($fetch_Godown)) {
                                                             $selected = ($godown_id == $row_Godown['id']) ? 'selected' : '';
-                                                            echo '<option value="' . $row_Godown['id'] . '" ' . $selected . '>' . htmlspecialchars($row_Godown['gname']) . '</option>';
+                                                            echo '<option value="' . htmlspecialchars((string)($row_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false) . '" ' . $selected . '>' . htmlspecialchars($row_Godown['gname']) . '</option>';
                                                         }
                                                         ?>
                                                     </select>
@@ -246,8 +246,8 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                                             $user_districtID = $result_Customers_list['district_id'];
                                                             
                                                             // Get district name
-                                                            $select_User_districtName = "SELECT * FROM district WHERE id='$user_districtID'";
-                                                            $fetch_user_districtName = mysqli_query($db_conn, $select_User_districtName);
+                                                            $select_User_districtName = "SELECT * FROM district WHERE id=?";
+                                                            $fetch_user_districtName = db_q($db_conn,$select_User_districtName,[$user_districtID]);
                                                             $result_user_districtName = mysqli_fetch_array($fetch_user_districtName);
                                                             $user_districtName = $result_user_districtName['dist_name'] ?? '';
                                                             
@@ -342,7 +342,7 @@ if ($godown_id > 0 && is_godown_allowed($db_conn, $godown_id)) {
                                                                     $select_Products = "SELECT * FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC";
                                                                     $fetch_Products = mysqli_query($db_conn, $select_Products);
                                                                     while ($row_Product = mysqli_fetch_array($fetch_Products)) {
-                                                                        echo '<option value="' . $row_Product['id'] . '">' . htmlspecialchars($row_Product['productName']) . '</option>';
+                                                                        echo '<option value="' . htmlspecialchars((string)($row_Product['id']), ENT_QUOTES, 'ISO-8859-1', false) . '">' . htmlspecialchars($row_Product['productName']) . '</option>';
                                                                     }
                                                                     ?>
                                                                 </select>

@@ -210,7 +210,7 @@ $totalConversions = count($conversions);
                                     </td>
                                     <td>
                                         <?php echo htmlspecialchars($c['bundle_label'], ENT_QUOTES, 'UTF-8'); ?>
-                                        <span class="<?php echo $c['bundle_status'] === 'open' ? 'badge-open' : 'badge-closed'; ?>" style="margin-left:6px;"><?php echo ucfirst($c['bundle_status']); ?></span>
+                                        <span class="<?php echo $c['bundle_status'] === 'open' ? 'badge-open' : 'badge-closed'; ?>" style="margin-left:6px;"><?php echo htmlspecialchars((string)(ucfirst($c['bundle_status'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span>
                                     </td>
                                     <td style="text-align:center;font-weight:600;"><?php echo number_format($c['packs_made']); ?></td>
                                     <td style="text-align:center;"><?php echo number_format($c['pieces_used']); ?></td>

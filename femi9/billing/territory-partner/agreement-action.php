@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 require_once __DIR__ . '/../shared/AgreementService.php';
 require_once __DIR__ . '/../shared/KycImageCompressor.php';
@@ -66,7 +66,7 @@ if (!empty($_FILES['pan_card']['name'])) {
     $tmpName = $_FILES['pan_card']['tmp_name'];
     if ($ext === 'pdf') {
         $newName = 'pan_tp_' . $tp_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.pdf';
-        if (move_uploaded_file($tmpName, $uploadDir . $newName)) {
+        if (safe_move_uploaded_file($tmpName, $uploadDir . $newName)) {
             $panCardPath = $newName;
         }
     } else {

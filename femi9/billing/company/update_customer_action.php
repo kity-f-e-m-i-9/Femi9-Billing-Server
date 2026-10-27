@@ -1,6 +1,5 @@
-<?php
-session_name('femi9_company_sess');
-session_start();
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
+session_name('femi9_company_sess'); session_start(); include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ss');
 include("include/db-connect.php");
 include("config.php");
 require_once("include/StockService.php");
@@ -16,8 +15,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 //-------------------------------------------------------------------	
 //-------------------------------------------------------------------	
 
-$select_invdetails="select * from user_invoice where inv_id='$invid'";
-$fetch_invdetails=mysqli_query($db_conn,$select_invdetails);
+$select_invdetails="select * from user_invoice where inv_id=?";
+$fetch_invdetails=db_q($db_conn,$select_invdetails,[$invid]);
 $result_invdetails=mysqli_fetch_array($fetch_invdetails);
 $cus_tempid=$result_invdetails['to_user_id'];
 
@@ -25,8 +24,8 @@ if($old_customer_id==$cus_tempid)
 {	
 
 
-$select_prlist="select * from user_invoice_items where inv_id='$invid'";
-$fetch_prlist=mysqli_query($db_conn,$select_prlist);
+$select_prlist="select * from user_invoice_items where inv_id=?";
+$fetch_prlist=db_q($db_conn,$select_prlist,[$invid]);
 while($resultprlist=mysqli_fetch_array($fetch_prlist))
 {
 
@@ -59,20 +58,20 @@ try {
 }
 
 
-$update_user_invoice="update user_invoice set to_user_id='$new_customer_id' where inv_id='$invid'";
-mysqli_query($db_conn,$update_user_invoice);
+$update_user_invoice="update user_invoice set to_user_id=? where inv_id=?";
+db_q($db_conn,$update_user_invoice,[$new_customer_id,$invid]);
 
-$update_user_invoice12="update user_invoice_items set to_user_id='$new_customer_id' where inv_id='$invid'";
-mysqli_query($db_conn,$update_user_invoice12);
+$update_user_invoice12="update user_invoice_items set to_user_id=? where inv_id=?";
+db_q($db_conn,$update_user_invoice12,[$new_customer_id,$invid]);
 
-$update_user_receipt="update receipt set to_user_id='$new_customer_id' where inv_id='$invid'";
-mysqli_query($db_conn,$update_user_receipt);
+$update_user_receipt="update receipt set to_user_id=? where inv_id=?";
+db_q($db_conn,$update_user_receipt,[$new_customer_id,$invid]);
 
 //------------------------------------------------------------------
 //------------------------------------------------------------------	
 	
 	//$_SESSION['successMessage']="Customer Update Success!";
-	echo "<script>window.location='update_customer?invuser=$invuser&&InvoiceID=$invid&&updatedsuccess';</script>";
+	echo "<script>window.location='update_customer?invuser=".urlencode($invuser)."&&InvoiceID=".urlencode($invid)."&&updatedsuccess';</script>";
 	
 	
 	

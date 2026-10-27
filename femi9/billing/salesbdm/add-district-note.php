@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 include("config.php");
 require_once("include/BdmTpScope.php");
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
                 if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) { $ext = 'jpg'; }
                 $photoPath = 'note_' . $salesBdmID . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-                if (!move_uploaded_file($file['tmp_name'], $uploadDir . $photoPath)) {
+                if (!safe_move_uploaded_file($file['tmp_name'], $uploadDir . $photoPath)) {
                     $errorMsg = 'Could not save the uploaded photo. Please try again.';
                     $photoPath = null;
                 }

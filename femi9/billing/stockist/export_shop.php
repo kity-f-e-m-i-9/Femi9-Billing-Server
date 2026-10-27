@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/csv-safe.php'; require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $file = "Shop-list.csv";
@@ -7,9 +7,9 @@ header("Content-Type: text/csv; charset=UTF-8");
 header("Content-Disposition: attachment; filename=$file");
 
 $output = fopen("php://output", "w");
-fputcsv($output, ['Name', 'Category', 'State', 'District', 'Taluk', 'Pincode', 'Country Code', 'Mobile Number', 'Landline', 'Email ID', 'Address', 'GSTIN']);
+femi_fputcsv($output, ['Name', 'Category', 'State', 'District', 'Taluk', 'Pincode', 'Country Code', 'Mobile Number', 'Landline', 'Email ID', 'Address', 'GSTIN']);
 
-$select_product_list = "select s.*, sc.catlable from shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id where s.onboard_userID='$onboard_userID' order by s.id desc";
+$select_product_list = "select s.*, sc.catlable from shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id where s.onboard_userID='".db_esc($onboard_userID)."' order by s.id desc";
 $fetch_product_list = mysqli_query($db_conn, $select_product_list);
 while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
 
@@ -57,7 +57,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
 		}
 	}
 
-	fputcsv($output, [
+	femi_fputcsv($output, [
 		$result_product_list['name'],
 		$result_product_list['catlable'],
 		$state_name,

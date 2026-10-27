@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 /**
  * Credit Note Creation Page
  * Add return items against an invoice with quantity validation
@@ -207,8 +207,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                             $product_id = $result_product_list["pr_id"];
                                                                             
                                                                             // Get product details
-                                                                            $select_prdetails = "SELECT * FROM products WHERE id='$product_id' LIMIT 1";
-                                                                            $fetch_prdetails = mysqli_query($db_conn, $select_prdetails);
+                                                                            $select_prdetails = "SELECT * FROM products WHERE id=? LIMIT 1";
+                                                                            $fetch_prdetails = db_q($db_conn,$select_prdetails,[$product_id]);
                                                                             $result_prdetails = mysqli_fetch_array($fetch_prdetails);
                                                                             $productname = $result_prdetails['productName'];
                                                                             
@@ -225,13 +225,13 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                             <td><?php echo htmlspecialchars($productname); ?></td>
                                                                             <td>
                                                                                 <span class="qty-badge qty-original">
-                                                                                    <?php echo $availability['original_qty']; ?>
+                                                                                    <?php echo htmlspecialchars((string)($availability['original_qty']), ENT_QUOTES, 'UTF-8', false); ?>
                                                                                 </span>
                                                                             </td>
                                                                             <td>
                                                                                 <?php if ($availability['returned_qty'] > 0) { ?>
                                                                                     <span class="qty-badge qty-returned">
-                                                                                        <?php echo $availability['returned_qty']; ?>
+                                                                                        <?php echo htmlspecialchars((string)($availability['returned_qty']), ENT_QUOTES, 'UTF-8', false); ?>
                                                                                     </span>
                                                                                 <?php } else { ?>
                                                                                     <span style="color:#999;">-</span>
@@ -240,7 +240,7 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                             <td>
                                                                                 <?php if ($availability['available_qty'] > 0) { ?>
                                                                                     <span class="qty-badge qty-available">
-                                                                                        <?php echo $availability['available_qty']; ?>
+                                                                                        <?php echo htmlspecialchars((string)($availability['available_qty']), ENT_QUOTES, 'UTF-8', false); ?>
                                                                                     </span>
                                                                                 <?php } else { ?>
                                                                                     <span class="qty-badge qty-none">0</span>
@@ -304,8 +304,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                         while ($result_product_list12 = mysqli_fetch_array($fetch_product_list12)) {
                                                             $product_idshow = $result_product_list12["pr_id"];
                                                             
-                                                            $select_product_list = "SELECT * FROM products WHERE id='$product_idshow' LIMIT 1";
-                                                            $fetch_product_list = mysqli_query($db_conn, $select_product_list);
+                                                            $select_product_list = "SELECT * FROM products WHERE id=? LIMIT 1";
+                                                            $fetch_product_list = db_q($db_conn,$select_product_list,[$product_idshow]);
                                                             
                                                             while ($result_product_list = mysqli_fetch_array($fetch_product_list)) {
                                                                 // Get availability for this product
@@ -322,11 +322,11 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                     ? " (Available: " . $availability['available_qty'] . ")" 
                                                                     : " (Fully Returned)";
                                                         ?>
-                                                            <option value="<?=$result_product_list['id'];?>" 
-                                                                    data-available="<?=$availability['available_qty'];?>"
-                                                                    data-original="<?=$availability['original_qty'];?>"
-                                                                    data-returned="<?=$availability['returned_qty'];?>"
-                                                                    <?=$disabled;?>>
+                                                            <option value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" 
+                                                                    data-available="<?=htmlspecialchars((string)($availability['available_qty']), ENT_QUOTES, 'UTF-8', false);?>"
+                                                                    data-original="<?=htmlspecialchars((string)($availability['original_qty']), ENT_QUOTES, 'UTF-8', false);?>"
+                                                                    data-returned="<?=htmlspecialchars((string)($availability['returned_qty']), ENT_QUOTES, 'UTF-8', false);?>"
+                                                                    <?=htmlspecialchars((string)($disabled), ENT_QUOTES, 'UTF-8', false);?>>
                                                                 <?=htmlspecialchars($result_product_list['productName']) . $available_text;?>
                                                             </option>
                                                         <?php 
@@ -393,8 +393,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                 <?php if ($_REQUEST['returnid'] != NULL) { ?>
                                                 <!-- RETURN ITEMS TABLE -->
                                                 <?php 
-                                                $select_InvoieDetails234 = "SELECT * FROM user_return_stock WHERE returnid='$get_returnid' AND deleted_at IS NULL LIMIT 1";
-                                                $fetch_InvoieDetails234 = mysqli_query($db_conn, $select_InvoieDetails234);
+                                                $select_InvoieDetails234 = "SELECT * FROM user_return_stock WHERE returnid=? AND deleted_at IS NULL LIMIT 1";
+                                                $fetch_InvoieDetails234 = db_q($db_conn,$select_InvoieDetails234,[$get_returnid]);
                                                 $resultReturnDtails = mysqli_fetch_array($fetch_InvoieDetails234);
                                                 ?>
 
@@ -418,8 +418,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                             </thead>
                                                             <tbody>
                                                                 <?php
-                                                                $select_INVProductDetails = "SELECT * FROM user_return_stock_items WHERE returnid='$get_returnid' AND deleted_at IS NULL ORDER BY id DESC";
-                                                                $fetch_INVProductDetails = mysqli_query($db_conn, $select_INVProductDetails);
+                                                                $select_INVProductDetails = "SELECT * FROM user_return_stock_items WHERE returnid=? AND deleted_at IS NULL ORDER BY id DESC";
+                                                                $fetch_INVProductDetails = db_q($db_conn,$select_INVProductDetails,[$get_returnid]);
                                                                 $count_products_return = mysqli_num_rows($fetch_INVProductDetails);
                                                                 $rd = 0;
                                                                 $TotalAMount123 = 0;
@@ -427,8 +427,8 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                 while ($result_INVProductDetails = mysqli_fetch_array($fetch_INVProductDetails)) {
                                                                     // Product details
                                                                     $InV_Product_ID = $result_INVProductDetails['prid'];
-                                                                    $select_ProductDetails123 = "SELECT * FROM products WHERE id='$InV_Product_ID' LIMIT 1";
-                                                                    $fetch_ProductDetails123 = mysqli_query($db_conn, $select_ProductDetails123);
+                                                                    $select_ProductDetails123 = "SELECT * FROM products WHERE id=? LIMIT 1";
+                                                                    $fetch_ProductDetails123 = db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
                                                                     $result_ProductDetails123 = mysqli_fetch_array($fetch_ProductDetails123);
                                                                     
                                                                     $TotalAMount = $result_INVProductDetails['total'];
@@ -439,13 +439,13 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                 <tr>
                                                                     <th scope="row"><?php echo ++$rd;?></th>
                                                                     <td><?=htmlspecialchars($result_ProductDetails123['productName']);?></td>
-                                                                    <td><?=$result_INVProductDetails['qty'];?></td>
+                                                                    <td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                                     <td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
                                                                     <td align="right"><?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
-                                                                    <td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+                                                                    <td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
                                                                     <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
                                                                     <td>
-                                                                        <a href="cnote_delete.php?returnid=<?=$_REQUEST['returnid'];?>&&rowid=<?=$ItemRowid;?>&&InvoiceID=<?=$InvoiceID;?>&&redirurl=cnote_new&&ActionDel" 
+                                                                        <a href="cnote_delete.php?returnid=<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?=$ItemRowid;?>&&InvoiceID=<?=htmlspecialchars((string)($InvoiceID), ENT_QUOTES, 'UTF-8', false);?>&&redirurl=cnote_new&&ActionDel" 
                                                                            onclick="return confirm('Are you sure you want to remove this item?');">
                                                                             <span class="badge bg-danger">Remove</span>
                                                                         </a>
@@ -475,7 +475,7 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                             <div class="invoice-info">
                                                                 <?php if ($count_products_return > 0) { ?>
                                                                 <form action="cnote_finish.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please confirm the return submission!');">
-                                                                    <input type="hidden" name="returnid" value="<?=$_REQUEST['returnid'];?>"/>
+                                                                    <input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>"/>
                                                                     <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
                                                                     <p class="bold">Subtotal 
@@ -490,7 +490,7 @@ $get_returnid = isset($_REQUEST['returnid']) ? base64_decode($_REQUEST['returnid
                                                                             <?php if ($resultReturnDtails['discount'] == 0) { ?>
                                                                                 <input type="number" onkeyup="totalamount()" id="discount" value="0" min="0" name="discount" required="">
                                                                             <?php } else { ?>
-                                                                                <input type="number" value="<?=$resultReturnDtails['discount'];?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
+                                                                                <input type="number" value="<?=htmlspecialchars((string)($resultReturnDtails['discount']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
                                                                             <?php } ?>
                                                                         </span>
                                                                     </p>

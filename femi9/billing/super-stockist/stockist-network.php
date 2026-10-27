@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $title="Users Network";
@@ -104,20 +104,20 @@ $superstockistid=$Login_user_IDvl;
 <th>District</th>
 </thead>
 <?php 
-$select_product_list12="select * from super_stockiest where temp_id='$superstockistid'";
+$select_product_list12="select * from super_stockiest where temp_id='".db_esc($superstockistid)."'";
 $fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
 while($result_product_list12=mysqli_fetch_array($fetch_product_list12))
 {
 //
 $district_id12=$result_product_list12['district_id'];
-$select_distict12="select * from district where id='$district_id12'";
+$select_distict12="select * from district where id='".db_esc($district_id12)."'";
 $fetch_district12=mysqli_query($db_conn,$select_distict12);
 $result_district12=mysqli_fetch_array($fetch_district12);
 ?>
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list12["name"]);?></td>
-<td><?php echo strtoupper($result_district12['dist_name']);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list12["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_district12['dist_name'])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 </tr>
 </tbody>
 <?php }?>		
@@ -134,7 +134,7 @@ $result_district12=mysqli_fetch_array($fetch_district12);
 </thead>
 
 <?php 
-$select_product_list="select * from stockiest where ss_id='$superstockistid'";
+$select_product_list="select * from stockiest where ss_id='".db_esc($superstockistid)."'";
 				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
@@ -142,13 +142,13 @@ $select_product_list="select * from stockiest where ss_id='$superstockistid'";
 									
 //
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
+$select_distict="select * from district where id='".db_esc($district_id)."'";
 	$fetch_district=mysqli_query($db_conn,$select_distict);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 //
 $taluk_id=$result_product_list['taluk_id'];
-$select_Taluks12="select * from taluk where id='$taluk_id'";
+$select_Taluks12="select * from taluk where id='".db_esc($taluk_id)."'";
 	$fetch_Taluks12=mysqli_query($db_conn,$select_Taluks12);
 	$result_Taluks12=mysqli_fetch_array($fetch_Taluks12);
 $taluk_name=$result_Taluks12['taluk'];
@@ -156,11 +156,11 @@ $taluk_name=$result_Taluks12['taluk'];
 
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list["name"]);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($district_name);?></td>
 <td><?php echo strtoupper($taluk_name);?></td>
 </tr>
-<tr><td colspan="3"><a href="distributor-network.php?superid=<?=$superstockistid;?>&&stockistid=<?=$result_product_list['temp_id'];?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="3"><a href="distributor-network.php?superid=<?=$superstockistid;?>&&stockistid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" title="<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

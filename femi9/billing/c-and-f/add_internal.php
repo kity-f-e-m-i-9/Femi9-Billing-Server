@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 include("config.php"); 
 date_default_timezone_set("Asia/Kolkata");
 ?>
@@ -62,7 +62,7 @@ date_default_timezone_set("Asia/Kolkata");
 									<table class="headertble">
 									<tr>
 									<td>Add Internal Stock Transfer<br/>
-									<h4>(to) <?=$_REQUEST['to_usertype'];?></h4>
+									<h4>(to) <?=htmlspecialchars((string)($_REQUEST['to_usertype']), ENT_QUOTES, 'UTF-8', false);?></h4>
 									</td>
 		<td><a href="manage_internal" title="Manage Internal Stock Transfer">&#9776;</a></td>
 									</tr>
@@ -81,8 +81,8 @@ date_default_timezone_set("Asia/Kolkata");
 									
 <?php if(isset($_REQUEST['InvalidStock'])){?><div class="alert alert-danger">There is no stock for the quantity you entered!</div><?php }?>
 <?php 	 
-$slctcheckstock="select count(*) as numstockcheck from stock where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-$fetch_ProductsPrice=mysqli_query($db_conn,$slctcheckstock);
+$slctcheckstock="select count(*) as numstockcheck from stock where user_type=? and user_id=?";
+$fetch_ProductsPrice=db_q($db_conn,$slctcheckstock,[$Login_user_TYPEvl,$Login_user_IDvl]);
 $Result_ProductsPrice=mysqli_fetch_array($fetch_ProductsPrice);
 if($Result_ProductsPrice['numstockcheck']!=0)
 {
@@ -102,7 +102,7 @@ $tempid="".$randum_number."INTTRNS".$temp_date."".$temp_time."";?>
 <input type="hidden" name="tempid" value="<?=$tempid?>">
 <input type="hidden" name="from_usertype" value="<?=$Login_user_TYPEvl?>">
 <input type="hidden" name="from_userid" value="<?=$Login_user_IDvl?>">
-<input type="hidden" name="to_usertype" value="<?=$_REQUEST['to_usertype'];?>">
+<input type="hidden" name="to_usertype" value="<?=htmlspecialchars((string)($_REQUEST['to_usertype']), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                         <div class="example-content">
@@ -114,7 +114,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintstock").innerHTML=xmlhttp.responseText;}}
-var invuser="<?=$_REQUEST['to_usertype'];?>";
+var invuser="<?=htmlspecialchars((string)($_REQUEST['to_usertype']), ENT_QUOTES, 'UTF-8', false);?>";
 xmlhttp.open("GET","loadstockcheck.php?q="+str + '&invuser='+ invuser,true);
 xmlhttp.send();}
 </script>
@@ -127,19 +127,19 @@ xmlhttp.send();}
 							   if($_REQUEST['to_usertype']=="super_stockiest")
 							   {
 							   $loginuser_state_id=$result_LoGuserDtails['state_id'];
-							   $select_Godown="select * from super_stockiest where state_id='$loginuser_state_id' order by name asc";
+							   $select_Godown="select * from super_stockiest where state_id='".db_esc($loginuser_state_id)."' order by name asc";
 							   }
 							   else
 							   {
 							   $loginuser_DistrictID=$result_LoGuserDtails['district_id'];
-							   $select_Godown="select * from stockiest where district_id='$loginuser_DistrictID' order by name asc";
+							   $select_Godown="select * from stockiest where district_id=? order by name asc";
 							   }
 							   
 							   
-							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
+							   $fetch_Godown=db_q($db_conn,$select_Godown,[$loginuser_DistrictID]);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['temp_id'];?>"><?=strtoupper($result_Godown['name']);?>, <?=$result_Godown['mobile_number'];?></option>
+						  <option value="<?=htmlspecialchars((string)($result_Godown['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_Godown['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_Godown['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>
@@ -167,7 +167,7 @@ flatpickr("#bookingDate", {
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{?>
-<option value="<?=$result_product_list['id'];?>"><?=strtoupper($result_product_list['productName']);?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_product_list['productName'])), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>

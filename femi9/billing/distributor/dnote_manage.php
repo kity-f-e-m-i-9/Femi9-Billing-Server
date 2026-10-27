@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -128,23 +128,23 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-	$select_product_list="select * from user_return_stock where from_usertype='$Login_user_TYPEvl' and from_userid='$Login_user_IDvl' and status='accept' order by id desc";
-	$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+	$select_product_list="select * from user_return_stock where from_usertype=? and from_userid=? and status='accept' order by id desc";
+	$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 	while($result_product_list=mysqli_fetch_array($fetch_product_list))
 	{
 										
 										
 									//INVOICE Number
 									$invid=$result_product_list['invnumber'];
-									$select_userinvoice="select * from user_invoice where inv_id='$invid'";
-									$fetch_userinvoice=mysqli_query($db_conn,$select_userinvoice);
+									$select_userinvoice="select * from user_invoice where inv_id=?";
+									$fetch_userinvoice=db_q($db_conn,$select_userinvoice,[$invid]);
 									$result_userinvoice=mysqli_fetch_array($fetch_userinvoice);
 											
 ?>
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_userinvoice["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_userinvoice["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 
 				<td><?php echo inr_format($result_product_list["total"], 2);?></td>

@@ -74,7 +74,7 @@ function render_geo_filter($layers, $geoNodes, $depthToField) {
             onchange="ordGeoPopulate(<?php echo $_d; ?>, this.value); ordFilterShops();">
         <option value="" hidden>Select <?php echo $_label; ?></option>
         <?php if ($_d === 3): foreach ($geoNodes as $_n): if ((int)$_n['depth'] === 3): ?>
-        <option value="<?php echo $_n['id']; ?>"><?php echo htmlspecialchars($_n['name']); ?></option>
+        <option value="<?php echo htmlspecialchars((string)($_n['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars($_n['name']); ?></option>
         <?php endif; endforeach; endif; ?>
     </select><br/>
 <?php
@@ -224,7 +224,7 @@ function render_geo_filter($layers, $geoNodes, $depthToField) {
                                             <select class="form-control mb-2" id="pr_select" onchange="showOrderPrice(this.value)">
                                                 <option value="" hidden>Select Product</option>
                                                 <?php foreach ($productList as $p): ?>
-                                                <option value="<?=$p['id']?>"><?=htmlspecialchars($p['productName'])?></option>
+                                                <option value="<?=htmlspecialchars((string)($p['id']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars($p['productName'])?></option>
                                                 <?php endforeach; ?>
                                             </select>
 

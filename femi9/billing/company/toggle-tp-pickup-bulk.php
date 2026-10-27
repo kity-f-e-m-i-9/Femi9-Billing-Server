@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('territory_partner');
 require_once __DIR__ . '/../shared/TpCourierPayment.php';
 header('Content-Type: application/json');
 error_reporting(0);

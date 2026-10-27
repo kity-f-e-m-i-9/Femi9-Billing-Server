@@ -28,7 +28,7 @@ $fetch_supersotkist=mysqli_query($db_conn,$select_supersotkist);
 while($result_supersotkist=mysqli_fetch_array($fetch_supersotkist))
 {
 ?>
-<option value="<?=$result_supersotkist['temp_id'];?>"><?=strtoupper($result_supersotkist['name']);?>, <?=$result_supersotkist['mobile_number'];?></option>
+<option value="<?=htmlspecialchars((string)($result_supersotkist['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_supersotkist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_supersotkist['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 <?php } else{?>

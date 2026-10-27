@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('company_profile');
 require_once("include/GodownAccess.php");
 error_reporting(0);
@@ -25,7 +25,7 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	   $fileLogo=$rand_isdLG.$small_LOGO;
                  $uploaddirLG='bussiness_logo/';
                  $uploadfileLG=$uploaddirLG.$fileLogo;
-	   move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
+	   safe_move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
 	   $insfoldernameLG="bussiness_logo/";
 	   $insfilenameLG=$insfoldernameLG.$fileLogo;
 	   
@@ -77,16 +77,16 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	$upinumber=str_replace("'","&#39;",$_REQUEST['upinumber']);
 	$upinumber = RemoveSpecialChar($upinumber);
      	
-	$selectcount="select count(*) as num from company_godown where gname='$gname'";
-	$fetchcount=mysqli_query($db_conn,$selectcount);
+	$selectcount="select count(*) as num from company_godown where gname=?";
+	$fetchcount=db_q($db_conn,$selectcount,[$gname]);
 	$resultcount=mysqli_fetch_array($fetchcount);
 	if($resultcount['num']==0)
 	{
 		$insertrecords="insert into company_godown (gname,address_line1,address_line2,gstin,state,state_code,contact,email,logo,acname,acnumber,
-		bankname,branchname,ifsc,upinumber) values ('$gname','$address_line1','$address_line2',
-		'$gstin','$state','$state_code','$contact','$email','$insfilenameLG',
-		'$acname','$acnumber','$bankname','$branchname','$ifsc','$upinumber')";
-		mysqli_query($db_conn,$insertrecords);
+		bankname,branchname,ifsc,upinumber) values (?,?,?,
+		?,?,?,?,?,?,
+		?,?,?,?,?,?)";
+		db_q($db_conn,$insertrecords,[$gname,$address_line1,$address_line2,$gstin,$state,$state_code,$contact,$email,$insfilenameLG,$acname,$acnumber,$bankname,$branchname,$ifsc,$upinumber]);
 	}
 	echo "<script>window.location='godown?addedsuccess';</script>";
 }
@@ -341,10 +341,10 @@ function validateFileLogo(file) {
                                            
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["gname"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 	<td>
 	<?php if($result_product_list["logo"]!=NULL){?>
-	<img src="<?php echo $result_product_list["logo"];?>" style="width:50px;border:1px solid #999;"/>
+	<img src="<?php echo htmlspecialchars((string)($result_product_list["logo"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:50px;border:1px solid #999;"/>
 	<?php }else{ echo "---";}?>
 	</td>
 																										<td>

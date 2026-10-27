@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Sales BDM's own version of ms-team-shop-view.php — same per-person shop/
 // order stats, but flat (no SM/ASM/DM org-tree) and filtered down to only
 // the marketing staff whose OWN assigned district (marketing_staff_locations,
@@ -81,8 +81,8 @@ if (!empty($allIds)) {
             "SELECT o.ms_id, COUNT(DISTINCT o.shop_id) AS cnt
              FROM ms_orders o JOIN ms_shop s ON s.id = o.shop_id
              WHERE o.ms_id IN ($idList) AND o.new_order='yes'
-                   AND o.order_date BETWEEN '$fromDate' AND '$toDate'
-                   AND DATE(s.created_at) < '$fromDate'
+                   AND o.order_date BETWEEN '".db_esc($fromDate)."' AND '".db_esc($toDate)."'
+                   AND DATE(s.created_at) < '".db_esc($fromDate)."'
              GROUP BY o.ms_id"
         );
         if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['oldshops'] = (int)$r['cnt']; } }
@@ -237,10 +237,10 @@ $kpiNo = array_sum(array_column($rawStats, 'no'));
                                             <td><b><?=htmlspecialchars($row['ms_name'])?></b></td>
                                             <td><span class="tp-tag" style="color:<?=$color?>;background:<?=$color?>1a;"><?=htmlspecialchars($row['level_name'] ?: '-')?></span></td>
                                             <td><?=htmlspecialchars($row['districts'])?></td>
-                                            <td><span class="stat-pill"><?=$sum['shops']?></span></td>
-                                            <td><span class="stat-pill"><?=$sum['oldshops']?></span></td>
-                                            <td><span class="stat-pill"><?=$sum['got']?></span></td>
-                                            <td><span class="stat-pill"><?=$sum['no']?></span></td>
+                                            <td><span class="stat-pill"><?=htmlspecialchars((string)($sum['shops']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                            <td><span class="stat-pill"><?=htmlspecialchars((string)($sum['oldshops']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                            <td><span class="stat-pill"><?=htmlspecialchars((string)($sum['got']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                            <td><span class="stat-pill"><?=htmlspecialchars((string)($sum['no']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
                                             <td><span class="stat-pill"><?=($sum['got'] + $sum['no'])?></span></td>
                                             <td>
                                                 <div class="actions-cell">

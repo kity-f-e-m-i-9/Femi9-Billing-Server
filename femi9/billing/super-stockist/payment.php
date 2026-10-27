@@ -1,10 +1,10 @@
-<?php /*include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; /*include("include/db-connect.php");
 
     // Include the PhonePe API code
 	
 $get_tempid=base64_decode($_REQUEST['tempid']);
-$select_product_list="select * from super_stockiest where temp_id='$get_tempid'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from super_stockiest where temp_id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_tempid]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list); 
    
 $apiKey ='099eb0cd-02cf-4e2a-8aca-3e6c6aff0399';
@@ -110,9 +110,9 @@ $dbname1 = "femi9";
         $transactionId = $res->data->instrumentResponse->transactionId;
 
         $sql = "INSERT INTO paymentdetails (merchantOrderId, amount, merchantTransactionId, merchantUserId, status, transactionId,user_temp_id)
-                VALUES ('$merchantOrderId', $amount, '$merchantTransactionId', '$merchantUserId', '$status', '$transactionId','$get_tempid')";
+                VALUES (?, $amount, ?, ?, ?, ?,?)";
 
-        if ($conn->query($sql) === TRUE) {
+        if (db_q($conn,$sql,[$merchantOrderId,$merchantTransactionId,$merchantUserId,$status,$transactionId,$get_tempid]) === TRUE) {
             // Redirect to the PhonePe payment URL
             header('Location:' . $payUrl);
         } else {

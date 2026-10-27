@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('products_edit');
 
 if (empty($_SESSION['csrf_token'])) {
@@ -18,8 +18,8 @@ if ($_ppcCol && $_ppcCol->num_rows === 0) {
 }
 
 //fetch product details
-$select_product_list="select * from products where id='$prid' and (temp_id not like 'NKS-%' or temp_id is null)";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from products where id=? and (temp_id not like 'NKS-%' or temp_id is null)";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 									$result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -97,13 +97,13 @@ $select_product_list="select * from products where id='$prid' and (temp_id not l
  <?php include("validate-scripts.php");?>                                        
 <form action="product-action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                 <label for="exampleInputEmail1" class="form-label">Product Name</label>
-                                                <input type="text" required="" name="productName" value="<?php echo $result_product_list["productName"]?>" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
+                                                <input type="text" required="" name="productName" value="<?php echo htmlspecialchars((string)($result_product_list["productName"]), ENT_QUOTES, 'ISO-8859-1', false)?>" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
 
 												<?php $_prodCategory = $result_product_list["category"] ?: 'napkin'; ?>
 												<label for="exampleInputEmail1" class="form-label">Product Type</label>
@@ -120,34 +120,34 @@ $select_product_list="select * from products where id='$prid' and (temp_id not l
                                                 </select>
 
 												<label for="exampleInputEmail1" class="form-label">Pieces per Pack <small class="text-muted">(optional)</small></label>
-                                                <input type="number" min="0" name="pieces_per_pack" class="form-control" value="<?=$result_product_list["pieces_per_pack"]?>" onkeypress="restrictnumber(event)" placeholder="e.g. 12">
+                                                <input type="number" min="0" name="pieces_per_pack" class="form-control" value="<?=htmlspecialchars((string)($result_product_list["pieces_per_pack"]), ENT_QUOTES, 'ISO-8859-1', false)?>" onkeypress="restrictnumber(event)" placeholder="e.g. 12">
 
 												<label for="exampleInputEmail1" class="form-label">Packs per Carton <small class="text-muted">(optional)</small></label>
-                                                <input type="number" min="0" name="packs_per_carton" class="form-control" value="<?=$result_product_list["packs_per_carton"]?>" onkeypress="restrictnumber(event)" placeholder="e.g. 60">
+                                                <input type="number" min="0" name="packs_per_carton" class="form-control" value="<?=htmlspecialchars((string)($result_product_list["packs_per_carton"]), ENT_QUOTES, 'ISO-8859-1', false)?>" onkeypress="restrictnumber(event)" placeholder="e.g. 60">
 
 												<label for="exampleInputEmail1" class="form-label">Packs per Cover <small class="text-muted">(optional — dispatch slip marks an order line as a full box once its quantity passes this)</small></label>
                                                 <input type="number" min="0" name="packs_per_cover" class="form-control" value="<?=$result_product_list["packs_per_cover"] ?? ''?>" onkeypress="restrictnumber(event)" placeholder="e.g. 20">
 
 												 <label for="exampleInputEmail1" class="form-label">MRP</label>
-                                                <input value="<?php echo $result_product_list["mrp"]?>" type="number" min="0" max="999" required="" name="mrp" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictnumber(event)">
+                                                <input value="<?php echo htmlspecialchars((string)($result_product_list["mrp"]), ENT_QUOTES, 'ISO-8859-1', false)?>" type="number" min="0" max="999" required="" name="mrp" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictnumber(event)">
 												
 												<label for="exampleInputEmail1" class="form-label">Super Stockist Price</label>
-                                                <input type="number" min="0" max="999" required="" name="supersstock_price" class="form-control" value="<?php echo $result_product_list["supersstock_price"]?>" onkeypress="restrictnumber(event)">
+                                                <input type="number" min="0" max="999" required="" name="supersstock_price" class="form-control" value="<?php echo htmlspecialchars((string)($result_product_list["supersstock_price"]), ENT_QUOTES, 'ISO-8859-1', false)?>" onkeypress="restrictnumber(event)">
 												
 												<label for="exampleInputEmail1" class="form-label">Super Distributor Price</label>
-                                                <input type="number" min="0" max="999" required="" name="super_distributor_price" class="form-control" value="<?php echo $result_product_list["super_distributor_price"]?>" onkeypress="restrictnumber(event)">
+                                                <input type="number" min="0" max="999" required="" name="super_distributor_price" class="form-control" value="<?php echo htmlspecialchars((string)($result_product_list["super_distributor_price"]), ENT_QUOTES, 'ISO-8859-1', false)?>" onkeypress="restrictnumber(event)">
 												
 												<label for="exampleInputEmail1" class="form-label">Stockist Price</label>
-                                                <input type="number" min="0" max="999" required="" name="stockist_price" class="form-control" value="<?php echo $result_product_list["stockist_price"]?>" onkeypress="restrictnumber(event)">
+                                                <input type="number" min="0" max="999" required="" name="stockist_price" class="form-control" value="<?php echo htmlspecialchars((string)($result_product_list["stockist_price"]), ENT_QUOTES, 'ISO-8859-1', false)?>" onkeypress="restrictnumber(event)">
 												
 												<label for="exampleInputEmail1" class="form-label">Distributor Price</label>
-                                                <input type="number" min="0" max="999" required="" name="distributor_price" class="form-control" value="<?php echo $result_product_list["distributor_price"]?>" onkeypress="restrictnumber(event)">
+                                                <input type="number" min="0" max="999" required="" name="distributor_price" class="form-control" value="<?php echo htmlspecialchars((string)($result_product_list["distributor_price"]), ENT_QUOTES, 'ISO-8859-1', false)?>" onkeypress="restrictnumber(event)">
 												
 												<label for="exampleInputEmail1" class="form-label">Shop Price</label>
-                                                <input type="number" min="0" max="999" required="" name="outlet_price" class="form-control" id="exampleInputEmail1" value="<?=$result_product_list["outlet_price"]?>" onkeypress="restrictnumber(event)">
+                                                <input type="number" min="0" max="999" required="" name="outlet_price" class="form-control" id="exampleInputEmail1" value="<?=htmlspecialchars((string)($result_product_list["outlet_price"]), ENT_QUOTES, 'ISO-8859-1', false)?>" onkeypress="restrictnumber(event)">
 												
 												<label>GST(%)</label>
-                                                <input type="number" min="0" max="99" required="" name="gst" class="form-control" value="<?=$result_product_list["gst"]?>" onkeypress="restrictnumber(event)">
+                                                <input type="number" min="0" max="99" required="" name="gst" class="form-control" value="<?=htmlspecialchars((string)($result_product_list["gst"]), ENT_QUOTES, 'ISO-8859-1', false)?>" onkeypress="restrictnumber(event)">
 
 												<label>GST Type</label>
 												<select name="gst_type" class="form-control" required>
@@ -156,10 +156,10 @@ $select_product_list="select * from products where id='$prid' and (temp_id not l
 												</select>
 
 												<label>HSN</label>
-                                                <input type="text" value="<?=$result_product_list["hsn"]?>" required="" name="hsn" class="form-control" onkeypress="restrictHSN(event)">
+                                                <input type="text" value="<?=htmlspecialchars((string)($result_product_list["hsn"]), ENT_QUOTES, 'ISO-8859-1', false)?>" required="" name="hsn" class="form-control" onkeypress="restrictHSN(event)">
 														
 														<label>Points</label>
-														 <input type="text" value="<?=$result_product_list["rwpoints"]?>" maxlength="3" required="" name="rwpoints" class="form-control" onkeypress="restrictfloat(event)">
+														 <input type="text" value="<?=htmlspecialchars((string)($result_product_list["rwpoints"]), ENT_QUOTES, 'ISO-8859-1', false)?>" maxlength="3" required="" name="rwpoints" class="form-control" onkeypress="restrictfloat(event)">
 												<br/>
 												
 												<button type="submit" name="update-product" class="btn btn-primary">Update</button>

@@ -125,7 +125,7 @@ $tempID="".$randum_number."SPDT".$temp_date."".$temp_time."";
 							   $fetch_stcatlist=mysqli_query($db_conn,$select_stcatlist);
 							   while($result_stcatlist=mysqli_fetch_array($fetch_stcatlist))
 							   {?>
-	<option value="<?php echo $result_stcatlist['amount'];?>"><?php echo $result_stcatlist['amount'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_stcatlist['amount']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stcatlist['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 			<br/>	
@@ -195,7 +195,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 	}
 	
 	function getPincode(courseId,scourseID,talukID) {		
-		var usertype="<?=$_REQUEST['usertype'];?>";
+		var usertype="<?=htmlspecialchars((string)($_REQUEST['usertype']), ENT_QUOTES, 'UTF-8', false);?>";
 		var strURL="distributor_find_pincode.php?subcourseID="+courseId+"&techID="+scourseID+"&talukID="+talukID+"&usertype="+usertype;
 		var req = getXMLHTTP();
 		if (req) {
@@ -257,7 +257,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 <?php $selectCountry="select * from country order by id asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>

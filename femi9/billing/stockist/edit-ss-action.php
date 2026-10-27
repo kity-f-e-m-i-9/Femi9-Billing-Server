@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; 
 include("checksession.php");
 include("config.php");
 
@@ -11,7 +11,7 @@ include("RemoveSpecialChar.php");
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     
     $update_id = mysqli_real_escape_string($db_conn, $_REQUEST['update_id']);
-    $old_icon = mysqli_real_escape_string($db_conn, $_REQUEST['old_icon']);
+    $old_icon = mysqli_real_escape_string($db_conn, safe_old_file_param($_REQUEST['old_icon']));
     
     $name = str_replace("'","&#39;", $_REQUEST['name']);
     $name = mysqli_real_escape_string($db_conn, $name);
@@ -73,11 +73,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             
             $uploadfile = $uploaddir . $filename;
             
-            if(move_uploaded_file($_FILES['user_icon']['tmp_name'], $uploadfile)) {
+            if(safe_move_uploaded_file($_FILES['user_icon']['tmp_name'], $uploadfile)) {
                 $insfilename = $uploadfile;
                 
                 // Delete old icon
-                if($old_icon != "Nil" && file_exists($old_icon)) {
+                if(strpos($old_icon, "user_icon/") === 0 && file_exists($old_icon)) {
                     unlink($old_icon);
                 }
             } else {
@@ -92,7 +92,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     
     // FIX: Added gstin to the update query
     $update_ss = "UPDATE distributor SET 
-        user_icon='$insfilename',
+        user_icon='".db_esc($insfilename)."',
         name='$name',
         email='$email',
         mobile_number='$mobile_number',
@@ -104,7 +104,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         taluk_id='$taluk_id',
         pincode_id='$pincode_id',
         gstin='$gstin',
-        shop_onboard='$shop_onboard' 
+        shop_onboard='".db_esc($shop_onboard)."' 
         WHERE id='$update_id'";
     
     // FIX: Check if query executed successfully

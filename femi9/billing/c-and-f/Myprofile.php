@@ -1,29 +1,29 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
 //fetch profile Details
-$selectcoutprofileDetaiils="select * from users_profile where user_tempid='$Login_user_IDvl' and usertype='$Login_user_TYPEvl'";
-$fetchcountprofileDetails=mysqli_query($db_conn,$selectcoutprofileDetaiils);
+$selectcoutprofileDetaiils="select * from users_profile where user_tempid=? and usertype=?";
+$fetchcountprofileDetails=db_q($db_conn,$selectcoutprofileDetaiils,[$Login_user_IDvl,$Login_user_TYPEvl]);
 $resultcountprofileDetails=mysqli_fetch_array($fetchcountprofileDetails);
 
 //---------------------------------------------------------------------------------------
 //user details
-$select_userdetails234="select * from c_and_f where temp_id='$Login_user_IDvl'";
-$fetch_userdetails234=mysqli_query($db_conn,$select_userdetails234);
+$select_userdetails234="select * from c_and_f where temp_id=?";
+$fetch_userdetails234=db_q($db_conn,$select_userdetails234,[$Login_user_IDvl]);
 $result_userdetails234=mysqli_fetch_array($fetch_userdetails234);
 
 //state details
 $state_id=$result_userdetails234['state_id'];
-$select_state_dtails="select * from state where id='$state_id'";
-$fetch_state_dtails=mysqli_query($db_conn,$select_state_dtails);
+$select_state_dtails="select * from state where id=?";
+$fetch_state_dtails=db_q($db_conn,$select_state_dtails,[$state_id]);
 $result_state_dtails=mysqli_fetch_array($fetch_state_dtails);
 $state_name=$result_state_dtails['st_name'];
 
 //district details
 $district_id=$result_userdetails234['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 //-------------------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ if(isset($_REQUEST['updateprofile']))
 	$upinumber=str_replace("'","&#39;",$_REQUEST['upinumber']);
 	
 	//UPLOAD BUSINESS LOGO
-	$old_logo=$_REQUEST['old_logo'];
+	$old_logo=safe_old_file_param($_REQUEST['old_logo']);
 	$small_LOGO= $_FILES['logo']['name'];
 	if($small_LOGO!=NULL)
 	{
@@ -62,7 +62,7 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	   $fileLogo=$rand_isdLG.$small_LOGO;
                  $uploaddirLG='bussiness_logo/';
                  $uploadfileLG=$uploaddirLG.$fileLogo;
-	   move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
+	   safe_move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
 	   $insfoldernameLG="bussiness_logo/";
 	   $insfilenameLG=$insfoldernameLG.$fileLogo;
 	   unlink("bussiness_logo/".$old_logo."");
@@ -72,21 +72,21 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	}else{$insfilenameLG=$old_logo;}
 	//--------------------------------
 	
-	$selectcoutprofile="select count(*) as numprofile from users_profile where user_tempid='$user_tempid' and usertype='$usertype'";
-	$fetchcountprofile=mysqli_query($db_conn,$selectcoutprofile);
+	$selectcoutprofile="select count(*) as numprofile from users_profile where user_tempid=? and usertype=?";
+	$fetchcountprofile=db_q($db_conn,$selectcoutprofile,[$user_tempid,$usertype]);
 	$resultcountprofile=mysqli_fetch_array($fetchcountprofile);
 	if($resultcountprofile['numprofile']==0)
 	{
 	$insertprofile="insert into users_profile (user_tempid,usertype,companyname,deliveryaddress,acname,acnumber,bankname,branchname,ifsc,upinumber,logo) 
-	values ('$user_tempid','$usertype','$companyname','$deliveryaddress','$acname','$acnumber','$bankname',
-	'$branchname','$ifsc','$upinumber','$insfilenameLG')";
-	mysqli_query($db_conn,$insertprofile);
+	values (?,?,?,?,?,?,?,
+	?,?,?,?)";
+	db_q($db_conn,$insertprofile,[$user_tempid,$usertype,$companyname,$deliveryaddress,$acname,$acnumber,$bankname,$branchname,$ifsc,$upinumber,$insfilenameLG]);
 	}else{
 		
-		$updateprofile="update users_profile set usertype='$usertype',
-	companyname='$companyname',deliveryaddress='$deliveryaddress',acname='$acname',acnumber='$acnumber',
-	bankname='$bankname',branchname='$branchname',ifsc='$ifsc',upinumber='$upinumber',logo='$insfilenameLG' where user_tempid='$user_tempid'";
-	mysqli_query($db_conn,$updateprofile);
+		$updateprofile="update users_profile set usertype=?,
+	companyname=?,deliveryaddress=?,acname=?,acnumber=?,
+	bankname=?,branchname=?,ifsc=?,upinumber=?,logo=? where user_tempid=?";
+	db_q($db_conn,$updateprofile,[$usertype,$companyname,$deliveryaddress,$acname,$acnumber,$bankname,$branchname,$ifsc,$upinumber,$insfilenameLG,$user_tempid]);
 		
 	}
 	
@@ -99,7 +99,7 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	$address=str_replace("'","&#39;",$_REQUEST['address']);
 	
 	//upload user icon
-	$old_user_icon=$_REQUEST['old_user_icon'];
+	$old_user_icon=safe_old_file_param($_REQUEST['old_user_icon']);
 	$small_jpg= $_FILES['user_icon']['name'];
 	if($small_jpg!=NULL)
 	{
@@ -115,7 +115,7 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='../company/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 	   unlink("../company/".$old_user_icon."");
@@ -124,8 +124,8 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
 
 	}else{$insfilename=$old_user_icon;}
 	
-	$updateusers="update c_and_f set user_icon='$insfilename',name='$name',email='$email',gstin='$gstin',address='$address' where temp_id='$user_tempid'";
-	mysqli_query($db_conn,$updateusers);
+	$updateusers="update c_and_f set user_icon=?,name=?,email=?,gstin=?,address=? where temp_id=?";
+	db_q($db_conn,$updateusers,[$insfilename,$name,$email,$gstin,$address,$user_tempid]);
 	//-------------------------------------------------------------------
 	
 	
@@ -219,15 +219,15 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
                                             <div class="example-content">
 											
 			<label class="form-label">Candidate Name</label>
-            <input type="text" required="" value="<?=$result_userdetails234['name'];?>" name="name" class="form-control" onkeypress="restrictSpecialChars(event)">
+            <input type="text" required="" value="<?=htmlspecialchars((string)($result_userdetails234['name']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="name" class="form-control" onkeypress="restrictSpecialChars(event)">
 			<br/>
 			
 			<label class="form-label">Candidate Photo</label>
-			<input type="hidden" name="old_user_icon" value="<?=$result_userdetails234['user_icon'];?>">
+			<input type="hidden" name="old_user_icon" value="<?=htmlspecialchars((string)($result_userdetails234['user_icon']), ENT_QUOTES, 'ISO-8859-1', false);?>">
             <input type="file" name="user_icon" class="form-control" id="fileUpload" accept=".jpg, .jpeg, .png">
 			
 			<?php if($result_userdetails234['user_icon']!="Nil"){?>
-			<img src="../company/<?=$result_userdetails234['user_icon'];?>" style="width:150px;margin-bottom:10px;margin-top:10px;"/>
+			<img src="../company/<?=htmlspecialchars((string)($result_userdetails234['user_icon']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;margin-bottom:10px;margin-top:10px;"/>
 			<div style="clear:both;"></div>
 			<?php }?>
 			<br/>
@@ -241,34 +241,34 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
 			<br/>---->
 			
 			<label class="form-label">Mobile Number</label>
-            <input type="text" required="" value="<?=$result_userdetails234['mobile_number'];?>" disabled class="form-control"><br/>
+            <input type="text" required="" value="<?=htmlspecialchars((string)($result_userdetails234['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" disabled class="form-control"><br/>
 			
 			<label class="form-label">Email ID</label>
-            <input type="email" onkeypress="restrictemail(event)" required="" value="<?=$result_userdetails234['email'];?>" name="email" class="form-control">
+            <input type="email" onkeypress="restrictemail(event)" required="" value="<?=htmlspecialchars((string)($result_userdetails234['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="email" class="form-control">
 			<br/>
 			
 			<label class="form-label">GSTIN</label>
-            <input type="text" required="" onkeypress="restrictGSTIN(event)" value="<?=$result_userdetails234['gstin'];?>" name="gstin" class="form-control">
+            <input type="text" required="" onkeypress="restrictGSTIN(event)" value="<?=htmlspecialchars((string)($result_userdetails234['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="gstin" class="form-control">
 			<br/>
 			
 			<label class="form-label">Business Name</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" value="<?=$resultcountprofileDetails['companyname'];?>" name="companyname" class="form-control">
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" value="<?=htmlspecialchars((string)($resultcountprofileDetails['companyname']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="companyname" class="form-control">
 			<br/>
 			
 			<label class="form-label">Business Address</label>
-            <textarea required="" name="address" onkeypress="restrictSpecialChars(event)" class="form-control"><?=$result_userdetails234['address'];?></textarea>
+            <textarea required="" name="address" onkeypress="restrictSpecialChars(event)" class="form-control"><?=htmlspecialchars((string)($result_userdetails234['address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			<label class="form-label">Delivery Address</label>
-            <textarea required="" name="deliveryaddress" onkeypress="restrictSpecialChars(event)" class="form-control"><?=$resultcountprofileDetails['deliveryaddress'];?></textarea>
+            <textarea required="" name="deliveryaddress" onkeypress="restrictSpecialChars(event)" class="form-control"><?=htmlspecialchars((string)($resultcountprofileDetails['deliveryaddress']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			<label class="form-label">Business Logo</label>
-			<input type="hidden" name="old_logo"  value="<?=$resultcountprofileDetails['logo'];?>">
+			<input type="hidden" name="old_logo"  value="<?=htmlspecialchars((string)($resultcountprofileDetails['logo']), ENT_QUOTES, 'ISO-8859-1', false);?>">
             <input type="file" name="logo" class="form-control" id="fileLogo" accept=".jpg, .jpeg, .png">
 			
 			<?php if($resultcountprofileDetails['logo']!="Nil"){?>
-			<img src="<?=$resultcountprofileDetails['logo'];?>" style="width:150px;margin-bottom:10px;margin-top:10px;"/>
+			<img src="<?=htmlspecialchars((string)($resultcountprofileDetails['logo']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;margin-bottom:10px;margin-top:10px;"/>
 			<div style="clear:both;"></div>
 			<?php }?>
 			<br/>
@@ -276,23 +276,23 @@ if($filetype12 != 'image/jpeg' && $filetype12 != 'image/jpg' && $filetype12 != '
 			<h1>Bank Details</h1>
 			
 			<label class="form-label">A/c Name</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="acname" value="<?=$resultcountprofileDetails['acname'];?>" class="form-control"><br/>
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="acname" value="<?=htmlspecialchars((string)($resultcountprofileDetails['acname']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control"><br/>
 			
 			<label class="form-label">A/c Number</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="acnumber" value="<?=$resultcountprofileDetails['acnumber'];?>" class="form-control"><br/>
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="acnumber" value="<?=htmlspecialchars((string)($resultcountprofileDetails['acnumber']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control"><br/>
 			
 			<label class="form-label">Bank Name</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="bankname" value="<?=$resultcountprofileDetails['bankname'];?>" class="form-control"><br/>
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="bankname" value="<?=htmlspecialchars((string)($resultcountprofileDetails['bankname']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control"><br/>
 			
 			<label class="form-label">Branch Name</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="branchname" value="<?=$resultcountprofileDetails['branchname'];?>" class="form-control"><br/>
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="branchname" value="<?=htmlspecialchars((string)($resultcountprofileDetails['branchname']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control"><br/>
 			
 			<label class="form-label">IFS Code</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="ifsc" value="<?=$resultcountprofileDetails['ifsc'];?>" class="form-control">
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="ifsc" value="<?=htmlspecialchars((string)($resultcountprofileDetails['ifsc']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			<br/>
 			
 			<label class="form-label">UPI Number</label>
-            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="upinumber" value="<?=$resultcountprofileDetails['upinumber'];?>" class="form-control"><br/>
+            <input type="text" required="" onkeypress="restrictSpecialChars(event)" name="upinumber" value="<?=htmlspecialchars((string)($resultcountprofileDetails['upinumber']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control"><br/>
 			<br/>
 			
 	<button type="submit" name="updateprofile" class="btn btn-primary">

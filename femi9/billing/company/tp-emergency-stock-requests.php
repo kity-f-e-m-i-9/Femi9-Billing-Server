@@ -136,7 +136,7 @@ $pendingCount = count(getTpEmergencyStockRequests($db_conn, 'pending', 500));
                                     <td style="text-align:right;font-weight:600;"><?=number_format($r['requested_qty']);?></td>
                                     <td style="text-align:right;color:#9ca3af;"><?=number_format($r['cp_available_qty']);?></td>
                                     <td style="max-width:220px;font-size:12.5px;color:#6b7280;"><?=htmlspecialchars($r['note'] ?? '', ENT_QUOTES, 'UTF-8');?></td>
-                                    <td><span class="badge-<?=$r['status'];?>"><?=ucfirst($r['status']);?></span></td>
+                                    <td><span class="badge-<?=htmlspecialchars((string)($r['status']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(ucfirst($r['status'])), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                                     <td class="text-muted" style="font-size:12px;"><?=date('d M Y, h:i A', strtotime($r['created_at']));?></td>
                                     <?php if ($statusFilter === 'pending'): ?>
                                     <td>

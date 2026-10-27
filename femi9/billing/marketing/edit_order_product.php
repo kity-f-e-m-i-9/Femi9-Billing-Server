@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 include("RemoveSpecialChar.php");
 error_reporting(0);
@@ -9,13 +9,13 @@ $manage_title="Manage Orders";
 $message_title="Orders";
 
 $orderid=$_REQUEST['orderid'];
-$select_product_list="select * from ms_orders where order_id='$orderid'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from ms_orders where order_id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$orderid]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 				
 				$shop_id=$result_product_list['shop_id'];
-$select_shopcatt="select * from ms_shop where id='$shop_id'";
-$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
+$select_shopcatt="select * from ms_shop where id=?";
+$fetch_shopcatt=db_q($db_conn,$select_shopcatt,[$shop_id]);
 $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 
 // ── Assign To TP — same firka/district-based matching as add_order.php's
@@ -112,8 +112,8 @@ if(isset($_REQUEST['update_no_order']))
 	$update_orderid=$_POST["update_orderid"];
 
 	//Delete old order details
-    $delete_old_orders="delete from ms_orders where order_id='$update_orderid'";
-	mysqli_query($db_conn,$delete_old_orders);
+    $delete_old_orders="delete from ms_orders where order_id=?";
+	db_q($db_conn,$delete_old_orders,[$update_orderid]);
 
 	$ms_id=$_POST["ms_id"];
 	$order_date=$_POST["order_date"];
@@ -136,7 +136,7 @@ if(isset($_REQUEST['update_no_order']))
 	$tp_id = (int)($_POST["tp_id"] ?? 0);
 	if ($tp_id > 0) {
 		$tp_id_esc = (int)$tp_id;
-		$tpCheck = mysqli_query($db_conn, "select id from territory_partners where id='$tp_id_esc' and is_active=1 limit 1");
+		$tpCheck = mysqli_query($db_conn, "select id from territory_partners where id='".db_esc($tp_id_esc)."' and is_active=1 limit 1");
 		if (!$tpCheck || mysqli_num_rows($tpCheck) === 0) { $tp_id = 0; }
 	}
 	$tp_id_sql = $tp_id > 0 ? "'".$tp_id."'" : "NULL";
@@ -158,16 +158,16 @@ for ($i=0; $i<=$number; $i++)
 	 if($product_id_value!=NULL)
 	 {
 
-$select_count_dist="select count(*) as numShop from ms_orders where order_id='$update_orderid' and pr_id='$product_id_value'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+$select_count_dist="select count(*) as numShop from ms_orders where order_id=? and pr_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$update_orderid,$product_id_value]);
 $result_count_dist=mysqli_fetch_array($fetc_count_dist);
 if($result_count_dist['numShop']==0)
 	{
 	$lat_sql = $edit_latitude  !== null ? $edit_latitude  : "NULL";
 	$lng_sql = $edit_longitude !== null ? $edit_longitude : "NULL";
-        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,latitude,longitude) values ('$update_orderid','$shop_id','$ms_id',$tp_id_sql,'$order_date','yes','nil','$marketing_tool',
-		'$product_id_value','$qty_value',$lat_sql,$lng_sql)";
-		mysqli_query($db_conn,$sql);
+        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,latitude,longitude) values (?,?,?,$tp_id_sql,?,'yes','nil',?,
+		?,?,$lat_sql,$lng_sql)";
+		db_q($db_conn,$sql,[$update_orderid,$shop_id,$ms_id,$order_date,$marketing_tool,$product_id_value,$qty_value]);
 		$insertedLines[] = ['pr_id' => (int)$product_id_value, 'qty' => (int)$qty_value];
 
 	}
@@ -292,9 +292,9 @@ if($result_count_dist['numShop']==0)
 <form method="post" enctype="multipart/form-data" id="editOrderForm" onsubmit="return confirmEditOrderLocation();">
 
 <input type="hidden" name="update_no_order" value="1">
-<input type="hidden" name="update_orderid" value="<?=$orderid;?>">
-<input type="hidden" name="ms_id" value="<?=$result_product_list['ms_id'];?>">
-<input type="hidden" name="order_date" value="<?=$result_product_list['order_date'];?>">
+<input type="hidden" name="update_orderid" value="<?=htmlspecialchars((string)($orderid), ENT_QUOTES, 'UTF-8', false);?>">
+<input type="hidden" name="ms_id" value="<?=htmlspecialchars((string)($result_product_list['ms_id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="order_date" value="<?=htmlspecialchars((string)($result_product_list['order_date']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 <input type="hidden" name="latitude"  id="edit_order_latitude"  value="<?=htmlspecialchars($result_product_list['latitude'] ?? '');?>">
 <input type="hidden" name="longitude" id="edit_order_longitude" value="<?=htmlspecialchars($result_product_list['longitude'] ?? '');?>">
 <div id="editLocationNote" class="text-muted" style="font-size:12.5px;margin-bottom:10px;"></div>
@@ -311,7 +311,7 @@ if($result_count_dist['numShop']==0)
 											<select id="district_filter_select" class="form-control" onchange="onDistrictChange(this.value)">
 												<option value="">All Districts</option>
 												<?php foreach($assignedDistricts as $d): ?>
-												<option value="<?=$d['id']?>"><?=htmlspecialchars($d['name'])?></option>
+												<option value="<?=htmlspecialchars((string)($d['id']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars($d['name'])?></option>
 												<?php endforeach; ?>
 											</select>
 											<br/>
@@ -331,14 +331,14 @@ if($result_count_dist['numShop']==0)
 
 											<label for="exampleInputEmail1" class="form-label">Shop*</label>
     <select name="shop_id" id="shop_select" class="form-control" required="">
-	<option value="<?=$result_shopcatt['id'];?>" hidden=""><?=$result_shopcatt['name'];?></option>
-	<?php $selectShopCat="select * from ms_shop where ms_id='$markeingSTFID' order by id asc";
-	$fetchShopCat=mysqli_query($db_conn,$selectShopCat);
+	<option value="<?=htmlspecialchars((string)($result_shopcatt['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?=htmlspecialchars((string)($result_shopcatt['name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
+	<?php $selectShopCat="select * from ms_shop where ms_id=? order by id asc";
+	$fetchShopCat=db_q($db_conn,$selectShopCat,[$markeingSTFID]);
 	while($resultShopCat=mysqli_fetch_array($fetchShopCat)){?>
-	<option value="<?php echo $resultShopCat['id'];?>"
+	<option value="<?php echo htmlspecialchars((string)($resultShopCat['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"
 		data-district-id="<?=(int)($resultShopCat['district_node_id'] ?? 0)?>"
 		data-taluk-id="<?=(int)($resultShopCat['taluk_node_id'] ?? 0)?>"
-		data-district="<?=htmlspecialchars($resultShopCat['district_name'] ?? '')?>"><?php echo $resultShopCat['name'];?></option>
+		data-district="<?=htmlspecialchars($resultShopCat['district_name'] ?? '')?>"><?php echo htmlspecialchars((string)($resultShopCat['name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	<?php  } ?>
 	</select>
 	<br/>
@@ -364,12 +364,12 @@ if($result_count_dist['numShop']==0)
 
 
 			<label class="form-label">Marketing Tool*</label>
-            <textarea name="marketing_tool" onkeypress="restrictSpecialChars(event)" class="form-control" required=""><?=$result_product_list['marketing_tool'];?></textarea>
+            <textarea name="marketing_tool" onkeypress="restrictSpecialChars(event)" class="form-control" required=""><?=htmlspecialchars((string)($result_product_list['marketing_tool']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>		
 			
 			<?php 
-			 $select_product_listGETD="select * from ms_orders where order_id='$orderid' order by id asc";
-				$fetch_product_listGETD=mysqli_query($db_conn,$select_product_listGETD);
+			 $select_product_listGETD="select * from ms_orders where order_id=? order by id asc";
+				$fetch_product_listGETD=db_q($db_conn,$select_product_listGETD,[$orderid]);
 				$coun_product_listGETD=mysqli_num_rows($fetch_product_listGETD);
 				?>
 			<script>
@@ -427,10 +427,10 @@ function deleteRow(tableID) {
 						<td>&nbsp;</td>
 						 <td>
 							<select name="pr_id[]" class="form-control">
-<option value="<?=$result_product_listGETD['pr_id'];?>" hidden=""><?=$result_PRDetails['productName'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_listGETD['pr_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?=htmlspecialchars((string)($result_PRDetails['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										</td>
 
-<td><input type="number" placeholder="Qty" min="0" value="<?=$result_product_listGETD['qty'];?>" name="qty[]" class="form-control"/>
+<td><input type="number" placeholder="Qty" min="0" value="<?=htmlspecialchars((string)($result_product_listGETD['qty']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="qty[]" class="form-control"/>
 						 </td>
                     </tr>
 				<?php }?>
@@ -446,7 +446,7 @@ function deleteRow(tableID) {
 										while($result_product_list12=mysqli_fetch_array($fetch_product_list12))
 										{
 											?>
-<option value="<?=$result_product_list12['id'];?>"><?=$result_product_list12['productName'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list12['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_product_list12['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 										</td>
 

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 <!DOCTYPE html>
 <html lang="en">
@@ -99,8 +99,8 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 								<?php
 								if($_REQUEST['frdate']!=NULL)
 								{
-						$from_date=$_REQUEST['frdate'];
-						$to_date=$_REQUEST['todate'];
+						$from_date=(preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_REQUEST['frdate'])) ? (string)($_REQUEST['frdate']) : '');
+						$to_date=(preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_REQUEST['todate'])) ? (string)($_REQUEST['todate']) : '');
 								}
 								else
 								{
@@ -142,8 +142,8 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 						// needing company follow-up (the default/"Orders" link's tp_id IS NULL view).
 						$showAllOrders = (($_REQUEST['view'] ?? '') === 'all');
 						//
-						$select_msDetails12="select * from marketing_staff where id='$se_msid'";
-$fetch_msDetails12=mysqli_query($db_conn,$select_msDetails12);
+						$select_msDetails12="select * from marketing_staff where id=?";
+$fetch_msDetails12=db_q($db_conn,$select_msDetails12,[$se_msid]);
 $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 
 // Team-mode header — name of the manager whose subtree this is (always
@@ -164,7 +164,7 @@ if (!empty($se_msids)) {
     $getOrderCount = 0; $noOrderCount = 0;
     $resGN = mysqli_query($db_conn,
         "SELECT new_order, COUNT(DISTINCT order_id) c FROM ms_orders
-         WHERE ms_id IN ($msIdListSql) AND order_date BETWEEN '$from_date' AND '$to_date'
+         WHERE ms_id IN ($msIdListSql) AND order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
          GROUP BY new_order"
     );
     while ($gr = mysqli_fetch_assoc($resGN)) {
@@ -181,7 +181,7 @@ if (!empty($se_msids)) {
     $resAssigned = mysqli_query($db_conn,
         "SELECT COUNT(DISTINCT order_id) c FROM ms_orders
          WHERE ms_id IN ($msIdListSql) AND new_order='yes' AND tp_id IS NOT NULL
-               AND order_date BETWEEN '$from_date' AND '$to_date'"
+               AND order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'"
     );
     $arow = mysqli_fetch_assoc($resAssigned);
     $assignedToTpCount = (int)($arow['c'] ?? 0);
@@ -195,7 +195,7 @@ if (!empty($se_msids)) {
                 SUM(mo.qty * p.outlet_price * (1 - mo.discount_percentage/100)) totalvalue
          FROM ms_orders mo LEFT JOIN products p ON p.id=mo.pr_id
          WHERE mo.ms_id IN ($msIdListSql) AND mo.new_order='yes'
-               AND mo.order_date BETWEEN '$from_date' AND '$to_date'
+               AND mo.order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
          GROUP BY mo.pr_id, p.productName, p.outlet_price ORDER BY totalqty DESC"
     );
     while ($pr = mysqli_fetch_assoc($resPQ)) {
@@ -211,7 +211,7 @@ if (!empty($se_msids)) {
         "SELECT DISTINCT t.invoiced_inv_id
          FROM ms_orders o JOIN tp_orders t ON t.order_id=o.order_id
          WHERE o.ms_id IN ($msIdListSql) AND o.new_order='yes'
-               AND o.order_date BETWEEN '$from_date' AND '$to_date'
+               AND o.order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
                AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''"
     );
     while ($ir = mysqli_fetch_assoc($resInv)) { $invoiceIds[] = $ir['invoiced_inv_id']; }
@@ -296,7 +296,7 @@ if (!empty($se_msids)) {
 									<tr>
 									<td>Marketing Staff > <?php echo $showAllOrders ? 'Total Get Orders (all, incl. TP-assigned)' : 'Product Orders'; ?><?php if ($isTeamMode): ?> &mdash; <?php echo htmlspecialchars($teamRootName ?? 'Team'); ?>'s team (<?php echo count($se_msids); ?>)<?php endif; ?></td>
 									<td>
-									<a href="ms_orders_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=$se_msid;?>&&se_msids=<?=htmlspecialchars(implode(',', $se_msids));?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
+									<a href="ms_orders_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>&&se_msids=<?=htmlspecialchars(implode(',', $se_msids));?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
 									</td>
 									</tr>
 									</table>
@@ -307,7 +307,7 @@ if (!empty($se_msids)) {
 						
 						
 						
-						<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+						<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -337,14 +337,14 @@ if (!empty($se_msids)) {
 <?php if($se_msid==NULL){?>
 <option value="" hidden="">Select</option>
 <?php }else{?>
-<option value="<?=$se_msid;?>" hidden=""><?=strtoupper($result_msDetails12['ms_name']);?>, <?=$result_msDetails12['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=htmlspecialchars((string)(strtoupper($result_msDetails12['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetails12['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 <?php $select_msDetailsOPT="select * from marketing_staff order by ms_name asc";
 $fetch_msDetailsOPT=mysqli_query($db_conn,$select_msDetailsOPT);
 while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 {
 ?>
-<option value="<?=$result_msDetailsOPT['id'];?>"><?=strtoupper($result_msDetailsOPT['ms_name']);?>, <?=$result_msDetailsOPT['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($result_msDetailsOPT['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_msDetailsOPT['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetailsOPT['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 </div>

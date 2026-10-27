@@ -24,7 +24,7 @@ $rowid = $_REQUEST['rowid'] ?? '';
 $rowid_decode = base64_decode($rowid);
 $rowid_decode = mysqli_real_escape_string($db_conn, $rowid_decode);
 
-$redirurl = $_REQUEST['redirurl'] ?? 'cnote_new';
+$redirurl = preg_replace('/[^A-Za-z0-9_\-\/]/', '', (string)($_REQUEST['redirurl'] ?? 'cnote_new'));
 $InvoiceID = $_REQUEST['InvoiceID'] ?? '';
 
 if (empty($returnid_decode) || empty($rowid_decode)) {
@@ -81,9 +81,9 @@ if (!$item_details || empty($item_details['prid'])) {
     error_log("DELETE ITEM ERROR: Item $rowid_decode not found or invalid");
     
     if ($redirurl == "cnote_details") {
-        echo "<script>window.location='cnote_details.php?returnid=$returnid&&error=item_not_found';</script>";
+        echo "<script>window.location='cnote_details.php?returnid=".urlencode($returnid)."&&error=item_not_found';</script>";
     } else {
-        echo "<script>window.location='cnote_new.php?returnid=$returnid&&InvoiceID=$InvoiceID&&error=item_not_found';</script>";
+        echo "<script>window.location='cnote_new.php?returnid=".urlencode($returnid)."&&InvoiceID=".urlencode($InvoiceID)."&&error=item_not_found';</script>";
     }
     exit;
 }
@@ -246,9 +246,9 @@ try {
 |--------------------------------------------------------------------------
 */
 if ($redirurl == "cnote_details") {
-    echo "<script>window.location='cnote_details.php?returnid=$returnid&&DeleteSuccess';</script>";
+    echo "<script>window.location='cnote_details.php?returnid=".urlencode($returnid)."&&DeleteSuccess';</script>";
 } else {
-    echo "<script>window.location='cnote_new.php?returnid=$returnid&&InvoiceID=$InvoiceID&&DeleteSuccess';</script>";
+    echo "<script>window.location='cnote_new.php?returnid=".urlencode($returnid)."&&InvoiceID=".urlencode($InvoiceID)."&&DeleteSuccess';</script>";
 }
 
 exit;

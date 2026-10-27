@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/csv-safe.php'; require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -10,9 +10,9 @@ header("Content-Type: text/csv; charset=UTF-8");
 header("Content-Disposition: attachment; filename=$file");
 
 $output = fopen("php://output", "w");
-fputcsv($output, ['Invoice Number', 'Shop Name', 'Invoice Date', 'Invoice Amount']);
+femi_fputcsv($output, ['Invoice Number', 'Shop Name', 'Invoice Date', 'Invoice Amount']);
 
-$select_product_list="select * from user_invoice where from_user_id='$Login_user_IDvl' and to_user_type='$getinvuser' order by id desc";
+$select_product_list="select * from user_invoice where from_user_id='".db_esc($Login_user_IDvl)."' and to_user_type='".db_esc($getinvuser)."' order by id desc";
 $fetch_product_list=mysqli_query($db_conn,$select_product_list);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {
@@ -23,7 +23,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 	$Cust_Name=$result_Customers['name'];
 	$Cust_Mbile=$result_Customers['mobile_number'];
 
-	fputcsv($output, [
+	femi_fputcsv($output, [
 		$result_product_list["inv_number"],
 		$Cust_Name.' M: '.$Cust_Mbile,
 		date("d/M/Y",strtotime($result_product_list["date"])),

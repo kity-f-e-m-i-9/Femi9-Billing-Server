@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -73,12 +73,12 @@ $i = $start_from;
                                             </thead>
                                             <tbody>
 <?php
-$select_debit = "SELECT * FROM user_return_stock WHERE from_usertype='$Login_user_TYPEvl' AND from_userid='$Login_user_IDvl' AND status='accept' ORDER BY id DESC";
-$fetch_debit = mysqli_query($db_conn, $select_debit);
+$select_debit = "SELECT * FROM user_return_stock WHERE from_usertype=? AND from_userid=? AND status='accept' ORDER BY id DESC";
+$fetch_debit = db_q($db_conn,$select_debit,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while ($result_debit = mysqli_fetch_array($fetch_debit)) {
     $invid = $result_debit['invnumber'];
-    $select_inv = "SELECT * FROM user_invoice WHERE inv_id='$invid'";
-    $result_inv = mysqli_fetch_array(mysqli_query($db_conn, $select_inv));
+    $select_inv = "SELECT * FROM user_invoice WHERE inv_id=?";
+    $result_inv = mysqli_fetch_array(db_q($db_conn,$select_inv,[$invid]));
 ?>
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>

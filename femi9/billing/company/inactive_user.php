@@ -1,9 +1,14 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['dt','sdt','ss','st']);
 
-$user_table=$_REQUEST['usr'];
+$user_table=$_REQUEST['usr'] ?? '';
+// Table name must come from a fixed allowlist - it is concatenated into SQL.
+if (!in_array($user_table, ['c_and_f','distributor','stockiest','super_distributor','super_stockiest'], true)) {
+	http_response_code(400);
+	exit('Invalid request');
+}
 $usrname=base64_decode($_REQUEST['usrname']);
-$back_url=$_REQUEST['backurl'];
-$usrid=base64_decode($_REQUEST['usrid']);
+$back_url=preg_match('/^[A-Za-z0-9_\-\.\/]+$/',(string)($_REQUEST['backurl']??'')) ? $_REQUEST['backurl'] : 'dashboard';
+$usrid=mysqli_real_escape_string($db_conn,base64_decode($_REQUEST['usrid']));
 
 $del_product="UPDATE ".$user_table." SET account_status='deactive' WHERE id='$usrid'";
 mysqli_query($db_conn,$del_product);
@@ -16,12 +21,12 @@ if($user_table=='stockiest')
 	$result_stockist_details=mysqli_fetch_array($fetch_stockist_details);
 	$talukID=$result_stockist_details['taluk_id'];
 	
-	$update_taluk="update taluk set assigned_SID='Nil' where id='$talukID'";
-	mysqli_query($db_conn,$update_taluk);
+	$update_taluk="update taluk set assigned_SID='Nil' where id=?";
+	db_q($db_conn,$update_taluk,[$talukID]);
 }
 //-----------------------------------
 
-$_SESSION['successMessage']="".$_REQUEST['userlabel']." User (".strtoupper($usrname).") Deactivated Success!";
+$_SESSION['successMessage']="".htmlspecialchars((string)($_REQUEST['userlabel']??''),ENT_QUOTES)." User (".htmlspecialchars(strtoupper($usrname),ENT_QUOTES).") Deactivated Success!";
 
 if($back_url=="overallusers")
 {

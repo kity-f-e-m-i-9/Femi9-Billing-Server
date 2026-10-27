@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('partner_location');
 include("config.php");
 include("RemoveSpecialChar.php");
 

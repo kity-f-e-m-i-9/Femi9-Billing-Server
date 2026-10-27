@@ -995,7 +995,7 @@ $business_name        = $business_name ?? 'Femi9 Billing';
 
             $.post('get-bonus-points-details.php', {
                 id: id,
-                csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+                csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
             })
             .done(function (response) {
                 $('#modalContent').html(response);

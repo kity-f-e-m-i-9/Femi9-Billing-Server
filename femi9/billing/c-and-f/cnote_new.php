@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");
@@ -21,8 +21,8 @@ $_SESSION['invuser']=$getinvuser;
 	{
 		
 	//get invoice details
-	$select_invoicedetails="select * from invoice where inv_id='$invid_decode'";
-	$fetch_invoicedetails=mysqli_query($db_conn,$select_invoicedetails);
+	$select_invoicedetails="select * from invoice where inv_id=?";
+	$fetch_invoicedetails=db_q($db_conn,$select_invoicedetails,[$invid_decode]);
 	$result_invoicedtails=mysqli_fetch_array($fetch_invoicedetails);
 	
 	//Return stock send users
@@ -36,8 +36,8 @@ $_SESSION['invuser']=$getinvuser;
 	}else{
 	//ss, stockist, distributor, shop
 	//get invoice details
-	$select_invoicedetails="select * from user_invoice where inv_id='$invid_decode'";
-	$fetch_invoicedetails=mysqli_query($db_conn,$select_invoicedetails);
+	$select_invoicedetails="select * from user_invoice where inv_id=?";
+	$fetch_invoicedetails=db_q($db_conn,$select_invoicedetails,[$invid_decode]);
 	$result_invoicedtails=mysqli_fetch_array($fetch_invoicedetails);
 	
 	//Return stock send users
@@ -108,7 +108,7 @@ $_SESSION['invuser']=$getinvuser;
 									<?php if($getinvuser=="customer"){?>
 		<a href="customer-user-manage-invoice" id="linkbackvl">&#8630;&nbsp;Go Back</a>
 									<?php }else{?>
-		<a href="user-manage-invoice?invuser=<?=$getinvuser;?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+		<a href="user-manage-invoice?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
 									<?php }?>
 									
 								<h1>
@@ -117,8 +117,8 @@ $_SESSION['invuser']=$getinvuser;
 									<td><?=$displaytitle;?>
 									<br/>
 					<div style="font-size:15px;margin-top:10px;">Invoice Number:-</div>
-					<div style="font-size:22px;font-weight:600;color:blue;"><?=$result_invoicedtails['inv_number'];?></div>
-					<div style="font-size:12px;margin-top:5px;"><?=$getinvuser;?></div>
+					<div style="font-size:22px;font-weight:600;color:blue;"><?=htmlspecialchars((string)($result_invoicedtails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
+					<div style="font-size:12px;margin-top:5px;"><?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?></div>
 									</td>
 									<td>&nbsp;</td>
 									</tr>
@@ -160,26 +160,26 @@ $_SESSION['invuser']=$getinvuser;
 		
 		if($getinvuser=="customer")
 	{
-		$select_product_list="select * from invoice_items where inv_id='$invid_decode' order by id asc";
+		$select_product_list="select * from invoice_items where inv_id='".db_esc($invid_decode)."' order by id asc";
 	}else{
-		$select_product_list="select * from user_invoice_items where inv_id='$invid_decode' order by id asc";
+		$select_product_list="select * from user_invoice_items where inv_id=? order by id asc";
 	}
-		$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+		$fetch_product_list=db_q($db_conn,$select_product_list,[$invid_decode]);
 		while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 											$product_id=$result_product_list["pr_id"];
 											
 											//get product dtails
-		$select_prdetails="select * from products where id='$product_id'";
-	$fetch_prdetails=mysqli_query($db_conn,$select_prdetails);
+		$select_prdetails="select * from products where id=?";
+	$fetch_prdetails=db_q($db_conn,$select_prdetails,[$product_id]);
 	$result_prdetails=mysqli_fetch_array($fetch_prdetails);
 	$productname=$result_prdetails['productName'];
 	
 											?>
                                                 <tr>
 													<td><?php echo $productname;?></td>
-                                                    <td><?php echo $result_product_list["qty"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["qty"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                 </tr>
                                            
 										<?php }?>
@@ -211,8 +211,8 @@ $return_id="".$randum_number."RTN".$temp_date."".$temp_time."";
 }else{$return_id=$get_returnid;}
 ?>
 
-<input type="hidden" name="returnid" value="<?=$return_id;?>">
-<input type="hidden" name="invid" value="<?=$invid_decode;?>">
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($return_id), ENT_QUOTES, 'UTF-8', false);?>">
+<input type="hidden" name="invid" value="<?=htmlspecialchars((string)($invid_decode), ENT_QUOTES, 'UTF-8', false);?>">
 						
 <input type="hidden" name="from_usertype" value="<?=$fromusertype;?>">
 <input type="hidden" name="from_userid" value="<?=$fromuserid;?>">
@@ -226,22 +226,22 @@ $return_id="".$randum_number."RTN".$temp_date."".$temp_time."";
 <?php 
 if($getinvuser=="customer")
 	{
-		$select_product_list12="select * from invoice_items where inv_id='$invid_decode' order by id asc";
+		$select_product_list12="select * from invoice_items where inv_id='".db_esc($invid_decode)."' order by id asc";
 	}else{
-$select_product_list12="select * from user_invoice_items where inv_id='$invid_decode' order by id asc";
+$select_product_list12="select * from user_invoice_items where inv_id=? order by id asc";
 	}
-		$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
+		$fetch_product_list12=db_q($db_conn,$select_product_list12,[$invid_decode]);
 		while($result_product_list12=mysqli_fetch_array($fetch_product_list12))
 										{
 											
 										$product_idshow=$result_product_list12["pr_id"];
 										
-$select_product_list="select * from products where id='$product_idshow'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from products where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$product_idshow]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 										?>
-<option value="<?=$result_product_list['id'];?>"><?=$result_product_list['productName'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_product_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 										<?php }?>
 </select>
@@ -265,8 +265,8 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 <!----------------------------------------------------------------------------->		
 		
 		<?php 
-		$select_InvoieDetails234="select * from user_return_stock where returnid='$get_returnid'";
-		$fetch_InvoieDetails234=mysqli_query($db_conn,$select_InvoieDetails234);
+		$select_InvoieDetails234="select * from user_return_stock where returnid=?";
+		$fetch_InvoieDetails234=db_q($db_conn,$select_InvoieDetails234,[$get_returnid]);
 		$resultReturnDtails=mysqli_fetch_array($fetch_InvoieDetails234);
 		?>
 		
@@ -289,16 +289,16 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
                                                     </thead>
                                                     <tbody>
 													<?php
-	$select_INVProductDetails="select * from user_return_stock_items where returnid='$get_returnid' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_return_stock_items where returnid=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$get_returnid]);
 	$count_products_return=mysqli_num_rows($fetch_INVProductDetails);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['prid'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		$TotalAMount=$result_INVProductDetails['total'];
@@ -308,14 +308,14 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 	?>
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
-<td><?=$result_ProductDetails123['productName'];?></td>
-<td><?=$result_INVProductDetails['qty'];?></td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td align="right"><?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
-<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
-<a href="cnote_delete.php?returnid=<?=$_REQUEST['returnid'];?>&&rowid=<?=$ItemRowid;?>&&InvoiceID=<?=$InvoiceID;?>&&redirurl=cnote_new&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="cnote_delete.php?returnid=<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?=$ItemRowid;?>&&InvoiceID=<?=htmlspecialchars((string)($InvoiceID), ENT_QUOTES, 'UTF-8', false);?>&&redirurl=cnote_new&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>
                                                         </tr>
                                                         
@@ -347,7 +347,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 												<?php if($count_products_return>0){?>
 												
 <form action="cnote_finish.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
-<input type="hidden" name="returnid" value="<?=$_REQUEST['returnid'];?>"/>
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
 
@@ -360,7 +360,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 		   <?php if($resultReturnDtails['discount']==0){?>
 		  <input type="number" onkeyup="totalamount()" id="discount" value="0" min="0" name="discount" required="">
 		   <?php }else{ ?>
-		   <input type="number" value="<?=$resultReturnDtails['discount'];?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
+		   <input type="number" value="<?=htmlspecialchars((string)($resultReturnDtails['discount']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
 		   <?php }?>
 		 </span></p>
 													<br/>

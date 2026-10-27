@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('demo_free');
 $canEditDemoFree = hasPermission('demo_free_edit');
 include("config.php");
@@ -104,7 +104,7 @@ $to_date=date("Y-m-d");
 $from_date = date ("Y-m-d", strtotime("-2 days", strtotime($to_date)));
 						}
 ?>
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -163,7 +163,7 @@ $i= $start_from;
 				<?php $select_prdetails_header="select * from `products` order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 													<th>Details</th>
 													<th>Actions</th>
@@ -172,21 +172,21 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-									$select_product_list12="select distinct`tempid` from `demofreedamage` where usertype='$Login_user_TYPEvl' and date between '$from_date' and '$to_date'";
-										$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
+									$select_product_list12="select distinct`tempid` from `demofreedamage` where usertype=? and date between ? and ?";
+										$fetch_product_list12=db_q($db_conn,$select_product_list12,[$Login_user_TYPEvl,$from_date,$to_date]);
 										while($ResultRecords12=mysqli_fetch_array($fetch_product_list12))
 										{
 											
 											$tempid=$ResultRecords12["tempid"];
 											
-										$select_product_list="select * from demofreedamage where tempid='$tempid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										$select_product_list="select * from demofreedamage where tempid=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 										$ResultRecords=mysqli_fetch_array($fetch_product_list);
 											
 											//product details
 											$product_id=$ResultRecords['product_id'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						//SEND FROM
@@ -198,10 +198,10 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?php echo $result_godowndetails["gname"];?></td>
-													<td><?php echo $ResultRecords["category"];?></td>
+													<td><?php echo htmlspecialchars((string)($result_godowndetails["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($ResultRecords["category"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo date("d/M/Y",strtotime($ResultRecords["date"]));?></td>
-                    <td><?php echo $ResultRecords["remarks"];?></td>
+                    <td><?php echo htmlspecialchars((string)($ResultRecords["remarks"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<!------------------------PRODUCT WISE SALES QTY------------------------------->
 				<?php $select_prdetails_header="select * from `products` order by `id` asc";
@@ -211,8 +211,8 @@ $i= $start_from;
 					$prid_header=$result_prdetails_header['id'];
 					
 					//SALES QTY
-					$select_SUM_QTY="select qty from demofreedamage where tempid='$tempid' and product_id='$prid_header'";
-					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
+					$select_SUM_QTY="select qty from demofreedamage where tempid=? and product_id=?";
+					$fetch_SUM_QTY=db_q($db_conn,$select_SUM_QTY,[$tempid,$prid_header]);
 					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
 					if($result_SUM_QTY['qty']!=NULL){ $slsqty=$result_SUM_QTY['qty'];} else{ $slsqty="0";}
 					

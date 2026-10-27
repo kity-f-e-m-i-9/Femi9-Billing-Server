@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
@@ -9,8 +9,8 @@ if (!is_godown_allowed($db_conn, (int)$prid)) {
 	header("Location: godown?unauthorized"); exit;
 }
 
-$select_product_list="select * from company_godown where id='$prid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from company_godown where id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 										$result_product_list=mysqli_fetch_array($fetch_product_list);
 							
 include("RemoveSpecialChar.php");
@@ -63,7 +63,7 @@ if(isset($_REQUEST['add-godown']))
 	$upinumber = RemoveSpecialChar($upinumber);
 	
 	//UPLOAD BUSINESS LOGO
-	$old_logo=$_REQUEST['old_logo'];
+	$old_logo=safe_old_file_param($_REQUEST['old_logo']);
 	$small_LOGO= $_FILES['logo']['name'];
 	if($small_LOGO!=NULL)
 	{
@@ -82,7 +82,7 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
                  $uploaddirLG=__DIR__.'/bussiness_logo/';
                  if(!is_dir($uploaddirLG)) mkdir($uploaddirLG, 0755, true);
                  $uploadfileLG=$uploaddirLG.$fileLogo;
-	   move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
+	   safe_move_uploaded_file($_FILES['logo']['tmp_name'],$uploadfileLG);
 	   $insfilenameLG="bussiness_logo/".$fileLogo;
 	   if($old_logo!=NULL && file_exists($old_logo)) unlink($old_logo);
 	   
@@ -91,12 +91,12 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 	}else{$insfilenameLG=$old_logo;}
 	//--------------------------------
 	
-		$insertrecords="update company_godown set gname='$gname',address_line1='$address_line1',
-		address_line2='$address_line2',gstin='$gstin',state='$state',state_code='$state_code',
-		contact='$contact',email='$email',logo='$insfilenameLG',
-		acname='$acname',acnumber='$acnumber',bankname='$bankname',
-		branchname='$branchname',ifsc='$ifsc',upinumber='$upinumber' where id='$updateid'";
-		mysqli_query($db_conn,$insertrecords);
+		$insertrecords="update company_godown set gname=?,address_line1=?,
+		address_line2=?,gstin=?,state=?,state_code=?,
+		contact=?,email=?,logo=?,
+		acname=?,acnumber=?,bankname=?,
+		branchname=?,ifsc=?,upinumber=? where id=?";
+		db_q($db_conn,$insertrecords,[$gname,$address_line1,$address_line2,$gstin,$state,$state_code,$contact,$email,$insfilenameLG,$acname,$acnumber,$bankname,$branchname,$ifsc,$upinumber,$updateid]);
 
 	echo "<script>window.location='godown?updatedSuccess';</script>";
 }
@@ -177,74 +177,74 @@ if($filetype != 'image/jpeg' && $filetype != 'image/jpg' && $filetype != 'image/
 									
  <?php include("validate-scripts.php");?>                                      
 <form method="post" enctype="multipart/form-data">
-<input type="hidden" name="updateid" value="<?=$prid;?>">
+<input type="hidden" name="updateid" value="<?=htmlspecialchars((string)($prid), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                 
 												<label class="form-label">Company Profile Name</label>
-                                                <input type="text" required="" onkeypress="restrictSpecialChars(event)" value="<?=$result_product_list['gname'];?>" name="gname" class="form-control">
+                                                <input type="text" required="" onkeypress="restrictSpecialChars(event)" value="<?=htmlspecialchars((string)($result_product_list['gname']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="gname" class="form-control">
 												<br/>
 												
 												
 												<label class="form-label">Business Logo</label>
-			<input type="hidden" name="old_logo"  value="<?=$result_product_list['logo'];?>">
+			<input type="hidden" name="old_logo"  value="<?=htmlspecialchars((string)($result_product_list['logo']), ENT_QUOTES, 'ISO-8859-1', false);?>">
             <input type="file" name="logo" class="form-control" id="fileLogo" accept=".jpg, .jpeg, .png">
 			
 			<?php if($result_product_list['logo']!=NULL){?>
-			<img src="<?=$result_product_list['logo'];?>" style="width:100px;margin-bottom:10px;margin-top:10px;"/>
+			<img src="<?=htmlspecialchars((string)($result_product_list['logo']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:100px;margin-bottom:10px;margin-top:10px;"/>
 			<div style="clear:both;"></div>
 			<?php }?>
 			<br/>
 			
 			
 												<label class="form-label">Address Line-1</label>
-                               <input type="text" required="" name="address_line1" value="<?=$result_product_list['address_line1'];?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+                               <input type="text" required="" name="address_line1" value="<?=htmlspecialchars((string)($result_product_list['address_line1']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 												<br/>
 												<label class="form-label">Address Line-2</label>
-                               <input type="text" required="" name="address_line2" value="<?=$result_product_list['address_line2'];?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+                               <input type="text" required="" name="address_line2" value="<?=htmlspecialchars((string)($result_product_list['address_line2']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 												<br/>
 												<label class="form-label">GSTIN</label>
-                               <input type="text" required="" name="gstin" value="<?=$result_product_list['gstin'];?>" class="form-control" maxlength="15" onkeypress="restrictGSTIN(event)">
+                               <input type="text" required="" name="gstin" value="<?=htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" maxlength="15" onkeypress="restrictGSTIN(event)">
 												<br/>
 												<label class="form-label">State Name</label>
-                               <input type="text" required="" name="state" value="<?=$result_product_list['state'];?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+                               <input type="text" required="" name="state" value="<?=htmlspecialchars((string)($result_product_list['state']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 												<br/>
 												<label class="form-label">State Code</label>
-												<input type="number" min="0" max="99" required="" onkeypress="restrictnumber(event)" name="state_code" class="form-control" value="<?=$result_product_list['state_code'];?>">
+												<input type="number" min="0" max="99" required="" onkeypress="restrictnumber(event)" name="state_code" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['state_code']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												<label class="form-label">Contact Number</label>
-												 <input type="text" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" required="" name="contact" class="form-control" value="<?=$result_product_list['contact'];?>">
+												 <input type="text" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" required="" name="contact" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['contact']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												 
 												<br/>
 												<label class="form-label">Email ID</label>
-												<input value="<?=$result_product_list['email'];?>" type="text" required="" onkeypress="restrictemail(event)" name="email" class="form-control">
+												<input value="<?=htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" type="text" required="" onkeypress="restrictemail(event)" name="email" class="form-control">
 												<br/>
 												
 												<h1>Bank Details</h1>
 			
 			<label class="form-label">A/c Name*</label>
-            <input type="text" value="<?=$result_product_list['acname'];?>" required="" onkeypress="restrictSpecialChars(event)" name="acname" class="form-control">
+            <input type="text" value="<?=htmlspecialchars((string)($result_product_list['acname']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" onkeypress="restrictSpecialChars(event)" name="acname" class="form-control">
 			<br/>
 			
 			<label class="form-label">A/c Number*</label>
-            <input type="text" value="<?=$result_product_list['acnumber'];?>" required="" onkeypress="restrictSpecialChars(event)" name="acnumber" class="form-control">
+            <input type="text" value="<?=htmlspecialchars((string)($result_product_list['acnumber']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" onkeypress="restrictSpecialChars(event)" name="acnumber" class="form-control">
 			<br/>
 			
 			<label class="form-label">Bank Name*</label>
-            <input type="text" value="<?=$result_product_list['bankname'];?>" required="" onkeypress="restrictSpecialChars(event)" name="bankname" class="form-control">
+            <input type="text" value="<?=htmlspecialchars((string)($result_product_list['bankname']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" onkeypress="restrictSpecialChars(event)" name="bankname" class="form-control">
 			<br/>
 			
 			<label class="form-label">Branch Name*</label>
-            <input type="text" value="<?=$result_product_list['branchname'];?>" required="" onkeypress="restrictSpecialChars(event)" name="branchname" class="form-control">
+            <input type="text" value="<?=htmlspecialchars((string)($result_product_list['branchname']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" onkeypress="restrictSpecialChars(event)" name="branchname" class="form-control">
 			<br/>
 			
 			<label class="form-label">IFS Code*</label>
-            <input type="text" value="<?=$result_product_list['ifsc'];?>" required="" onkeypress="restrictSpecialChars(event)" name="ifsc" class="form-control">
+            <input type="text" value="<?=htmlspecialchars((string)($result_product_list['ifsc']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" onkeypress="restrictSpecialChars(event)" name="ifsc" class="form-control">
 			<br/>
 			
 			<label class="form-label">UPI Number*</label>
-            <input type="text" value="<?=$result_product_list['upinumber'];?>" required="" onkeypress="restrictSpecialChars(event)" name="upinumber" class="form-control">
+            <input type="text" value="<?=htmlspecialchars((string)($result_product_list['upinumber']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" onkeypress="restrictSpecialChars(event)" name="upinumber" class="form-control">
 			<br/>
 												
 												<button type="submit" name="add-godown" class="btn btn-primary">

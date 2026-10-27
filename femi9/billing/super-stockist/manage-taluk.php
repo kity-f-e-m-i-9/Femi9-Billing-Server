@@ -1,4 +1,4 @@
-<?php include("checksession.php"); include("config.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); include("config.php");
 
 $title="Manage Taluk";
 $add_url="add-taluk.php";
@@ -106,8 +106,8 @@ $i= $start_from;
                                             </thead>
 											 <tbody>
 <?php 
-$select_product_list="select * from taluk where usertype='$Login_user_TYPEvl' and userid='$Login_user_IDvl' order by id asc";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from taluk where usertype=? and userid=? order by id asc";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {
 											$district_id=$result_product_list['dist_id'];
@@ -123,7 +123,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo $district_name;?></td>
-													<td><?php echo $result_product_list['taluk'];?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
 													<a href="edit-taluk.php?prid=<?php echo $row_id;?>"><img src="../../assets/images/edit-32.png"/></a>
 													</td>

@@ -162,7 +162,7 @@ if ($_r2) { while ($row = mysqli_fetch_assoc($_r2)) { $ssList[] = $row; } }
                                                 </td>
                                                 <td>
                                                     <button class="btn-remap"
-                                                        onclick="openRemap(<?= $tp['id'] ?>, '<?= htmlspecialchars(addslashes($tp['tp_name'])) ?>', '<?= htmlspecialchars($tp['tp_code']) ?>', '<?= htmlspecialchars(addslashes($tp['ss_name'] ?? 'Company (Direct)')) ?>')">
+                                                        onclick="openRemap(<?= htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false) ?>, '<?= htmlspecialchars(addslashes($tp['tp_name'])) ?>', '<?= htmlspecialchars($tp['tp_code']) ?>', '<?= htmlspecialchars(addslashes($tp['ss_name'] ?? 'Company (Direct)')) ?>')">
                                                         Remap
                                                     </button>
                                                 </td>

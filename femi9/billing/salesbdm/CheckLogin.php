@@ -40,6 +40,31 @@ function checkLoginRateLimit($key, $maxAttempts = 5, $timeWindow = 900) {
     return true;
 }
 
+
+// Function to record a failed attempt (without this the limiter never triggers)
+function recordFailedAttempt($key) {
+    $rateLimitFile = __DIR__ . '/logs/login_rate_limit.json';
+    $fp = @fopen($rateLimitFile, 'c+');
+    if (!$fp) { return; }
+    if (flock($fp, LOCK_EX)) {
+        $raw = stream_get_contents($fp);
+        $rateLimits = json_decode($raw ?: '[]', true);
+        if (!is_array($rateLimits)) { $rateLimits = []; }
+        $now = time();
+        foreach ($rateLimits as $k => $v) {            // drop stale entries
+            if (($now - ($v['time'] ?? 0)) > 3600) { unset($rateLimits[$k]); }
+        }
+        $count = ($rateLimits[$key]['count'] ?? 0) + 1;
+        $rateLimits[$key] = ['count' => $count, 'time' => $now];
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($rateLimits));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+    }
+    fclose($fp);
+}
+
 // Check if form was submitted
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['login'])) {
     header('Location: index.php');
@@ -94,6 +119,7 @@ try {
     // Check if user exists
     if (!$user) {
         logLoginAttempt($mobileNumber, false, 'User not found');
+        recordFailedAttempt($rateLimitKey);
         // Don't reveal if user exists or not (security best practice)
         throw new Exception('Invalid mobile number or password');
     }
@@ -104,13 +130,14 @@ try {
         throw new Exception('Your account is inactive. Please contact support.');
     }
 
-    // Verify password — sales_bdm_staff.password is always plaintext by
-    // design (every Sales BDM gets the fixed "salesbdm@123" on creation),
-    // so a direct comparison is enough — no encrypt/decrypt round-trip needed.
-    $isPasswordValid = ($password === $user['password']);
+    // Verify password — hashed (bcrypt); legacy plain-text rows are accepted
+    // once and re-stored as a hash on this successful login.
+    require_once __DIR__ . '/../shared/PasswordService.php';
+    $isPasswordValid = femi_password_verify($db_conn, $password, (string)$user['password'], 'sales_bdm_staff', 'id', $user['id']);
 
     if (!$isPasswordValid) {
         logLoginAttempt($mobileNumber, false, 'Invalid password');
+        recordFailedAttempt($rateLimitKey);
         throw new Exception('Invalid mobile number or password');
     }
 
@@ -127,13 +154,7 @@ try {
     mysqli_stmt_close($stmtAdmin);
 
     if ($adminUser) {
-        require_once __DIR__ . '/../shared/EncryptionService.php';
-        $encryption = new EncryptionService();
-        try {
-            $companyPasswordValid = ($password === $encryption->decrypt($adminUser['password']));
-        } catch (Exception $e) {
-            $companyPasswordValid = ($password === $adminUser['password']);
-        }
+        $companyPasswordValid = femi_password_check($password, (string)$adminUser['password'])['valid'];
         if ($companyPasswordValid) {
             session_regenerate_id(true);
             $_SESSION['pending_switch_bdm_id'] = $user['id'];

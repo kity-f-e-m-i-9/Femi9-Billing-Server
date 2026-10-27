@@ -1,10 +1,10 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 error_reporting(0);
 
 // Include session check
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('report');
 include("config.php");
 
 $Report_LABLE="Onboarded Count";
@@ -41,7 +41,7 @@ $file = "".$Report_LABLE."-".$DISPLAY_LABLE."-".$from_date."(to)".$to_date.".csv
 
 											
 // Fetch product data from database
-$select_records = "select * from ".$tablename." where valid_from between '$from_date' and '$to_date' order by id asc";
+$select_records = "select * from ".$tablename." where valid_from between '".db_esc($from_date)."' and '".db_esc($to_date)."' order by id asc";
 $fetch_records = mysqli_query($db_conn, $select_records);
 
 // Initialize CSV content
@@ -55,8 +55,8 @@ while ($result_product_list = mysqli_fetch_array($fetch_records)) {
 	
 	
 	$district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 				

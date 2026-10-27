@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -19,8 +19,8 @@ $tempid=$_REQUEST['tempid'];
 	$login_usertype=$Result_Log_users_Dtails134['usertype'];
 	$usertype=$_REQUEST['usertype'];
 		
-	$selectcount="select count(*) as num from top_performar where tempid='$tempid'";
-	$fetchcount=mysqli_query($db_conn,$selectcount);
+	$selectcount="select count(*) as num from top_performar where tempid=?";
+	$fetchcount=db_q($db_conn,$selectcount,[$tempid]);
 	$resultcount=mysqli_fetch_array($fetchcount);
 	if($resultcount['num']==0)
 	{
@@ -35,7 +35,7 @@ $DATETIME_PRPH4=date("YmdHis");
 $filename_PRPH4="TPRFMS".$DATETIME_PRPH4."".$tempid.".".$file_extension_PRPH4."";
 $uploaddir_PRPH4='top_performers_photo/';
 $uploadfile_PRPH4=$uploaddir_PRPH4.$filename_PRPH4;
-move_uploaded_file($_FILES['per_photo']['tmp_name'],$uploadfile_PRPH4);
+safe_move_uploaded_file($_FILES['per_photo']['tmp_name'],$uploadfile_PRPH4);
    
 }
 else
@@ -45,9 +45,9 @@ else
 	
 	
 		$insertrecords="insert into top_performar (tempid,usertype,particulars,per_photo,posted_date,login_username,login_usertype) values 
-		('$tempid','$usertype','$particulars','$filename_PRPH4','$posted_date',
-		'$login_username','$login_usertype')";
-		mysqli_query($db_conn,$insertrecords);
+		(?,?,?,?,?,
+		?,?)";
+		db_q($db_conn,$insertrecords,[$tempid,$usertype,$particulars,$filename_PRPH4,$posted_date,$login_username,$login_usertype]);
 	}
 	echo "<script>window.location='performers_manage?addedsuccess';</script>";
 }

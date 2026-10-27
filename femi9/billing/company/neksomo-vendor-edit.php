@@ -84,7 +84,7 @@ if (!$vendor) {
                                     <?php if (isset($_REQUEST['error'])) { ?><div class="alert alert-danger">Something went wrong. Please try again.</div><?php } ?>
 
 <form action="neksomo-vendor-action.php" method="post">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 <input type="hidden" name="action" value="update-vendor">
 <input type="hidden" name="vendor_id" value="<?php echo (int)$vendor['id']; ?>">
 

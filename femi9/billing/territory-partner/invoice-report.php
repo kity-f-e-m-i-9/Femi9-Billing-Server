@@ -227,7 +227,7 @@ $exportQuery = http_build_query([
                                 <span class="kpi-icon-chip chip-indigo"><i class="material-icons-outlined">receipt_long</i></span>
                                 <div class="kpi-title">Total Invoices</div>
                                 <div class="kpi-value"><?php echo count($filtered); ?></div>
-                                <div class="kpi-sub"><?php echo $shop_count; ?> shop &middot; <?php echo $cust_count; ?> customer</div>
+                                <div class="kpi-sub"><?php echo htmlspecialchars((string)($shop_count), ENT_QUOTES, 'UTF-8', false); ?> shop &middot; <?php echo htmlspecialchars((string)($cust_count), ENT_QUOTES, 'UTF-8', false); ?> customer</div>
                             </div>
                         </div>
                         <div class="col-xl-3 col-md-6 col-6 mb-3">
@@ -271,7 +271,7 @@ $exportQuery = http_build_query([
                                 <div class="card-header">
                                     <span class="hdr-icon chip-indigo"><i class="material-icons-outlined">receipt_long</i></span>
                                     <h5 class="card-title">Invoices : <?php echo date('d-M-Y', strtotime($from)); ?> to <?php echo date('d-M-Y', strtotime($to)); ?></h5>
-                                    <a href="invoice-report-export.php?<?php echo $exportQuery; ?>" class="view-btn" style="margin-left:auto;background:var(--green-soft);color:var(--green);">
+                                    <a href="invoice-report-export.php?<?php echo htmlspecialchars((string)($exportQuery), ENT_QUOTES, 'UTF-8', false); ?>" class="view-btn" style="margin-left:auto;background:var(--green-soft);color:var(--green);">
                                         <i class="material-icons-outlined">file_download</i> Export Excel
                                     </a>
                                 </div>
@@ -304,7 +304,7 @@ $exportQuery = http_build_query([
                                             <tr>
                                                 <td><?php echo date('d-m-Y', strtotime($inv['date'])); ?></td>
                                                 <td><b><?php echo htmlspecialchars($inv['inv_no']); ?></b></td>
-                                                <td><span class="badge-kind <?php echo $inv['kind']; ?>"><?php echo $inv['kind'] === 'shop' ? 'Shop' : 'Customer'; ?></span></td>
+                                                <td><span class="badge-kind <?php echo htmlspecialchars((string)($inv['kind']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo $inv['kind'] === 'shop' ? 'Shop' : 'Customer'; ?></span></td>
                                                 <td><?php echo htmlspecialchars(ucwords($inv['party'])); ?></td>
                                                 <td><?php echo htmlspecialchars($inv['mobile']); ?></td>
                                                 <td>&#x20B9;<?php echo inr_format($inv['total'], 2); ?></td>

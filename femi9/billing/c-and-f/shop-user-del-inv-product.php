@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 if(isset($_REQUEST['inv_id']))
@@ -10,8 +10,8 @@ if(isset($_REQUEST['inv_id']))
 	$rowid_encode=$_REQUEST['rowid'];
 	$rowid_decode=base64_decode($rowid_encode);
 	
-	$select_INVProductDetails="select * from user_invoice_items where id='$rowid_decode'";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_invoice_items where id=?";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$rowid_decode]);
 	$result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails);
 	if($result_INVProductDetails['pr_id']!=NULL)
 	{
@@ -22,23 +22,23 @@ if(isset($_REQUEST['inv_id']))
 		//------------------------------
 		//2. stock increment to distributor
 		//------------------------------
-		$select_stockDetails="select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
+		$select_stockDetails="select * from stock where product_id=? and user_type=? and user_id=?";
+		$fetch_stockDetails=db_q($db_conn,$select_stockDetails,[$pr_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
 		
 		$update_Sales_stock=$result_stockDetails['sales_qty']-$qty;
 		$update_Closing_stock=$result_stockDetails['closing_qty']+$qty;
 		
-		$update_stockDetails="update stock set sales_qty='$update_Sales_stock',closing_qty='$update_Closing_stock' where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-		mysqli_query($db_conn,$update_stockDetails);
+		$update_stockDetails="update stock set sales_qty=?,closing_qty=? where product_id=? and user_type=? and user_id=?";
+		db_q($db_conn,$update_stockDetails,[$update_Sales_stock,$update_Closing_stock,$pr_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 		
 		
 	}
 	
-	$delRecord="delete from user_invoice_items where id='$rowid_decode'";
-	mysqli_query($db_conn,$delRecord);
+	$delRecord="delete from user_invoice_items where id=?";
+	db_q($db_conn,$delRecord,[$rowid_decode]);
 	
-	echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".$invoice_id_encode."&&DeleteSuccess&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&ActionRemove';</script>";
+	echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&ActionRemove';</script>";
 	
 }
 ?>

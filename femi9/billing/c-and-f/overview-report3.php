@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -76,7 +76,7 @@ $to_date=$_REQUEST['todate'];
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report3?frdate=<?=$from_date;?>&&todate=<?=$to_date;?>&&lable=<?=$_REQUEST['lable'];?>&&rptlable=<?=$_REQUEST['rptlable'];?>&&out1=<?=$_REQUEST['out1'];?>&&out2=<?=$_REQUEST['out2'];?>&&out3=<?=$_REQUEST['out3'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report3?frdate=<?=htmlspecialchars((string)($from_date), ENT_QUOTES, 'UTF-8', false);?>&&todate=<?=htmlspecialchars((string)($to_date), ENT_QUOTES, 'UTF-8', false);?>&&lable=<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>&&rptlable=<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>&&out2=<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>&&out3=<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -95,15 +95,15 @@ $to_date=$_REQUEST['todate'];
 												<table id="reportdash">
 												<tr>
 												<th>Invoice&nbsp;Count</th>
-												<td>:&nbsp;<?=$_REQUEST['out1'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Product&nbsp;Qty</th>
-												<td>:&nbsp;<?=$_REQUEST['out2'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Total&nbsp;Amount</th>
-												<td>:&nbsp;&#x20B9;<?=$_REQUEST['out3'];?></td>
+												<td>:&nbsp;&#x20B9;<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												</table>
                                             </div>
@@ -115,22 +115,22 @@ $to_date=$_REQUEST['todate'];
 						<?php }?>
 						
 						
-						<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="lable" value="<?=$_REQUEST['lable'];?>"/>
-<input type="hidden" name="rptlable" value="<?=$_REQUEST['rptlable'];?>"/>
-<input type="hidden" name="out1" value="<?=$_REQUEST['out1'];?>"/>
-<input type="hidden" name="out2" value="<?=$_REQUEST['out2'];?>"/>
-<input type="hidden" name="out3" value="<?=$_REQUEST['out3'];?>"/>
+						<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="lable" value="<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="rptlable" value="<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out1" value="<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out2" value="<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out3" value="<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="setrigger" value="1"/>
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$from_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($from_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$to_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($to_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
@@ -176,47 +176,47 @@ $i= $start_from;
 											
 											<tbody>
 										<?php
-										$select_Count_records="select count(*) as numRecords from ot_sales where date between '$from_date' and '$to_date'";
-										$fetch_Count_records=mysqli_query($db_conn,$select_Count_records);
+										$select_Count_records="select count(*) as numRecords from ot_sales where date between ? and ?";
+										$fetch_Count_records=db_q($db_conn,$select_Count_records,[$from_date,$to_date]);
 										$result_Count_records=mysqli_fetch_array($fetch_Count_records);
 										if($result_Count_records['numRecords']>0)
 										{
 										
 										
-										$select_product_list="select distinct tempid from ot_sales where date between '$from_date' and '$to_date' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										$select_product_list="select distinct tempid from ot_sales where date between ? and ? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 											$ot_tempid=$result_product_list['tempid'];
 
-										$selectrecords="select * from ot_sales where tempid='$ot_tempid'";
-										$fetchrecords=mysqli_query($db_conn,$selectrecords);
+										$selectrecords="select * from ot_sales where tempid=?";
+										$fetchrecords=db_q($db_conn,$selectrecords,[$ot_tempid]);
 										$resultrecords=mysqli_fetch_array($fetchrecords);
 											
 											//company profile details
 											$godownid=$resultrecords['godownid'];
-$select_Customers="select * from company_godown where id='$godownid'";
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+$select_Customers="select * from company_godown where id=?";
+										$fetch_Customers=db_q($db_conn,$select_Customers,[$godownid]);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 ?>
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?=$result_Customers["gname"];?></td>
-													<td><?=$resultrecords['cat'];?></td>
+                                                    <td><?=htmlspecialchars((string)($result_Customers["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?=htmlspecialchars((string)($resultrecords['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?=date("d/M/Y",strtotime($resultrecords["date"]));?></td>
 													
 				<?php
-				$selectsumTotalAmount="select sum(total) from ot_sales where tempid='$ot_tempid'";
-				$fetchsumTotalAmount=mysqli_query($db_conn,$selectsumTotalAmount);
+				$selectsumTotalAmount="select sum(total) from ot_sales where tempid=?";
+				$fetchsumTotalAmount=db_q($db_conn,$selectsumTotalAmount,[$ot_tempid]);
 				$resultsumTotalAmount=mysqli_fetch_array($fetchsumTotalAmount);
 				if($resultsumTotalAmount[0]!=NULL){
 				$TotalAmount=$resultsumTotalAmount[0];}else{$TotalAmount="0";}
 				$TotalAmount123+=$TotalAmount;
 				
-				$selectsumTotalQTY="select sum(qty) from ot_sales where tempid='$ot_tempid'";
-				$fetchsumTotalQTY=mysqli_query($db_conn,$selectsumTotalQTY);
+				$selectsumTotalQTY="select sum(qty) from ot_sales where tempid=?";
+				$fetchsumTotalQTY=db_q($db_conn,$selectsumTotalQTY,[$ot_tempid]);
 				$resultsumTotalQTY=mysqli_fetch_array($fetchsumTotalQTY);
 				if($resultsumTotalQTY[0]!=NULL){
 				$TotalPrQty=$resultsumTotalQTY[0];}else{$TotalPrQty="0";}

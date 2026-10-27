@@ -1,21 +1,21 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from super_stockiest where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from super_stockiest where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 				
 //state details
 $state_id=$result_product_list['state_id'];
-$select_state_dtails="select * from state where id='$state_id'";
-$fetch_state_dtails=mysqli_query($db_conn,$select_state_dtails);
+$select_state_dtails="select * from state where id=?";
+$fetch_state_dtails=db_q($db_conn,$select_state_dtails,[$state_id]);
 $result_state_dtails=mysqli_fetch_array($fetch_state_dtails);
 $state_name=$result_state_dtails['st_name'];
 
 //district details
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 					?>
@@ -29,7 +29,7 @@ $district_name=	$result_district['dist_name'];
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : Super Stockist</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : Super Stockist</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -71,7 +71,7 @@ $district_name=	$result_district['dist_name'];
  <table class="table">
   <?php if($result_product_list["user_icon"]!="Nil"){ ?>
  <tr>
-                    <th colspan="2"><img src="<?php echo $result_product_list["user_icon"];?>" style="width:150px;border-radius:10px;"></th>
+                    <th colspan="2"><img src="<?php echo htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;border-radius:10px;"></th>
                     </tr>
  <?php } ?>
  <tr>
@@ -93,7 +93,7 @@ $district_name=	$result_district['dist_name'];
                     </tr>
                     <tr>
                     <th scope="col">Name</th>
-                    <td><?php echo $result_product_list['name'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">State</th>
@@ -106,31 +106,31 @@ $district_name=	$result_district['dist_name'];
 					
 					<tr>
                     <th scope="col">Email ID</th>
-                    <td><?php echo $result_product_list['email'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Address</th>
-                    <td><?php echo $result_product_list['address'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Mobile Number</th>
-                    <td><?php echo $result_product_list['country_code'];?>&nbsp;<?php echo $result_product_list['mobile_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Username</th>
-                    <td><span id="usernamebox"><?php echo $result_product_list['username'];?></span></td>
+                    <td><span id="usernamebox"><?php echo htmlspecialchars((string)($result_product_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Password</th>
-                    <td><?php echo $result_product_list['password'];?></td>
+                    <td><?php echo '••••••••';?></td>
                     </tr>
 					
 					 <tr>
                     <th scope="col">GST Number</th>
-                    <td><?php echo $result_product_list['gstin'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					
@@ -141,7 +141,7 @@ $district_name=	$result_district['dist_name'];
 					
 					<tr>
                     <th scope="col">Plan Amount</th>
-                    <td>&#8377; <?php echo $result_product_list['plan_amount'];?></td>
+                    <td>&#8377; <?php echo htmlspecialchars((string)($result_product_list['plan_amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
@@ -151,7 +151,7 @@ $district_name=	$result_district['dist_name'];
 					
 					<tr>
                     <th scope="col">payment Method</th>
-                    <td><?php echo $result_product_list['amount_method'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['amount_method']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
@@ -172,7 +172,7 @@ $district_name=	$result_district['dist_name'];
 					
 					<tr>
                     <th scope="col">Reference Number</th>
-                    <td><?php echo $result_product_list['ref_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['ref_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<?php */?>
 					
@@ -201,16 +201,16 @@ $district_name=	$result_district['dist_name'];
 			$stock_usertype="super_stockiest";
 			$stock_userid=$result_product_list['temp_id'];
 			
-echo $select_OPStock="select * from stock where user_type='$stock_usertype' and user_id='$stock_userid'";
-										$Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
+echo $select_OPStock="select * from stock where user_type=? and user_id=?";
+										$Fetch_OPStock=db_q($db_conn,$select_OPStock,[$stock_usertype,$stock_userid]);
 										while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
 										{
 <?php /*?>
 											//Get Product Details
 											$StockProductID=$Result_OPStock['product_id'];
 											
-						$select_productDetils="select * from products where id='$StockProductID'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+						$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$StockProductID]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						
@@ -219,18 +219,18 @@ echo $select_OPStock="select * from stock where user_type='$stock_usertype' and 
 						$ClosingStock=$Result_OPStock['closing_qty'];
 										?>
                                                 <tr>
-                                                    <td><?php echo $Result_productDetils["productName"];?></td>
-													<td><?php echo $Result_OPStock['opening_qty'];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($Result_OPStock['opening_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
 													
 						<!-------PURCHASE QTY------------->
-						<td align="right"><?php echo $Result_OPStock['input_qty'];?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($Result_OPStock['input_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						
 						<!-------SALES QTY------------->
-						<td align="right"><?php echo $Result_OPStock['sales_qty'];?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($Result_OPStock['sales_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						
 						<!-------INTERNAL TRANSFER + DEMO/FREE/DAMAGE------------->
-						<td align="right"><?php echo $Result_OPStock['sent_qty'];?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($Result_OPStock['sent_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						
 						<td align="right"><b><?php echo $ClosingStock;?></b></td>
 													
@@ -240,8 +240,8 @@ echo $select_OPStock="select * from stock where user_type='$stock_usertype' and 
 										
 										<?php }
 										//sum total closing qty
-										$select_sumclosing="select sum(closing_qty) from stock where user_type='$stock_usertype' and user_id='$stock_userid'";
-										$Fetch_sumclosing=mysqli_query($db_conn,$select_sumclosing);
+										$select_sumclosing="select sum(closing_qty) from stock where user_type=? and user_id=?";
+										$Fetch_sumclosing=db_q($db_conn,$select_sumclosing,[$stock_usertype,$stock_userid]);
 										$Result_sumclosing=mysqli_fetch_array($Fetch_sumclosing);
 										?>
 										

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -148,29 +148,29 @@ $i= $start_from;
                                             
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_product_list["useridtext"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b></td>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 					
 					
 					<td>
-					<a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo $result_product_list["id"];?>" title="Click to Update Mobile Number">
-					<?=$result_product_list["country_code"];?>&nbsp;<?=$result_product_list["mobile_number"];?>
+					<a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" title="Click to Update Mobile Number">
+					<?=htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</a>
 					
-					<div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+					<div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
 													
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
                                                                 <h5 class="modal-title" id="exampleModalLiveLabel">Update Mobile Number<br/>
-																<?=$result_product_list["mobile_number"];?>
+																<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
 																</h5>
                                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
 									<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_mobile_action">	
 	
-									<input type="hidden" name="old_mobile_number" value="<?=$result_product_list["mobile_number"];?>">
+									<input type="hidden" name="old_mobile_number" value="<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
 									<input type="hidden" name="update_usertype" value="candf">
 															
                                                             <div class="example-content" style="padding:20px;">
@@ -200,11 +200,11 @@ $ex=explode("#",$data);
   foreach ($ex as $key => $value)
    {  
     
-$select_distict="select st_name from state where id='$value'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select st_name from state where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$value]);
 $result_district=mysqli_fetch_array($fetch_district);
 		
-		echo "<li>".ucwords($result_district['st_name'])."</li>";
+		echo "<li>".htmlspecialchars((string)(ucwords($result_district['st_name'])), ENT_QUOTES, 'ISO-8859-1', false)."</li>";
 	
    }
 
@@ -222,11 +222,11 @@ $result_district=mysqli_fetch_array($fetch_district);
 			else if($result_product_list['account_status']=="active")
 			{
 			?>
-			<a href="inactive_user?usr=c_and_f&&backurl=manage_cf&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=CandF" onclick="return confirm('You want to confirm Deactivate this (<?php echo strtoupper($result_product_list["name"]);?>)  user?');" data-bs-toggle="tooltip" data-bs-placement="top" title="Click to Deactivate user"><span class='badge badge-style-bordered badge-success'>Active</span></a>
+			<a href="inactive_user?usr=c_and_f&&backurl=manage_cf&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=CandF" onclick="return confirm('You want to confirm Deactivate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>)  user?');" data-bs-toggle="tooltip" data-bs-placement="top" title="Click to Deactivate user"><span class='badge badge-style-bordered badge-success'>Active</span></a>
 			<?php
 			}else{
 				?>
-				<a href="active_user?usr=c_and_f&&backurl=manage_cf&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=CandF" onclick="return confirm('You want to confirm Activate this (<?php echo strtoupper($result_product_list["name"]);?>)  user?');" data-bs-toggle="tooltip" data-bs-placement="top" title="Click to Activate user"><span class='badge badge-style-bordered badge-danger'>Deactive</span></a>
+				<a href="active_user?usr=c_and_f&&backurl=manage_cf&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=CandF" onclick="return confirm('You want to confirm Activate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>)  user?');" data-bs-toggle="tooltip" data-bs-placement="top" title="Click to Activate user"><span class='badge badge-style-bordered badge-danger'>Deactive</span></a>
 				
 				<?php
 			}

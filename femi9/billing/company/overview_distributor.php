@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -109,8 +109,8 @@ $i= $start_from;
 $district_id=$result_product_list['district_id'];
 if(is_numeric($district_id))
 {
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 }
@@ -123,8 +123,8 @@ $district_name=	$district_id;
 $taluk_id=$result_product_list['taluk_id'];
 if(is_numeric($taluk_id))
 {
-$select_Taluk12="select * from taluk where id='$taluk_id'";
-	$fetch_Taluk12=mysqli_query($db_conn,$select_Taluk12);
+$select_Taluk12="select * from taluk where id=?";
+	$fetch_Taluk12=db_q($db_conn,$select_Taluk12,[$taluk_id]);
 	$result_Taluk12=mysqli_fetch_array($fetch_Taluk12);
 $taluk_name=$result_Taluk12['taluk'];
 }else{
@@ -135,8 +135,8 @@ $taluk_name=$result_Taluk12['taluk'];
 $pincode_id=$result_product_list['pincode_id'];
 if($pincode_id<6)
 {
-$select_pincodelist="select * from pincode where id='$pincode_id'";
-$fetch_pincodelist=mysqli_query($db_conn,$select_pincodelist);
+$select_pincodelist="select * from pincode where id=?";
+$fetch_pincodelist=db_q($db_conn,$select_pincodelist,[$pincode_id]);
 $result_pincodelist=mysqli_fetch_array($fetch_pincodelist);
 $pincodeshow=$result_pincodelist['pincode'];
 }
@@ -166,20 +166,20 @@ $fetch_ssDetails=mysqli_fetch_array($exe_ssDetails);
 					
                     <td>
 					<?php if($result_product_list["user_icon"]!="Nil"){ ?>
-					<a href="../distributor/<?=$result_product_list["user_icon"];?>" target="_blank">
-					<img src="../distributor/<?=$result_product_list["user_icon"];?>" style="width:90px;border-radius:10px;">
+					<a href="../distributor/<?=htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" target="_blank">
+					<img src="../distributor/<?=htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:90px;border-radius:10px;">
 					</a>
 					<?php }else{ ?>
 					<img src="../../assets/images/149071.png" style="width:90px;border-radius:10px;">
 					<?php }?>
 					</td>
  
-					<td><?=$result_product_list["useridtext"];?></td>
-					<td><?php echo ucwords($result_product_list["name"]);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo $district_name;?></td>
 					<td><?php echo $taluk_name;?></td>
 					<td><?=$pincodeshow;?></td>
-					<td><?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td>
 			<?php 

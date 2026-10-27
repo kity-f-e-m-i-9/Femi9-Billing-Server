@@ -1,6 +1,19 @@
 <?php
 include("checksession.php");
 include("config.php");
+// Accounts created with the shared default password must change it before using the portal.
+require_once __DIR__ . '/../shared/PasswordService.php';
+{
+    $__mc = mysqli_prepare($db_conn, "SELECT id FROM forgotpassword WHERE usertype = 'salesbdm' AND mobilenumber = ? AND must_change_password = 1 LIMIT 1");
+    $__mob = (string)($result_LoGuserDtails['bdm_mobile'] ?? '');
+    mysqli_stmt_bind_param($__mc, 's', $__mob);
+    mysqli_stmt_execute($__mc);
+    if (mysqli_stmt_get_result($__mc)->fetch_assoc()) {
+        echo "<script>alert('For security reasons, you must change your password before continuing.');window.location='change-password.php?forced=1';</script>";
+        exit;
+    }
+    mysqli_stmt_close($__mc);
+}
 require_once("include/BdmTpScope.php");
 require_once("include/TeamSubtree.php");
 require_once __DIR__ . '/../shared/TpProductType.php';

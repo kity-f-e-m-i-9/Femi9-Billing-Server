@@ -2,6 +2,7 @@
 include("checksession.php");
 $title = "Change Password";
 include("config.php");
+require_once __DIR__ . '/../shared/PasswordService.php';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     try {
@@ -20,7 +21,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             throw new Exception('New password does not meet the requirements below');
         }
 
-        // sales_bdm_staff.password is always plaintext by design (see CheckLogin.php).
+        // Stored as a bcrypt hash (legacy plain-text rows are still accepted once).
         $stmt = mysqli_prepare($db_conn, "SELECT password FROM sales_bdm_staff WHERE id = ? LIMIT 1");
         mysqli_stmt_bind_param($stmt, "i", $salesBdmID);
         mysqli_stmt_execute($stmt);
@@ -30,14 +31,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (!$user) {
             throw new Exception('User not found');
         }
-        if ($oldPassword !== $user['password']) {
+        if (!femi_password_check($oldPassword, (string)$user['password'])['valid']) {
             throw new Exception('Old password is incorrect');
         }
 
         $stmt = mysqli_prepare($db_conn, "UPDATE sales_bdm_staff SET password = ? WHERE id = ?");
-        mysqli_stmt_bind_param($stmt, "si", $newPassword, $salesBdmID);
+        $newHash = femi_password_hash($newPassword);
+        mysqli_stmt_bind_param($stmt, "si", $newHash, $salesBdmID);
         mysqli_stmt_execute($stmt);
         mysqli_stmt_close($stmt);
+        femi_clear_must_change($db_conn, 'salesbdm', (string)($result_LoGuserDtails['bdm_mobile'] ?? ''));
 
         echo "<script>
             alert('Password changed successfully! Please login with your new password.');

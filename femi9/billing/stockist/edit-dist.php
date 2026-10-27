@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Update District";
 $manage_url="manage-district.php";
@@ -9,8 +9,8 @@ $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
 
 //fetch product details
-$select_product_list="select * from district where id='$prid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from district where id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 									$result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -88,12 +88,12 @@ $select_product_list="select * from district where id='$prid'";
                                        
 <form action="product-action.php" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                 <label for="exampleInputEmail1" class="form-label">District Name</label>
-                                                <input type="text" required="" name="dist_name" value="<?php echo $result_product_list["dist_name"]?>" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp">
+                                                <input type="text" required="" name="dist_name" value="<?php echo htmlspecialchars((string)($result_product_list["dist_name"]), ENT_QUOTES, 'ISO-8859-1', false)?>" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp">
 												
 												<br/>
 												

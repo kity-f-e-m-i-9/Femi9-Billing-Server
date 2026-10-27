@@ -165,12 +165,12 @@ $i= $start_from;
                                             <tr>
                                                 <td><?php echo ++$i; ?></td>
 												<td><?php echo date("d/M/Y", strtotime($note['created_at'])); ?></td>
-												<td><?php echo $product['productName']; ?></td>
+												<td><?php echo htmlspecialchars((string)($product['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
 												<td><?php echo inr_format($note['qty'], 1); ?></td>
-												<td><?php echo $gd_from['gname']; ?></td>
-												<td><?php echo $gd_to['gname']; ?></td>
+												<td><?php echo htmlspecialchars((string)($gd_from['gname']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+												<td><?php echo htmlspecialchars((string)($gd_to['gname']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
 												<td><?php echo inr_format($note['total'], 2); ?></td>
-												<td><?php echo $note['created_by']; ?></td>
+												<td><?php echo htmlspecialchars((string)($note['created_by']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
 												<td>
 <a href="internal_transfer_return_details?returnid=<?=$noteIdEnc;?>" target="_blank"><img src="../../assets/images/details-32.png"/></a>
 												</td>

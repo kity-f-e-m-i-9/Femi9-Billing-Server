@@ -7,7 +7,7 @@ $reqid_encode = $_REQUEST['reqid'] ?? '';
 $reqid        = base64_decode($reqid_encode);
 
 if (!isset($_REQUEST['truncate'])) {
-    echo "<script>window.location='stock_request_details.php?reqid={$reqid_encode}';</script>";
+    echo "<script>window.location='stock_request_details.php?reqid=".urlencode($reqid_encode)."';</script>";
     exit;
 }
 
@@ -21,7 +21,7 @@ $reqRow = $stmtReq->get_result()->fetch_assoc();
 $stmtReq->close();
 
 if (!$reqRow) {
-    echo "<script>window.location='stock_request_details.php?reqid={$reqid_encode}';</script>";
+    echo "<script>window.location='stock_request_details.php?reqid=".urlencode($reqid_encode)."';</script>";
     exit;
 }
 
@@ -30,7 +30,7 @@ $customer_id = (string) $reqRow['fromuserid'];
 
 $rowid = (int) base64_decode($_REQUEST['rowid'] ?? '');
 if ($rowid <= 0) {
-    echo "<script>window.location='stock_request_details.php?reqid={$reqid_encode}&&DeleteSuccess&&ActionRemove';</script>";
+    echo "<script>window.location='stock_request_details.php?reqid=".urlencode($reqid_encode)."&&DeleteSuccess&&ActionRemove';</script>";
     exit;
 }
 
@@ -110,5 +110,5 @@ if ($item && (int)$item['pr_id'] > 0) {
     $stmtDel->close();
 }
 
-echo "<script>window.location='stock_request_details.php?reqid={$reqid_encode}&&DeleteSuccess&&ActionRemove';</script>";
+echo "<script>window.location='stock_request_details.php?reqid=".urlencode($reqid_encode)."&&DeleteSuccess&&ActionRemove';</script>";
 ?>

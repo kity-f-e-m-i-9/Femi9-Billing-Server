@@ -1,15 +1,15 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
 $tempid=$_REQUEST['tempid'];
 
-$select_Invoice="select * from ot_sales_invoice where tempid='$tempid'";
-$fetch_Invoice=mysqli_query($db_conn,$select_Invoice);
+$select_Invoice="select * from ot_sales_invoice where tempid=?";
+$fetch_Invoice=db_q($db_conn,$select_Invoice,[$tempid]);
 $result_Invoice=mysqli_fetch_array($fetch_Invoice);
 
-$select_Invoice_Details="select * from ot_sales where tempid='$tempid'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from ot_sales where tempid=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$tempid]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 
 //SEND FROM
@@ -19,13 +19,13 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 						$result_godowndetails=mysqli_fetch_array($fetch_godowndetails);
 						
 //DELETE INVOICE Number
-$select_Count_Invoice="select * from ot_sales where tempid='$tempid'";
-$fetch_Count_Invoice=mysqli_query($db_conn,$select_Count_Invoice);
+$select_Count_Invoice="select * from ot_sales where tempid=?";
+$fetch_Count_Invoice=db_q($db_conn,$select_Count_Invoice,[$tempid]);
 $result_Count_Invoice=mysqli_num_rows($fetch_Count_Invoice);	
 if($result_Count_Invoice==0)
 {
-   $deletInovice="delete from ot_sales_invoice where tempid='$tempid'";
-   mysqli_query($db_conn,$deletInovice);
+   $deletInovice="delete from ot_sales_invoice where tempid=?";
+   db_q($db_conn,$deletInovice,[$tempid]);
    
    $_SESSION['sucMessage']="One OT Sales Details Deleted Successfully!";
    echo "<script>window.location='ot-sale-view?alldeleted';</script>";
@@ -40,7 +40,7 @@ if($result_Count_Invoice==0)
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <!-- Title -->
-    <title><?=$result_Invoice['inv_number']?> : OT Sales Details : <?php echo $business_name;?></title>
+    <title><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?> : OT Sales Details : <?php echo $business_name;?></title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -163,8 +163,8 @@ $i= $start_from;
 									</thead>
 									<tbody>
 									<tr>
-									<td><?php echo $result_godowndetails["gname"];?></td>
-									<td><?=$result_Invoice['inv_number']?></td>
+									<td><?php echo htmlspecialchars((string)($result_godowndetails["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+									<td><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?></td>
 									<td><?=date("d/m/Y",strtotime($result_Invoice_Details['date']));?></td>
 									</tr>
 									</tbody>
@@ -187,8 +187,8 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-		$select_product_list="select * from ot_sales where tempid='$tempid' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+		$select_product_list="select * from ot_sales where tempid=? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 										while($ResultRecords=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -196,8 +196,8 @@ $i= $start_from;
 											
 											//product details
 											$product_id=$ResultRecords['prid'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						$PR_qty=$ResultRecords["qty"];
@@ -210,7 +210,7 @@ $i= $start_from;
                                             
                                                 <tr id="viewRow_<?=$RowID;?>">
                                                     <td><?php echo ++$i; ?></td>
-                    <td><?php echo $Result_productDetils["productName"];?></td>
+                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo inr_format($PR_qty, 1);?></td>
 					<td><?php echo inr_format($PR_rate, 2);?></td>
 					<td><?php echo inr_format($SubTotal, 2);?></td>
@@ -220,13 +220,13 @@ $i= $start_from;
 																										<td>
 													    <div class="actions-group">
 													        <a href="#" class="action-link" title="Edit" onclick="toggleEditRow('<?=$RowID;?>'); return false;"><i class="material-icons-outlined" style="font-size:17px;color:#3b82f6;">edit</i></a>
-													        <a href="ot-sale-delete.php?id=<?=$RowID;?>&&tempid=<?=$tempid;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <a href="ot-sale-delete.php?id=<?=$RowID;?>&&tempid=<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 													</td>
                                                 </tr>
                                                 <tr id="editRow_<?=$RowID;?>" style="display:none;background:#f8fafc;">
                                                     <td></td>
-                                                    <td><?php echo $Result_productDetils["productName"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <td><input type="number" min="1" step="1" class="form-control form-control-sm" id="editQty_<?=$RowID;?>" value="<?=$PR_qty;?>" style="width:90px;"></td>
                                                     <td><input type="number" min="0" step="any" class="form-control form-control-sm" id="editRate_<?=$RowID;?>" value="<?=$PR_rate;?>" style="width:100px;"></td>
                                                     <td colspan="2"><input type="number" min="0" step="any" class="form-control form-control-sm" id="editDisc_<?=$RowID;?>" value="<?=$PR_discount;?>" placeholder="Discount(Rs.)" style="width:110px;"></td>

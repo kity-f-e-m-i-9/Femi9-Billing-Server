@@ -30,7 +30,7 @@
                                 <li class="nav-item hidden-on-mobile">
                                     <a class="nav-link nav-notifications-toggle" id="notificationsDropDown" href="#" data-bs-toggle="dropdown"><img src="../../assets/images/femi-logo.png"/></a>
                                     <div class="dropdown-menu dropdown-menu-end notifications-dropdown" aria-labelledby="notificationsDropDown">
-                                        <h6 class="dropdown-header"><?=ucwords($LoginusertypeGET);?> (<?=$_SESSION['LOGIN_USER'];?>)</h6>
+                                        <h6 class="dropdown-header"><?=ucwords($LoginusertypeGET);?> (<?=htmlspecialchars((string)($_SESSION['LOGIN_USER']), ENT_QUOTES, 'ISO-8859-1', false);?>)</h6>
                                         <div class="notifications-dropdown-list">
                                             
 											<?php if($LoginusertypeGET=="admin"){?>

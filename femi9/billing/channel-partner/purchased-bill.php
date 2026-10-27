@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpProductType.php';
@@ -79,7 +79,7 @@ while ($result_bill = mysqli_fetch_array($fetch_bills)) {
     $inv_db_id   = (int)$result_bill["id"];
 
     $res_receipt = mysqli_fetch_array(mysqli_query($db_conn,
-        "SELECT COALESCE(SUM(amount),0) AS paid FROM tp_invoice_receipts WHERE tp_invoice_id='$inv_db_id'"
+        "SELECT COALESCE(SUM(amount),0) AS paid FROM tp_invoice_receipts WHERE tp_invoice_id='".db_esc($inv_db_id)."'"
     ));
     $Total_Receipt = (float)$res_receipt['paid'];
 

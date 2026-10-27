@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 include("config.php"); 
 date_default_timezone_set("Asia/Kolkata");
 ?>
@@ -191,11 +191,11 @@ $_ss_uid = mysqli_real_escape_string($db_conn, $Login_user_IDvl);
 $_ss_res = mysqli_query($db_conn,
     "SELECT p.id, p.productName, s.closing_qty
      FROM products p
-     JOIN stock s ON s.product_id = p.id AND s.user_type = 'super_stockiest' AND s.user_id = '$_ss_uid'
+     JOIN stock s ON s.product_id = p.id AND s.user_type = 'super_stockiest' AND s.user_id = '".db_esc($_ss_uid)."'
      WHERE s.closing_qty > 0
      ORDER BY p.productName");
 while ($result_product_list12 = mysqli_fetch_assoc($_ss_res)) { ?>
-<option value="<?= $result_product_list12['id']; ?>"><?= htmlspecialchars($result_product_list12['productName']); ?> (Stock: <?= $result_product_list12['closing_qty']; ?>)</option>
+<option value="<?= htmlspecialchars((string)($result_product_list12['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?= htmlspecialchars($result_product_list12['productName']); ?> (Stock: <?= htmlspecialchars((string)($result_product_list12['closing_qty']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
 <?php } ?>
 </select>
 					     </td>

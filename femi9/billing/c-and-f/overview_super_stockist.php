@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -106,8 +106,8 @@ $i= $start_from;
 									
 //district details
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 						?>
@@ -118,16 +118,16 @@ $district_name=	$result_district['dist_name'];
 					
                     <td>
 					<?php if($result_product_list["user_icon"]!="Nil"){ ?>
-					<a href="<?=$result_product_list["user_icon"];?>" target="_blank">
-					<img src="<?=$result_product_list["user_icon"];?>" style="width:90px;border-radius:10px;">
+					<a href="<?=htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" target="_blank">
+					<img src="<?=htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:90px;border-radius:10px;">
 					</a>
 					<?php } ?>
 					</td>
  
-					<td><?=$result_product_list["useridtext"];?></td>
-					<td><?php echo ucwords($result_product_list["name"]);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo $district_name;?></td>
-					<td><?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td>
 			<?php 

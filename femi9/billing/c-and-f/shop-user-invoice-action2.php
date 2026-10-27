@@ -1,12 +1,12 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 if(isset($_REQUEST['addInvoice2']))
 {
 	$inv_id=$_REQUEST['inv_id'];
 	//
-	$select_INVProductDetails="select * from user_invoice where inv_id='$inv_id'";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_invoice where inv_id=?";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$inv_id]);
 	$result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails);
 	$gst_type=$result_INVProductDetails['gst_type'];
 	$buyer_gsttype=$result_INVProductDetails['buyer_gsttype'];
@@ -18,10 +18,10 @@ if(isset($_REQUEST['addInvoice2']))
 	$inv_year=date("Y",strtotime($_REQUEST['date']));
 		
 		//3. update invoice
-		$update_Invoice="update user_invoice set to_user_id='$customer_id',date='$date',inv_year='$inv_year' 
-where inv_id='$inv_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and 
-to_user_type='$invuser' and to_user_id='$customer_id'";
-		mysqli_query($db_conn,$update_Invoice);
+		$update_Invoice="update user_invoice set to_user_id=?,date=?,inv_year=? 
+where inv_id=? and from_user_type=? and from_user_id=? and 
+to_user_type=? and to_user_id=?";
+		db_q($db_conn,$update_Invoice,[$customer_id,$date,$inv_year,$inv_id,$Login_user_TYPEvl,$Login_user_IDvl,$invuser,$customer_id]);
 		
 		//-------------------------------------------
 		//insert product details
@@ -39,8 +39,8 @@ $totalamount=$amount*$qty;
 //--------------------------TOTAL, GST, DISCOUNT------------------
 //----------------------------------------------------------------
 //get product gst
-$selectproducts="select * from products where id='$pr_id'";
-$fetchproducts=mysqli_query($db_conn,$selectproducts);
+$selectproducts="select * from products where id=?";
+$fetchproducts=db_q($db_conn,$selectproducts,[$pr_id]);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $gst_percentage=$resultproducts['gst'];
 $hsn=$resultproducts['hsn'];
@@ -70,23 +70,23 @@ $total=$subtotal+$gstamount_total;
 
 	
 	//count available stock
-	$select_count_AVSTOCK="select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and 
-user_id='$Login_user_IDvl'";
-	$FETCH_count_AVSTOCK=mysqli_query($db_conn,$select_count_AVSTOCK);
+	$select_count_AVSTOCK="select * from stock where product_id=? and user_type=? and 
+user_id=?";
+	$FETCH_count_AVSTOCK=db_q($db_conn,$select_count_AVSTOCK,[$pr_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 	$RESULT_count_AVSTOCK=mysqli_fetch_array($FETCH_count_AVSTOCK);
 	$AVMstock=$RESULT_count_AVSTOCK['closing_qty'];
 	
 	if($AVMstock<$qty)
 	{
 		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id).
-"&&InvalidStock&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&AlertStockError';</script>";
+"&&InvalidStock&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&AlertStockError';</script>";
 		
 	}else{
 	
-	$select_count_invoiceItem="select count(*) as numInvoiceItem from user_invoice_items where inv_id='$inv_id' 
-and pr_id='$pr_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and 
-to_user_type='$invuser' and to_user_id='$customer_id'";
-	$fetch_count_invoiceItem=mysqli_query($db_conn,$select_count_invoiceItem);
+	$select_count_invoiceItem="select count(*) as numInvoiceItem from user_invoice_items where inv_id=? 
+and pr_id=? and from_user_type=? and from_user_id=? and 
+to_user_type=? and to_user_id=?";
+	$fetch_count_invoiceItem=db_q($db_conn,$select_count_invoiceItem,[$inv_id,$pr_id,$Login_user_TYPEvl,$Login_user_IDvl,$invuser,$customer_id]);
 	$result_count_invoiceItem=mysqli_fetch_array($fetch_count_invoiceItem);
 	if($result_count_invoiceItem['numInvoiceItem']==0)
 	{
@@ -96,34 +96,34 @@ to_user_type='$invuser' and to_user_id='$customer_id'";
 (inv_id,pr_id,amount,qty,total,to_user_type,to_user_id,from_user_type,from_user_id,
 		gst_percentage,gstamount_singlepr,gstamount_total,
 		subtotal,discount_percentage,discount_amount,gst_type,hsn,date,rwpoints,buyer_gsttype)
-		values ('$inv_id','$pr_id','$amount','$qty','$total','$invuser','$customer_id','$Login_user_TYPEvl','
-$Login_user_IDvl','$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal','
-$discount_percentage','$discount_amount','$gst_type','$hsn','$date','$rwpoints','$buyer_gsttype')";
-		mysqli_query($db_conn,$insert_InvoiceItems);
+		values (?,?,?,?,?,?,?,?,'
+$Login_user_IDvl',?,?,?,?,'
+$discount_percentage',?,?,?,?,?,?)";
+		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$invuser,$customer_id,$Login_user_TYPEvl,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_amount,$gst_type,$hsn,$date,$rwpoints,$buyer_gsttype]);
 		
 		//------------------------------
 		//2. stock decrement to distributor
 		//------------------------------
-		$select_stockDetails="select * from stock where product_id='$pr_id' and user_type='$Login_user_TYPEvl' 
-and user_id='$Login_user_IDvl'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
+		$select_stockDetails="select * from stock where product_id=? and user_type=? 
+and user_id=?";
+		$fetch_stockDetails=db_q($db_conn,$select_stockDetails,[$pr_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
 		
 		$update_Sales_stock=$result_stockDetails['sales_qty']+$qty;
 		$update_Closing_stock=$result_stockDetails['closing_qty']-$qty;
 		
-		$update_stockDetails="update stock set sales_qty='$update_Sales_stock',closing_qty='$update_Closing_stock
-' where product_id='$pr_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-		mysqli_query($db_conn,$update_stockDetails);
+		$update_stockDetails="update stock set sales_qty=?,closing_qty='$update_Closing_stock
+' where product_id=? and user_type=? and user_id=?";
+		db_q($db_conn,$update_stockDetails,[$update_Sales_stock,$pr_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 		
 		
 		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id).
-"&&AddedSuccess&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&FemiAdded';</script>";
+"&&AddedSuccess&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&FemiAdded';</script>";
 		
 	}else{
 		
 		echo "<script>window.location='shop-user-invoice-add.php?InvoiceID=".base64_encode($inv_id).
-"&&ItemAlreadyExists&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&AlertMessage';</script>";
+"&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&AlertMessage';</script>";
 	}
 		
 }

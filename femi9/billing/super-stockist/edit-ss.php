@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Edit Stockist";
 $manage_url="manage_ss.php";
@@ -6,29 +6,29 @@ $manage_title="Manage Stockist";
 $message_title="Stockist";
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from stockiest where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from stockiest where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 				$stockistid=$result_product_list['temp_id'];
 				
 //state details
 				$state_id=$result_product_list['state_id'];
-				$select_stdetails="select * from state where id='$state_id'";
-	$fetch_stdetails=mysqli_query($db_conn,$select_stdetails);
+				$select_stdetails="select * from state where id=?";
+	$fetch_stdetails=db_q($db_conn,$select_stdetails,[$state_id]);
 	$result_stdetails=mysqli_fetch_array($fetch_stdetails);
 	$state_name=$result_stdetails['st_name'];
 				
 //district details
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 //taluk details
 $taluk_id=$result_product_list['taluk_id'];
-$select_distict="select * from taluk where id='$taluk_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from taluk where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$taluk_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $taluk_name=$result_district['taluk'];
 ?>
@@ -111,8 +111,8 @@ $taluk_name=$result_district['taluk'];
                       <?php include("validate-scripts.php");?>                 
 <form action="edit-ss-action.php" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?=$result_product_list['id'];?>">
-<input type="hidden" name="old_icon" value="<?=$result_product_list['user_icon'];?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="old_icon" value="<?=htmlspecialchars((string)($result_product_list['user_icon']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 <input type="hidden" name="stockistid" value="<?=$stockistid;?>">
 
                                         <div class="example-container">
@@ -121,31 +121,31 @@ $taluk_name=$result_district['taluk'];
 											
 											<?php 
 											//REFERAL PERSON & CATEGORY DETAILS
-$select_RFRDtailsCNG="select * from stockist_referral where stockist_id='$stockistid'";
-$fetch_RFRDtailsCNG=mysqli_query($db_conn,$select_RFRDtailsCNG);
+$select_RFRDtailsCNG="select * from stockist_referral where stockist_id=?";
+$fetch_RFRDtailsCNG=db_q($db_conn,$select_RFRDtailsCNG,[$stockistid]);
 $result_RFRDtailsCNG=mysqli_fetch_array($fetch_RFRDtailsCNG);
 $CNG_catID=$result_RFRDtailsCNG['st_cat_id'];
 
-$select_RFRDtailsCNG_CAT="select * from stockist_category where id='$CNG_catID'";
-$fetch_RFRDtailsCNG_CAT=mysqli_query($db_conn,$select_RFRDtailsCNG_CAT);
+$select_RFRDtailsCNG_CAT="select * from stockist_category where id=?";
+$fetch_RFRDtailsCNG_CAT=db_q($db_conn,$select_RFRDtailsCNG_CAT,[$CNG_catID]);
 $result_RFRDtailsCNG_CAT=mysqli_fetch_array($fetch_RFRDtailsCNG_CAT);
 $Login_person_CAT=$result_RFRDtailsCNG_CAT['catname'];
 ?>
 
 		<label class="form-label">Category*</label>
            <select required="" name="st_cat_id" class="form-control">
-							   <option value="<?=$CNG_catID;?>" hidden=""><?php echo $result_RFRDtailsCNG_CAT['catname'];?> (<?php echo $result_RFRDtailsCNG_CAT['target_amount'];?>)</option>
+							   <option value="<?=$CNG_catID;?>" hidden=""><?php echo htmlspecialchars((string)($result_RFRDtailsCNG_CAT['catname']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($result_RFRDtailsCNG_CAT['target_amount']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 							   <?php $select_stcatlist="select * from stockist_category order by id asc";
 							   $fetch_stcatlist=mysqli_query($db_conn,$select_stcatlist);
 							   while($result_stcatlist=mysqli_fetch_array($fetch_stcatlist))
 							   {?>
-	<option value="<?php echo $result_stcatlist['id'];?>"><?php echo $result_stcatlist['catname'];?> (<?php echo $result_stcatlist['target_amount'];?>)</option>
+	<option value="<?php echo htmlspecialchars((string)($result_stcatlist['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stcatlist['catname']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($result_stcatlist['target_amount']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 							   <?php }?>
 							   </select>
 			<br/>	
 											
             <label class="form-label">Name</label>
-            <input type="text" required="" name="name" value="<?php echo $result_product_list['name'];?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+            <input type="text" required="" name="name" value="<?php echo htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 			
 			<?php
 			
@@ -162,7 +162,7 @@ $Login_person_CAT=$result_RFRDtailsCNG_CAT['catname'];
 									
 <br/>									
 			<!-----<label class="form-label">Mobile Number</label>
-            <input type="text" value="<?php echo $result_product_list['mobile_number'];?>" required="" name="mobile_number" class="form-control">----->
+            <input type="text" value="<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" name="mobile_number" class="form-control">----->
 			
 			
 			<!-- New add -->
@@ -183,32 +183,32 @@ $Login_person_CAT=$result_RFRDtailsCNG_CAT['catname'];
             <div class="country-code">
                 <label class="form-label">Country Code *</label>
 <select id='country_code' name='country_code' required="" class="form-control">
-<option value="<?php echo $result_product_list['country_code'];?>" hidden><?php echo $result_product_list['country_code'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php $selectCountry="select * from country order by c_name asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>
             <div class="mobile-number">
                 <label class="form-label">Mobile Number (Username)*</label>
-                <input type="text" required name="mobile_number" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo $result_product_list['mobile_number'];?>" class="form-control" maxlength="10" readonly>
+                <input type="text" required name="mobile_number" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" value="<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" maxlength="10" readonly>
             </div>
         </div>
         <!-- New add end -->
 			
 			<br/>									
 			<label class="form-label">Email ID</label>
-            <input type="email" onkeypress="restrictemail(event)" value="<?php echo $result_product_list['email'];?>" required="" name="email" class="form-control">
+            <input type="email" onkeypress="restrictemail(event)" value="<?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" name="email" class="form-control">
 			
 			<br/>									
 			<label class="form-label">Address*</label>
-            <textarea name="address" onkeypress="restrictSpecialChars(event)" class="form-control" required="required"><?php echo $result_product_list['address'];?></textarea>
+            <textarea name="address" onkeypress="restrictSpecialChars(event)" class="form-control" required="required"><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			<!-------<label class="form-label">Password</label>
-            <input type="text" value="<?php echo $result_product_list['password'];?>" required="" name="password" class="form-control">
+            <input type="text" value="<?php echo '••••••••';?>" required="" name="password" class="form-control">
 			<br/>----->
 	
 	<button type="submit" name="update-superstockiest" class="btn btn-primary">
@@ -222,7 +222,7 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 										<br/><br/>
 										<h1>Update Pincode</h1>
 <form action="update-location.php" method="post" enctype="multipart/form-data">
-<input type="hidden" name="update_id" value="<?=$result_product_list['id'];?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 <input type="hidden" name="stockistid" value="<?=$stockistid;?>">
 
                                         <div class="example-container">
@@ -311,12 +311,12 @@ var DistrictID="<?php echo $loguser_DistrictID;?>";
 					<label for="exampleInputEmail1" class="form-label">Taluk Name*</label>
            <select onChange="getState(this.value)" required="" name="taluk_id" class="form-control">
 <option value="<?=$taluk_id;?>" hidden=""><?=$taluk_name;?></option>
-<?php $select_Taluk_list="select * from taluk where state_id='$loguser_StateID' and assigned_SID='Nil' and dist_id='$loguser_DistrictID' order by taluk asc";
-										$fetch_Taluk_list=mysqli_query($db_conn,$select_Taluk_list);
+<?php $select_Taluk_list="select * from taluk where state_id=? and assigned_SID='Nil' and dist_id=? order by taluk asc";
+										$fetch_Taluk_list=db_q($db_conn,$select_Taluk_list,[$loguser_StateID,$loguser_DistrictID]);
 										while($result_Taluk_list=mysqli_fetch_array($fetch_Taluk_list))
 										{
 											?>
-											<option value="<?php echo $result_Taluk_list['id'];?>"><?php echo $result_Taluk_list['taluk'];?></option>
+											<option value="<?php echo htmlspecialchars((string)($result_Taluk_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Taluk_list['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>
 												<br/>
@@ -328,12 +328,12 @@ var DistrictID="<?php echo $loguser_DistrictID;?>";
 			<div id="statediv">
           <select class="form-control" disabled multiple required="" style="height:250px !important;">
 			<?php 
-$select_PINlist12="select * from pincode where assigned_SID='$stockistid' order by pincode asc";
-										$fetch_PINlist12=mysqli_query($db_conn,$select_PINlist12);
+$select_PINlist12="select * from pincode where assigned_SID=? order by pincode asc";
+										$fetch_PINlist12=db_q($db_conn,$select_PINlist12,[$stockistid]);
 										while($result_PINlist12=mysqli_fetch_array($fetch_PINlist12))
 										{
 											?>
-<option value="<?php echo $result_PINlist12['id'];?>"><?php echo $result_PINlist12['pincode'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_PINlist12['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_PINlist12['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 										
 			</select>

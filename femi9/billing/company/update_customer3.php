@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 $title="Update Customer";
 error_reporting(0);
@@ -97,21 +97,21 @@ $lablenamedisplay="Customer Name";
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from invoice where inv_id='$invid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+					<?php $select_product_list="select * from invoice where inv_id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$invid]);
 										$result_product_list=mysqli_fetch_array($fetch_product_list);
 											
 										$CuSTID=$result_product_list['customer_id'];
 										
-										$select_Customers="select * from customers where id='$CuSTID'";
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+										$select_Customers="select * from customers where id=?";
+										$fetch_Customers=db_q($db_conn,$select_Customers,[$CuSTID]);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 										$Cust_Name=$result_Customers['name'];
 										$Cust_Mbile=$result_Customers['mobile'];
 										?>
                                             
                                                 <tr>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $Cust_Name;?><br/>M: <?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 	
@@ -124,8 +124,8 @@ $lablenamedisplay="Customer Name";
 										
 				<form action="update_customer_action3.php" method="post" enctype="multipart/form-data" onsubmit="return confirm('Please make a confirm!')">
 				
-				<input type="hidden" name="invid" value="<?=$invid;?>"/>
-				<input type="hidden" name="invuser" value="<?=$_REQUEST['invuser'];?>"/>
+				<input type="hidden" name="invid" value="<?=htmlspecialchars((string)($invid), ENT_QUOTES, 'UTF-8', false);?>"/>
+				<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>"/>
 				<input type="hidden" name="old_customer_id" value="<?=$CuSTID;?>"/>
 				
                 <div class="example-container">
@@ -136,14 +136,14 @@ $lablenamedisplay="Customer Name";
 <select required="" name="new_customer_id" class="js-states form-control" tabindex="-1" style="display: none; width: 100%">
 <option value="" hidden="">Select</option>
 <?php 
-$selectCusList="select * from customers where user_type='$onboard_userTYPE' order by name asc";
-$fetch_Customers_list=mysqli_query($db_conn,$selectCusList);
+$selectCusList="select * from customers where user_type=? order by name asc";
+$fetch_Customers_list=db_q($db_conn,$selectCusList,[$onboard_userTYPE]);
 while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 		{
 			
 			$user_districtID=$result_Customers_list['district_id'];
-			$select_User_districtName="select * from district where id='$user_districtID'";
-			$fetch_user_districtName=mysqli_query($db_conn,$select_User_districtName);
+			$select_User_districtName="select * from district where id=?";
+			$fetch_user_districtName=db_q($db_conn,$select_User_districtName,[$user_districtID]);
 			$result_user_districtName=mysqli_fetch_array($fetch_user_districtName);
 			$user_districtName=$result_user_districtName['dist_name'];
 			
@@ -151,7 +151,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 			
 			
 ?>
-<option value="<?=$result_Customers_list['id'];?>"><?=$UserName_SHOW;?></option>
+<option value="<?=htmlspecialchars((string)($result_Customers_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=$UserName_SHOW;?></option>
 <?php }?>
 </select>
 							   

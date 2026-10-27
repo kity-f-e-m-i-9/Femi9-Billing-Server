@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
@@ -100,7 +100,7 @@ $i          = $start_from;
                                         <tbody>
 <?php
 $fetch_invoices = mysqli_query($db_conn,
-    "SELECT * FROM user_invoice WHERE from_user_id='$Login_user_IDvl' AND from_user_type='$Login_user_TYPEvl' AND to_user_type='$getinvuser' ORDER BY id DESC");
+    "SELECT * FROM user_invoice WHERE from_user_id='".db_esc($Login_user_IDvl)."' AND from_user_type='".db_esc($Login_user_TYPEvl)."' AND to_user_type='".db_esc($getinvuser)."' ORDER BY id DESC");
 // Delivery-note modals are buffered here and printed once, after </table>,
 // instead of inline inside each <tr> — a <div> nested directly between two
 // <td>s is invalid HTML that browsers silently "fix" by relocating it out
@@ -109,7 +109,7 @@ $fetch_invoices = mysqli_query($db_conn,
 $dlModalsHtml = '';
 while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
     $CuSTID       = $result_product_list['to_user_id'];
-    $result_cust  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='$CuSTID'"));
+    $result_cust  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='".db_esc($CuSTID)."'"));
     $Cust_Name    = $result_cust['name']          ?? '---';
     $Cust_Mbile   = $result_cust['mobile_number'] ?? '';
     $RowID_encode = base64_encode($result_product_list["id"]);
@@ -154,21 +154,21 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                 <?php if ($isPendingInvNumber) { ?>
                                                 <span class="badge badge-style-bordered badge-warning">Pending</span>
                                                 <?php } else { ?>
-                                                <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#dlModal<?php echo $result_product_list["id"]; ?>">
+                                                <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#dlModal<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                                 <?php echo $invNumberDisplay; ?></a>
                                                 <?php } ?>
                                                 </td>
 
                                                 <?php ob_start(); ?>
                                                 <!-- Delivery note modal -->
-                                                <div class="modal fade" id="dlModal<?php echo $result_product_list["id"]; ?>" tabindex="-1" aria-hidden="true">
+                                                <div class="modal fade" id="dlModal<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false); ?>" tabindex="-1" aria-hidden="true">
                                                 <div class="modal-dialog"><div class="modal-content">
                                                     <div class="modal-header">
                                                         <h5 class="modal-title">Update Delivery Note<br/><?php echo $invNumberDisplay; ?></h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
                                                     <form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="dlnote_action.php">
-                                                    <input type="hidden" name="inv_id"     value="<?php echo $result_product_list["inv_id"]; ?>">
+                                                    <input type="hidden" name="inv_id"     value="<?php echo htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                                     <input type="hidden" name="inv_number" value="<?php echo $invNumberDisplay; ?>">
                                                     <input type="hidden" name="inv_table"  value="shop">
                                                     <div class="example-content" style="padding:20px;">
@@ -197,7 +197,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                 $cnt_ret = mysqli_num_rows(mysqli_query($db_conn,
                                                     "SELECT * FROM user_return_stock_items WHERE invnumber='" . $result_product_list["inv_id"] . "'"));
                                                 if ($cnt_ret == 0) {
-                                                    echo "<a href='update_customer2.php?invuser=$getinvuser&&InvoiceID=" . $result_product_list["inv_id"] . "' style='text-decoration:none;'><span class='badge badge-style-bordered badge-primary'>Update</span></a>";
+                                                    echo "<a href='update_customer2.php?invuser=$getinvuser&&InvoiceID=" . htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false) . "' style='text-decoration:none;'><span class='badge badge-style-bordered badge-primary'>Update</span></a>";
                                                 } else {
                                                     echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";
                                                 }
@@ -207,7 +207,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
                                                 <td><?php echo date("d/M/Y", strtotime($result_product_list["date"])); ?></td>
 
                                                 <td><?php echo inr_format($result_product_list["total"], 2); ?>
-                                                <br/><a href="add-receipt.php?invid=<?php echo $result_product_list["inv_id"]; ?>&&invuser=<?php echo $getinvuser; ?>"><?php echo $msgpayment; ?></a>
+                                                <br/><a href="add-receipt.php?invid=<?php echo htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false); ?>&&invuser=<?php echo $getinvuser; ?>"><?php echo $msgpayment; ?></a>
                                                 </td>
 
                                                 <td style="white-space:nowrap;">

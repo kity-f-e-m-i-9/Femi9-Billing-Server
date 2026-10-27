@@ -1,9 +1,9 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 
 // Include session check
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('unassigned');
 include("config.php");
 
 $state_id=$_REQUEST['stid'];
@@ -14,13 +14,13 @@ $file = "Unassigned-Stockist-Talukwise.csv";
 
 // Fetch product data from database
 if($state_id!=NULL && $dist_id!=NULL){
-							$select_records="select * from taluk where state_id='$state_id' and dist_id='$dist_id' order by id asc";
+							$select_records="select * from taluk where state_id='".db_esc($state_id)."' and dist_id='".db_esc($dist_id)."' order by id asc";
 							}else{
-							$select_records="select * from taluk where state_id='$state_id' order by id asc";	
+							$select_records="select * from taluk where state_id=? order by id asc";	
 							}
 							
 							
-$fetch_records = mysqli_query($db_conn, $select_records);
+$fetch_records = db_q($db_conn,$select_records,[$state_id]);
 
 // Initialize CSV content
 $csv_content = '';
@@ -34,8 +34,8 @@ while ($result_product_list = mysqli_fetch_array($fetch_records)) {
 	
 	//state details
 											$dis_state_id=$result_product_list['state_id'];
-								$select_stateList12="select * from `state` where id='$dis_state_id'";
-							   $fetch_staeList12=mysqli_query($db_conn,$select_stateList12);
+								$select_stateList12="select * from `state` where id=?";
+							   $fetch_staeList12=db_q($db_conn,$select_stateList12,[$dis_state_id]);
 							   $result_stateList12=mysqli_fetch_array($fetch_staeList12);
 							   $dis_state_name=$result_stateList12['st_name'];
 							   

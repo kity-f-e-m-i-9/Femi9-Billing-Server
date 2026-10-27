@@ -191,7 +191,7 @@ $prefill_product_type = $poData['product_type'] ?? 'napkin';
                     </div>
 
                     <form action="tp-invoice-action" method="post" id="invoiceForm">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="action" value="insert-tp-invoice">
                         <?php if ($poData): ?>
                         <input type="hidden" name="po_id" value="<?php echo (int)$poData['po_id']; ?>">
@@ -207,7 +207,7 @@ $prefill_product_type = $poData['product_type'] ?? 'napkin';
                                     <select name="tp_id" id="tpSelect" class="form-control" required>
                                         <option value=""></option>
                                         <?php foreach ($tps as $tp): ?>
-                                            <option value="<?php echo $tp['id']; ?>"
+                                            <option value="<?php echo htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"
                                                 data-tpid="<?php echo htmlspecialchars($tp['tp_id']); ?>"
                                                 data-mobile="<?php echo htmlspecialchars($tp['mobile'] ?? ''); ?>">
                                                 <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars($tp['tp_id']); ?>)

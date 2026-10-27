@@ -247,7 +247,7 @@ for ($i = 0; $i < 6; $i++) {
                                                     <select name="fy" class="form-control">
                                                         <option value="">Custom Range</option>
                                                         <?php foreach ($fy_options as $fy): ?>
-                                                        <option value="<?= $fy['start'] ?>" <?= (($_REQUEST['fy'] ?? '') == $fy['start']) ? 'selected' : '' ?>><?= $fy['label'] ?></option>
+                                                        <option value="<?= htmlspecialchars((string)($fy['start']), ENT_QUOTES, 'ISO-8859-1', false) ?>" <?= (($_REQUEST['fy'] ?? '') == $fy['start']) ? 'selected' : '' ?>><?= htmlspecialchars((string)($fy['label']), ENT_QUOTES, 'ISO-8859-1', false) ?></option>
                                                         <?php endforeach; ?>
                                                     </select>
                                                     <label class="form-label">From Date</label>

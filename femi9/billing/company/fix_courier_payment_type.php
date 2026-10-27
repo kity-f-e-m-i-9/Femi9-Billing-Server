@@ -24,14 +24,14 @@
  * @version 1.0.0
  */
 
-declare(strict_types=1);
+declare(strict_types=1); include("checksession.php");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 // !! Move these to an .env file or a config outside webroot in production !!
 const DB_HOST = 'localhost';
 const DB_NAME = 'billing0femi9_billingapp';
-const DB_USER = 'billing0femi9_femi9admin';
-const DB_PASS = 'mavNip-xukvyk-9veqra';
+define('DB_USER', $_ENV['DB_USERNAME'] ?? '');
+define('DB_PASS', $_ENV['DB_PASSWORD'] ?? '');
 const DB_PORT = 3306;
 
 
@@ -665,7 +665,7 @@ function e(mixed $v): string
                     <?php endforeach; ?>
                 <?php else: ?>
                     <div class="alert alert-success">
-                        ✅ <strong><?= $data['updated'] ?> receipt(s) updated</strong> successfully.
+                        ✅ <strong><?= htmlspecialchars((string)($data['updated']), ENT_QUOTES, 'ISO-8859-1', false) ?> receipt(s) updated</strong> successfully.
                         All changes logged to <code><?= e(AUDIT_TABLE) ?></code>.
                     </div>
                 <?php endif; ?>
@@ -678,7 +678,7 @@ function e(mixed $v): string
                     <?php endforeach; ?>
                 <?php else: ?>
                     <div class="alert alert-info">
-                        ↩️ <strong><?= $data['restored'] ?> receipt(s) restored</strong>
+                        ↩️ <strong><?= htmlspecialchars((string)($data['restored']), ENT_QUOTES, 'ISO-8859-1', false) ?> receipt(s) restored</strong>
                         to <code>regular</code>. Audit log marked as rolled back.
                     </div>
                 <?php endif; ?>

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $file="customer-list.xls";
@@ -16,7 +16,7 @@ $html='
                                             </thead>
 											<tbody>';
 											
-				$select_product_list="select * from customers where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' order by id desc";
+				$select_product_list="select * from customers where user_type='".db_esc($Login_user_TYPEvl)."' and user_id='".db_esc($Login_user_IDvl)."' order by id desc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{

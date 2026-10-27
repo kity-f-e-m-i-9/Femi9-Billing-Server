@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['internal_transfer','stock_transfers']);
 include("config.php");
 require_once("include/StockService.php");
 require_once("include/GodownAccess.php");
@@ -20,7 +20,7 @@ $returnQty = (int) ($_REQUEST['return_qty'] ?? 0);
 
 if ($rowid <= 0 || $returnQty <= 0) {
     $_SESSION['errorMessage'] = "Invalid return quantity.";
-    echo "<script>window.location='internal_transfer_details?tempid=$tempid';</script>";
+    echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."';</script>";
     exit;
 }
 
@@ -36,7 +36,7 @@ $stmt->close();
 
 if (!$row) {
     $_SESSION['errorMessage'] = "Invalid record.";
-    echo "<script>window.location='internal_transfer_details?tempid=$tempid';</script>";
+    echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."';</script>";
     exit;
 }
 
@@ -53,7 +53,7 @@ $returnable = $qty - $returnedQty;
 if ($returnQty > $returnable) {
     $_SESSION['errorMessage'] = "Cannot return {$returnQty} units — only {$returnable} of the "
         . "original {$qty} units are still eligible to return.";
-    echo "<script>window.location='internal_transfer_details?tempid=$tempid';</script>";
+    echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."';</script>";
     exit;
 }
 
@@ -91,7 +91,7 @@ try {
         $_SESSION['errorMessage'] = "Cannot return this quantity — only {$available} units are "
             . "still in stock at the destination (the rest has already been sold or moved on). "
             . "Please reconcile manually.";
-        echo "<script>window.location='internal_transfer_details?tempid=$tempid';</script>";
+        echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."';</script>";
         exit;
     }
 
@@ -125,12 +125,12 @@ try {
     $db_conn->commit();
 
     $_SESSION['sucMessage'] = "{$returnQty} unit(s) returned successfully!";
-    echo "<script>window.location='internal_transfer_details?tempid=$tempid';</script>";
+    echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."';</script>";
 
 } catch (\Throwable $e) {
     $db_conn->rollback();
     error_log("internal_transfer_return_action error: " . $e->getMessage());
     $_SESSION['errorMessage'] = "Return failed. Please try again.";
-    echo "<script>window.location='internal_transfer_details?tempid=$tempid';</script>";
+    echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."';</script>";
     exit;
 }

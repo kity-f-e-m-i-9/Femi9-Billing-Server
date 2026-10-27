@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/GodownAccess.php");
 error_reporting(0);
 
@@ -11,12 +11,12 @@ if ($__usertype !== 'finance') {
 
 $tempid=$_REQUEST['tempid'];
 
-$select_Invoice="select * from internal_transfer_invoice where tempid='$tempid'";
-$fetch_Invoice=mysqli_query($db_conn,$select_Invoice);
+$select_Invoice="select * from internal_transfer_invoice where tempid=?";
+$fetch_Invoice=db_q($db_conn,$select_Invoice,[$tempid]);
 $result_Invoice=mysqli_fetch_array($fetch_Invoice);
 
-$select_Invoice_Details="select * from internal_transfer where tempid='$tempid'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from internal_transfer where tempid=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$tempid]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 //SEND FROM
 						$send_from=$result_Invoice_Details['send_from'];
@@ -31,13 +31,13 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 						$result_godowndetails2=mysqli_fetch_array($fetch_godowndetails2);
 						
 //DELETE INVOICE Number
-$select_Count_Invoice="select * from internal_transfer where tempid='$tempid'";
-$fetch_Count_Invoice=mysqli_query($db_conn,$select_Count_Invoice);
+$select_Count_Invoice="select * from internal_transfer where tempid=?";
+$fetch_Count_Invoice=db_q($db_conn,$select_Count_Invoice,[$tempid]);
 $result_Count_Invoice=mysqli_num_rows($fetch_Count_Invoice);	
 if($result_Count_Invoice==0)
 {
-   $deletInovice="delete from internal_transfer_invoice where tempid='$tempid'";
-   mysqli_query($db_conn,$deletInovice);
+   $deletInovice="delete from internal_transfer_invoice where tempid=?";
+   db_q($db_conn,$deletInovice,[$tempid]);
    
    $_SESSION['sucMessage']="One Internal Stock Transfer Details Deleted Successfully!";
    echo "<script>window.location='internal_transfer_manage?alldeleted';</script>";
@@ -52,7 +52,7 @@ if($result_Count_Invoice==0)
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <!-- Title -->
-    <title><?=$result_Invoice['inv_number']?> : Internal Stock Transfer Details : <?php echo $business_name;?></title>
+    <title><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?> : Internal Stock Transfer Details : <?php echo $business_name;?></title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -185,26 +185,26 @@ $i= $start_from;
 									</thead>
 									<tbody>
 									<tr>
-									<td><?php echo $result_godowndetails["gname"];?></td>
-													<td><?php echo $result_godowndetails2["gname"];?></td>
+									<td><?php echo htmlspecialchars((string)($result_godowndetails["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_godowndetails2["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 									<td>
 				   <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive">
-				   <span><?=$result_Invoice['inv_number']?></span>
+				   <span><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?></span>
 				   </a>
 				   
 				   <!--------INVOICE NUMBER EDIT FORM OPEN-------->
-				   <div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+				   <div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
 													
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
                                                                 <h5 class="modal-title" id="exampleModalLiveLabel">Update Invoice Number<br/>
-																<?php echo $result_Invoice['inv_number'];?></h5>
+																<?php echo htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></h5>
                                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
 				<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_invoice_action_itr">	
 									
-				<input type="hidden" name="tempid" value="<?php echo $_REQUEST['tempid'];?>">
+				<input type="hidden" name="tempid" value="<?php echo htmlspecialchars((string)($_REQUEST['tempid']), ENT_QUOTES, 'UTF-8', false);?>">
 															
                                                  <div class="example-content" style="padding:20px;">
                                                 <div class="form-floating mb-3">
@@ -242,8 +242,8 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-		$select_product_list="select * from internal_transfer where tempid='$tempid' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+		$select_product_list="select * from internal_transfer where tempid=? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 										while($ResultRecords=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -251,8 +251,8 @@ $i= $start_from;
 											
 											//product details
 											$product_id=$ResultRecords['product_id'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						$PR_qty=$ResultRecords["qty"];
@@ -266,7 +266,7 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                   <td><?php echo $Result_productDetils["productName"];?></td>
+                   <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo inr_format($PR_qty, 1); if($PR_returned > 0){ echo '<br/><small class="text-muted">Returned: '.inr_format($PR_returned, 1).'</small>'; } ?></td>
 					<td><?php echo inr_format($PR_rate, 2);?></td>
 					<td><?php echo inr_format($SubTotal, 2);?></td>
@@ -276,26 +276,26 @@ $i= $start_from;
 																										<td>
 													    <div class="actions-group">
 													        <?php if($PR_returnable > 0){ ?>
-													        <a href="#" class="action-link" title="Return Stock" data-bs-toggle="modal" data-bs-target="#returnModal<?=$ResultRecords['id'];?>"><i class="material-icons-outlined" style="font-size:17px;color:#f59e0b;">undo</i></a>
+													        <a href="#" class="action-link" title="Return Stock" data-bs-toggle="modal" data-bs-target="#returnModal<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><i class="material-icons-outlined" style="font-size:17px;color:#f59e0b;">undo</i></a>
 													        <?php } ?>
-													        <a href="internal_transfer_delete?Roowid=<?=$RowID;?>&&tempid=<?=$tempid;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <a href="internal_transfer_delete?Roowid=<?=$RowID;?>&&tempid=<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 
 													    <?php if($PR_returnable > 0){ ?>
-													    <div class="modal fade" id="returnModal<?=$ResultRecords['id'];?>" tabindex="-1" aria-labelledby="returnModalLabel<?=$ResultRecords['id'];?>" aria-hidden="true">
+													    <div class="modal fade" id="returnModal<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="returnModalLabel<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" aria-hidden="true">
 													        <div class="modal-dialog">
 													            <div class="modal-content">
 													                <div class="modal-header">
-													                    <h5 class="modal-title" id="returnModalLabel<?=$ResultRecords['id'];?>">Return Stock<br/><?php echo $Result_productDetils["productName"];?></h5>
+													                    <h5 class="modal-title" id="returnModalLabel<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">Return Stock<br/><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></h5>
 													                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 													                </div>
 													                <form method="post" onsubmit="return confirm('Return this quantity to the source godown?');" action="internal_transfer_return_action">
 													                    <input type="hidden" name="Roowid" value="<?=$RowID;?>">
-													                    <input type="hidden" name="tempid" value="<?=$tempid;?>">
+													                    <input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>">
 													                    <div class="example-content" style="padding:20px;">
 													                        <div class="form-floating mb-3">
-													                            <input type="number" name="return_qty" placeholder="Quantity to Return" class="form-control" id="returnQty<?=$ResultRecords['id'];?>" min="1" max="<?=$PR_returnable;?>" required>
-													                            <label for="returnQty<?=$ResultRecords['id'];?>">Quantity to Return (max <?=$PR_returnable;?>)</label>
+													                            <input type="number" name="return_qty" placeholder="Quantity to Return" class="form-control" id="returnQty<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" min="1" max="<?=$PR_returnable;?>" required>
+													                            <label for="returnQty<?=htmlspecialchars((string)($ResultRecords['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">Quantity to Return (max <?=$PR_returnable;?>)</label>
 													                        </div>
 													                        <button type="submit" class="btn btn-primary"><i class="material-icons">undo</i>Return</button>
 													                    </div>

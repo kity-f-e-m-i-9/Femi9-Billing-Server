@@ -715,7 +715,7 @@ body {
     ];
     $b = $bm[$mode] ?? ['cls'=>'mb-dry','label'=>$mode];
     ?>
-    <div class="mode-badge <?= $b['cls'] ?> fi">
+    <div class="mode-badge <?= htmlspecialchars((string)($b['cls']), ENT_QUOTES, 'UTF-8', false) ?> fi">
         <span class="dot"></span>
         <?= htmlspecialchars($b['label']) ?>
     </div>
@@ -732,15 +732,15 @@ body {
         <div class="stats sg">
             <div class="stat">
                 <div class="sl">Unpaid Invoices</div>
-                <div class="sv sv-blue"><?= $summary['invoices'] ?></div>
+                <div class="sv sv-blue"><?= htmlspecialchars((string)($summary['invoices']), ENT_QUOTES, 'ISO-8859-1', false) ?></div>
             </div>
             <div class="stat">
                 <div class="sl">Line Items</div>
-                <div class="sv sv-amber"><?= $summary['items'] ?></div>
+                <div class="sv sv-amber"><?= htmlspecialchars((string)($summary['items']), ENT_QUOTES, 'ISO-8859-1', false) ?></div>
             </div>
             <div class="stat">
                 <div class="sl">Skipped</div>
-                <div class="sv sv-red"><?= $summary['skipped'] ?></div>
+                <div class="sv sv-red"><?= htmlspecialchars((string)($summary['skipped']), ENT_QUOTES, 'ISO-8859-1', false) ?></div>
             </div>
             <div class="stat">
                 <div class="sl">Mode</div>
@@ -856,11 +856,11 @@ body {
         <div class="stats sg">
             <div class="stat">
                 <div class="sl">Invoices</div>
-                <div class="sv sv-violet"><?= $summary['invoices'] ?></div>
+                <div class="sv sv-violet"><?= htmlspecialchars((string)($summary['invoices']), ENT_QUOTES, 'ISO-8859-1', false) ?></div>
             </div>
             <div class="stat">
                 <div class="sl">Queries Run</div>
-                <div class="sv sv-violet"><?= $summary['items'] ?></div>
+                <div class="sv sv-violet"><?= htmlspecialchars((string)($summary['items']), ENT_QUOTES, 'ISO-8859-1', false) ?></div>
             </div>
         </div>
 

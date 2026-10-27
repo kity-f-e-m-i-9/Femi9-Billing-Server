@@ -24,7 +24,7 @@ if($mappingusertype=="company")
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 				{
 				?>
-	<option value="<?=$result_product_list['temp_id'];?>"><?=strtoupper($result_product_list['name']);?>, <?=$result_product_list['mobile_number'];?></option>
+	<option value="<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 					<?php }?>
 												</select>
 												

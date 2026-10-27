@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; 
 // Load environment variables FIRST (before anything else)
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -135,11 +135,11 @@ $i= $start_from;
 											$passwordError = false;
 											
 											try {
-												$decryptedPassword = $encryption->decrypt($storedPassword);
+												throw new Exception('hidden'); // passwords are hashed and can no longer be displayed
 											} catch (Exception $e) {
 												// If decryption fails, it might be plain text
 												if (strlen($storedPassword) < 50) {
-													$decryptedPassword = $storedPassword; // Plain text
+													$passwordError = true;
 												} else {
 													$passwordError = true;
 												}
@@ -147,27 +147,27 @@ $i= $start_from;
 											?>
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?php echo $result_product_list['username'];?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <td>
 													<?php 
 													if ($passwordError) {
-														echo '<span class="text-danger">Decryption Error</span>';
+														femi_password_hidden_cell('admin_log', $result_product_list['id']);
 													} else {
 													?>
 														<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-															<span id="pwd-hidden-<?php echo $result_product_list["id"];?>" 
+															<span id="pwd-hidden-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" 
 																  style="cursor:pointer;font-size:16px;display:flex;align-items:center;gap:5px;" 
-																  onclick="document.getElementById('pwd-hidden-<?php echo $result_product_list["id"];?>').style.display='none'; 
-																		   document.getElementById('pwd-shown-<?php echo $result_product_list["id"];?>').style.display='flex';"
+																  onclick="document.getElementById('pwd-hidden-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>').style.display='none'; 
+																		   document.getElementById('pwd-shown-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>').style.display='flex';"
 																  title="Click to show password">
 																<i class="material-icons" style="vertical-align:middle;font-size:18px;">visibility_off</i> 
 																<strong>••••••••••</strong>
 															</span>
 															
-															<span id="pwd-shown-<?php echo $result_product_list["id"];?>" 
+															<span id="pwd-shown-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" 
 																  style="display:none;cursor:pointer;font-size:16px;align-items:center;gap:5px;" 
-																  onclick="document.getElementById('pwd-shown-<?php echo $result_product_list["id"];?>').style.display='none'; 
-																		   document.getElementById('pwd-hidden-<?php echo $result_product_list["id"];?>').style.display='flex';"
+																  onclick="document.getElementById('pwd-shown-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>').style.display='none'; 
+																		   document.getElementById('pwd-hidden-<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>').style.display='flex';"
 																  title="Click to hide password">
 																<i class="material-icons" style="vertical-align:middle;font-size:18px;">visibility</i> 
 																<strong style="background:#ffeb3b;padding:5px 10px;border-radius:5px;letter-spacing:1px;">

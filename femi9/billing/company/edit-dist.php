@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Update District";
 $manage_url="manage-district";
@@ -14,14 +14,14 @@ if (empty($_SESSION['csrf_token'])) {
 }
 
 //fetch product details
-$select_product_list="select * from district where id='$prid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from district where id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 									$result_product_list=mysqli_fetch_array($fetch_product_list);
 									
 									//state details
 											$state_id=$result_product_list['state_id'];
-								$select_stateList="select * from `state` where id='$state_id'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+								$select_stateList="select * from `state` where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$state_id]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];
 ?>
@@ -100,8 +100,8 @@ $select_product_list="select * from district where id='$prid'";
   <?php include("validate-scripts.php");?>                                      
 <form action="product-action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
@@ -113,12 +113,12 @@ $select_product_list="select * from district where id='$prid'";
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-						   <option value="<?php echo $result_stateList['id'];?>"><?php echo $result_stateList['st_name'];?></option>
+						   <option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   
 							   <label for="exampleInputEmail1" class="form-label">District Name</label>
-                                                <input type="text" required="" name="dist_name" value="<?php echo $result_product_list["dist_name"]?>" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
+                                                <input type="text" required="" name="dist_name" value="<?php echo htmlspecialchars((string)($result_product_list["dist_name"]), ENT_QUOTES, 'ISO-8859-1', false)?>" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
 												
 												<br/>
 												

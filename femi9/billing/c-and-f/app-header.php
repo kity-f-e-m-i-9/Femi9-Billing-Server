@@ -6,8 +6,8 @@
 							<table id="logoTablevl">
 				<tr valign="top">
 				<td><img src="<?php echo $usericon_concat;?>" class="usericon"></td>
-				<td><h1><?=strtoupper($result_superstock['name']);?></h1>
-				<h3><?=$result_superstock['useridtext'];?></h3>
+				<td><h1><?=htmlspecialchars((string)(strtoupper($result_superstock['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></h1>
+				<h3><?=htmlspecialchars((string)($result_superstock['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></h3>
 				<h3>C&F</h3></td>
 				</tr>
 				</table>

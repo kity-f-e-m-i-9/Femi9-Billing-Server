@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Update Category (Distributor)";
 $manage_url="cat-view-dt";
@@ -9,8 +9,8 @@ $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
 
 //fetch product details
-$select_product_list="select * from distributor_category where id='$prid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from distributor_category where id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 									$result_product_list=mysqli_fetch_array($fetch_product_list);
 									
 ?>
@@ -89,26 +89,26 @@ $select_product_list="select * from distributor_category where id='$prid'";
  <?php include("validate-scripts.php");?>                                      
 <form action="product-action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
-<input type="hidden" name="prid" value="<?php echo $prid?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
+<input type="hidden" name="prid" value="<?php echo htmlspecialchars((string)($prid), ENT_QUOTES, 'UTF-8', false)?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                 
 												<label for="exampleInputEmail1" class="form-label">Category</label>
-                                                <input type="text" required="" name="catname" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictCountryName(event)" value="<?=$result_product_list['name'];?>">
+                                                <input type="text" required="" name="catname" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" onkeypress="restrictCountryName(event)" value="<?=htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												
 												<label for="exampleInputEmail1" class="form-label">Target Sales Value(Rs.)</label>
-                                                <input type="number" min="0" onkeypress="restrictnumber(event)" class="form-control" name="target_amount" value="<?=$result_product_list['amount'];?>" required="required" max="999999" placeholder="Target Amount(Rs.)"/>
+                                                <input type="number" min="0" onkeypress="restrictnumber(event)" class="form-control" name="target_amount" value="<?=htmlspecialchars((string)($result_product_list['amount']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="required" max="999999" placeholder="Target Amount(Rs.)"/>
 												<br/>
 												
 												<label for="exampleInputEmail1" class="form-label">Referral (%)</label>
-                                                <input type="number" value="<?=$result_product_list['ref_commission_percentage'];?>" onkeypress="restrictnumber(event)" class="form-control" name="ref_commission_percentage" min="0" max="10" required="required" placeholder="Referral(%)"/>
+                                                <input type="number" value="<?=htmlspecialchars((string)($result_product_list['ref_commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeypress="restrictnumber(event)" class="form-control" name="ref_commission_percentage" min="0" max="10" required="required" placeholder="Referral(%)"/>
 												<br/>
 												
 												<label for="exampleInputEmail1" class="form-label">Cashback (%)</label>
-                                                <input type="number" onkeypress="restrictnumber(event)" class="form-control" name="cash_back_percentage" min="0" max="10" required="required" placeholder="Referral(%)" value="<?=$result_product_list['cash_back_percentage'];?>"/>
+                                                <input type="number" onkeypress="restrictnumber(event)" class="form-control" name="cash_back_percentage" min="0" max="10" required="required" placeholder="Referral(%)" value="<?=htmlspecialchars((string)($result_product_list['cash_back_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>"/>
 												<br/>
 												
 												<button type="submit" name="UpdateDistributorCategory" class="btn btn-primary">Update</button>

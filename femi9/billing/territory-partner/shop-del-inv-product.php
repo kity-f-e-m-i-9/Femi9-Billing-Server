@@ -23,7 +23,7 @@ $inv_id_decoded = base64_decode($invoice_id_encode);
 // invoice. Never trust that the link was only reachable because the UI hid it.
 if (!tpShopInvoiceActionAllowed($db_conn, (int)$Login_user_IDvl, $inv_id_decoded, 'remove')) {
     $_SESSION['errorMessage'] = "Remove isn't approved for this invoice yet. Please raise a request from the invoice first.";
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID={$invoice_id_encode}&invuser={$invuser}&action={$actionEdit}';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&invuser=".urlencode($invuser)."&action={$actionEdit}';</script>";
     exit;
 }
 
@@ -56,4 +56,4 @@ if ($delRow) {
     logShopInvoiceChange($db_conn, $inv_id_decoded, (int)$delRow['pr_id'], 'removed', (int)$delRow['qty'], null, $Login_user_TYPEvl, (string)$Login_user_IDvl);
 }
 
-echo "<script>window.location='shop-invoice-add.php?InvoiceID={$invoice_id_encode}&&DeleteSuccess&&invuser={$invuser}&&ActionRemove&&action={$actionEdit}';</script>";
+echo "<script>window.location='shop-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&ActionRemove&&action={$actionEdit}';</script>";

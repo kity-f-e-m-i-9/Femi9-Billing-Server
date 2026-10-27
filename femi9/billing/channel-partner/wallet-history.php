@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -59,12 +59,12 @@ $tempID = GeraHash_tp(20) . date("dmyHis");
 
         <?php if (isset($_SESSION['successMessage'])): ?>
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script>Swal.fire({icon:'success',title:'Success',text:'<?php echo $_SESSION['successMessage']; ?>',confirmButtonText:'OK'});</script>
+        <script>Swal.fire({icon:'success',title:'Success',text:'<?php echo htmlspecialchars((string)($_SESSION['successMessage']), ENT_QUOTES, 'ISO-8859-1', false); ?>',confirmButtonText:'OK'});</script>
         <?php unset($_SESSION['successMessage']); endif; ?>
 
         <?php if (isset($_SESSION['errorMessage'])): ?>
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script>Swal.fire({icon:'error',title:'Error',text:'<?php echo $_SESSION['errorMessage']; ?>',confirmButtonText:'OK'});</script>
+        <script>Swal.fire({icon:'error',title:'Error',text:'<?php echo htmlspecialchars((string)($_SESSION['errorMessage']), ENT_QUOTES, 'ISO-8859-1', false); ?>',confirmButtonText:'OK'});</script>
         <?php unset($_SESSION['errorMessage']); endif; ?>
 
         <div class="app-content">
@@ -200,7 +200,7 @@ if ($wh_from > $wh_to) { $t = $wh_from; $wh_from = $wh_to; $wh_to = $t; }
                                             <ul class="list-unstyled">
 <?php
 $creditRes = mysqli_query($db_conn,
-    "SELECT * FROM wallet_monthly_sls_report WHERE refer_by_usertype='$utype' AND refer_by_userid='$uid' AND DATE(from_date) BETWEEN '$wh_from' AND '$wh_to' ORDER BY from_date DESC");
+    "SELECT * FROM wallet_monthly_sls_report WHERE refer_by_usertype='$utype' AND refer_by_userid='$uid' AND DATE(from_date) BETWEEN '".db_esc($wh_from)."' AND '".db_esc($wh_to)."' ORDER BY from_date DESC");
 $hasCredits = false;
 while ($credit = mysqli_fetch_array($creditRes)):
     $hasCredits = true;
@@ -266,7 +266,7 @@ if(mysqli_num_rows($creditRes)==0){ ?><li class="wh-empty"><i class="material-ic
                                             <ul class="list-unstyled">
 <?php
 $debitRes = mysqli_query($db_conn,
-    "SELECT * FROM wallet_withdraw WHERE user_type='$utype' AND user_id='$uid' AND DATE(date) BETWEEN '$wh_from' AND '$wh_to' ORDER BY date DESC");
+    "SELECT * FROM wallet_withdraw WHERE user_type='$utype' AND user_id='$uid' AND DATE(date) BETWEEN '".db_esc($wh_from)."' AND '".db_esc($wh_to)."' ORDER BY date DESC");
 $hasDebits = false;
 while ($debit = mysqli_fetch_array($debitRes)):
     $hasDebits = true;

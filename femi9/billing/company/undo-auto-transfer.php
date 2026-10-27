@@ -2,7 +2,7 @@
 // AJAX backend for internal_transfer_auto.php's Transfer History "Undo"
 // button — reverses one product's already-completed auto-transfer (both
 // legs: Neksomo -> Healthcare -> LLP) via undo_auto_transfer().
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/AutoTransferDemand.php");

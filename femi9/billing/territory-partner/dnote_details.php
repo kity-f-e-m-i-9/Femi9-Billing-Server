@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -11,7 +11,7 @@ $ret = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_return_stoc
 $invid = $ret['invnumber'] ?? '';
 
 // Debit note: TP sent goods back to supplier — invoice is always in user_invoice
-$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='$invid' LIMIT 1"));
+$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='".db_esc($invid)."' LIMIT 1"));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -81,10 +81,10 @@ $inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHE
     <tr>
         <th><?php echo ++$rd; ?></th>
         <td><?php echo htmlspecialchars($product['productName']); ?></td>
-        <td><?php echo $item['qty']; ?></td>
+        <td><?php echo htmlspecialchars((string)($item['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
         <td>&#8377;<?php echo inr_format($item['amount'], 2); ?></td>
         <td align="right"><?php echo inr_format($item['subtotal'], 2); ?></td>
-        <td><?php echo inr_format($item['gstamount_total'], 2); ?> (<?php echo $item['gst_percentage']; ?>%)</td>
+        <td><?php echo inr_format($item['gstamount_total'], 2); ?> (<?php echo htmlspecialchars((string)($item['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
         <td align="right"><?php echo inr_format($item['total'], 2); ?></td>
     </tr>
     <?php } ?>

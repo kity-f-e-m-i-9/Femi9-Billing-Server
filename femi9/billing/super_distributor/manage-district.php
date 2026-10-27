@@ -116,7 +116,7 @@ $i= $start_from;
                                            
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["dist_name"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["dist_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
 													<a href="edit-dist.php?prid=<?php echo $district_id;?>"><img src="../../assets/images/edit-32.png"/></a>
 													</td>

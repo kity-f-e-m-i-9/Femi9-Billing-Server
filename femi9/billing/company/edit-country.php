@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Update Country";
 $manage_url="manage-country";
@@ -14,8 +14,8 @@ if (empty($_SESSION['csrf_token'])) {
 }
 
 //fetch product details
-$select_product_list="select * from country where id='$prid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from country where id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 									$result_product_list=mysqli_fetch_array($fetch_product_list);
 									
 ?>
@@ -93,26 +93,26 @@ $select_product_list="select * from country where id='$prid'";
  <?php include("validate-scripts.php");?>                                      
 <form action="product-action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                 
 												<label for="exampleInputEmail1" class="form-label">Country Name</label>
-                                                <input type="text" onkeypress="restrictCountryName(event)" class="form-control" name="c_name" required="required" placeholder="Country Name" value="<?=$result_product_list['c_name'];?>"/>
+                                                <input type="text" onkeypress="restrictCountryName(event)" class="form-control" name="c_name" required="required" placeholder="Country Name" value="<?=htmlspecialchars((string)($result_product_list['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?>"/>
 												<br/>
 												
 												<label for="exampleInputEmail1" class="form-label">Country Name</label>
-                                                <input type="text" onkeypress="restrictCountryCode(event)" class="form-control" name="c_code" required="required" placeholder="Country Code" value="<?=$result_product_list['c_code'];?>"/>
+                                                <input type="text" onkeypress="restrictCountryCode(event)" class="form-control" name="c_code" required="required" placeholder="Country Code" value="<?=htmlspecialchars((string)($result_product_list['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>"/>
 												<br/>
 												
 												<label for="exampleInputEmail1" class="form-label">Currency Name</label>
-                                                <input type="text" onkeypress="restrictSpecialChars(event)" class="form-control" name="currency_name" required="required" placeholder="Currency Name" value="<?=$result_product_list['currency_name'];?>"/>
+                                                <input type="text" onkeypress="restrictSpecialChars(event)" class="form-control" name="currency_name" required="required" placeholder="Currency Name" value="<?=htmlspecialchars((string)($result_product_list['currency_name']), ENT_QUOTES, 'ISO-8859-1', false);?>"/>
 												<br/>
 												
 												<label for="exampleInputEmail1" class="form-label">Currency Ascii Code</label>
-                                                <input type="number" min="0" onkeypress="restrictnumber(event)" class="form-control" name="currency_ascii_code" required="required" placeholder="Currency Ascii Code" value="<?=$result_product_list['currency_ascii_code'];?>"/>
+                                                <input type="number" min="0" onkeypress="restrictnumber(event)" class="form-control" name="currency_ascii_code" required="required" placeholder="Currency Ascii Code" value="<?=htmlspecialchars((string)($result_product_list['currency_ascii_code']), ENT_QUOTES, 'ISO-8859-1', false);?>"/>
 												<br/>
 												
 												<button type="submit" name="UpdateCountry" class="btn btn-primary">Update</button>

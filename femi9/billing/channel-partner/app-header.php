@@ -1,10 +1,10 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 $_wUid   = mysqli_real_escape_string($db_conn, $Login_user_IDvl);
 $_wUtype = mysqli_real_escape_string($db_conn, $Login_user_TYPEvl);
 $_wCredits   = (float)(mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COALESCE(SUM(commission_amount),0) FROM wallet_monthly_sls_report WHERE refer_by_usertype='$_wUtype' AND refer_by_userid='$_wUid'"))[0] ?? 0);
+    "SELECT COALESCE(SUM(commission_amount),0) FROM wallet_monthly_sls_report WHERE refer_by_usertype='".db_esc($_wUtype)."' AND refer_by_userid='".db_esc($_wUid)."'"))[0] ?? 0);
 $_wWithdrawn = (float)(mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COALESCE(SUM(amount),0) FROM wallet_withdraw WHERE user_type='$_wUtype' AND user_id='$_wUid' AND req_status='approved'"))[0] ?? 0);
+    "SELECT COALESCE(SUM(amount),0) FROM wallet_withdraw WHERE user_type='".db_esc($_wUtype)."' AND user_id='".db_esc($_wUid)."' AND req_status='approved'"))[0] ?? 0);
 $walletBalance = $_wCredits - $_wWithdrawn;
 
 // Assigned locations for header display

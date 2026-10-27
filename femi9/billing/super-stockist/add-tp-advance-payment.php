@@ -109,7 +109,7 @@ $tps = $tp_stmt->get_result()->fetch_all(MYSQLI_ASSOC); $tp_stmt->close();
                                     </div>
 
                                     <form action="tp-advance-payment-action" method="POST" id="advancePaymentForm" onsubmit="return validateForm();">
-                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <input type="hidden" name="add_tp_advance_payment" value="1">
 
                                         <div class="row">
@@ -120,7 +120,7 @@ $tps = $tp_stmt->get_result()->fetch_all(MYSQLI_ASSOC); $tp_stmt->close();
                                                 <select name="territory_partner_id" id="territory_partner_id" class="form-select" required>
                                                     <option value=""></option>
                                                     <?php foreach ($tps as $tp): ?>
-                                                    <option value="<?php echo $tp['id']; ?>"
+                                                    <option value="<?php echo htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"
                                                         data-tp-id="<?php echo htmlspecialchars($tp['tp_id']); ?>"
                                                         data-mobile="<?php echo htmlspecialchars($tp['mobile'] ?? ''); ?>">
                                                         <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars($tp['tp_id']); ?>)

@@ -17,7 +17,7 @@
 declare(strict_types=1);
 
 // Session and security checks
-require_once "checksession.php";
+require_once "checksession.php"; require_once "include/PermissionCheck.php"; requirePermission('remap');
 
 // Set timezone
 date_default_timezone_set("Asia/Kolkata");

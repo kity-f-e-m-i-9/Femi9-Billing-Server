@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 /**
  * OT Channel Sales — Bulk Import Handler
  *
@@ -94,7 +94,7 @@ if (!is_dir($upload_dir)) {
 $stored_name = 'otimp_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
 $stored_path = $upload_dir . '/' . $stored_name;
 
-if (!move_uploaded_file($_FILES['import_file']['tmp_name'], $stored_path)) {
+if (!safe_move_uploaded_file($_FILES['import_file']['tmp_name'], $stored_path)) {
     $_SESSION['errorMessage'] = 'Could not save uploaded file';
     ot_import_back([]);
 }

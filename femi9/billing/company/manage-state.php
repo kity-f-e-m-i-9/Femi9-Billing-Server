@@ -126,8 +126,8 @@ $i= $start_from;
                                            
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><b><?php echo $result_product_list["id"];?></b></td>
-                                                    <td><?php echo $result_product_list["st_name"];?></td>
+													<td><b><?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["st_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 																										<td>
 													    <div class="actions-group">
 													        <a href="edit-state?prid=<?php echo $district_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>

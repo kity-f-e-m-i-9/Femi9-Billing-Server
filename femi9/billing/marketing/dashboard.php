@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php"); 
 
@@ -40,13 +40,13 @@ date_default_timezone_set("Asia/Kolkata");
 $ATTND_date=date("Y-m-d");
 $ATTND_time=date("H:i:s");
 
-$select_AttendanceCount="select * from ms_attendance where ms_id='$markeingSTFID' and date='$ATTND_date'";
-$fetch_AttendanceCount=mysqli_query($db_conn,$select_AttendanceCount);
+$select_AttendanceCount="select * from ms_attendance where ms_id=? and date=?";
+$fetch_AttendanceCount=db_q($db_conn,$select_AttendanceCount,[$markeingSTFID,$ATTND_date]);
 $result_AttendanceCount=mysqli_num_rows($fetch_AttendanceCount);
 if($result_AttendanceCount==0)
 	{
-		$insertATTND="insert into ms_attendance (ms_id,date,time) values ('$markeingSTFID','$ATTND_date','$ATTND_time')";
-		mysqli_query($db_conn,$insertATTND);
+		$insertATTND="insert into ms_attendance (ms_id,date,time) values (?,?,?)";
+		db_q($db_conn,$insertATTND,[$markeingSTFID,$ATTND_date,$ATTND_time]);
 
 	}
 
@@ -846,21 +846,21 @@ ksort($districtTpCounts);
                                         <div class="firka-tile">
                                             <div>
                                                 <div class="ft-label">Total Firkas</div>
-                                                <div class="ft-count"><?php echo $districtStats['firka_total_count']; ?></div>
+                                                <div class="ft-count"><?php echo htmlspecialchars((string)($districtStats['firka_total_count']), ENT_QUOTES, 'ISO-8859-1', false); ?></div>
                                             </div>
                                             <div class="ft-value">&#8377;<?php echo inr_format($districtStats['district_total_target'], 0); ?></div>
                                         </div>
                                         <div class="firka-tile">
                                             <div>
                                                 <div class="ft-label">Filled Firkas</div>
-                                                <div class="ft-count" style="color:#10b981;"><?php echo $districtStats['firka_filled_count']; ?></div>
+                                                <div class="ft-count" style="color:#10b981;"><?php echo htmlspecialchars((string)($districtStats['firka_filled_count']), ENT_QUOTES, 'ISO-8859-1', false); ?></div>
                                             </div>
                                             <div class="ft-value">&#8377;<?php echo inr_format($districtStats['target_active_amount'] + $districtStats['target_inactive_amount'], 0); ?></div>
                                         </div>
                                         <div class="firka-tile firka-tile-clickable" id="vacantFirkaTile" data-bs-toggle="modal" data-bs-target="#vacantFirkaModal" role="button" tabindex="0">
                                             <div>
                                                 <div class="ft-label">Vacant Firkas</div>
-                                                <div class="ft-count" style="color:#ef4444;"><?php echo $districtStats['firka_vacant_count']; ?></div>
+                                                <div class="ft-count" style="color:#ef4444;"><?php echo htmlspecialchars((string)($districtStats['firka_vacant_count']), ENT_QUOTES, 'ISO-8859-1', false); ?></div>
                                             </div>
                                             <div style="text-align:right;">
                                                 <div class="ft-value">&#8377;<?php echo inr_format($districtStats['target_unassigned_amount'], 0); ?></div>
@@ -902,8 +902,8 @@ ksort($districtTpCounts);
                                                 <?php foreach ($districtTpCounts as $_dn => $_cnt): ?>
                                                 <tr class="district-chip" data-district="<?php echo htmlspecialchars($_dn, ENT_QUOTES); ?>" style="cursor:pointer;">
                                                     <td><b style="color:#1f2937;"><?php echo htmlspecialchars($_dn); ?></b></td>
-                                                    <td style="text-align:right;color:#059669;font-weight:600;"><?php echo $_cnt['active']; ?></td>
-                                                    <td style="text-align:right;color:#dc2626;font-weight:600;"><?php echo $_cnt['inactive']; ?></td>
+                                                    <td style="text-align:right;color:#059669;font-weight:600;"><?php echo htmlspecialchars((string)($_cnt['active']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+                                                    <td style="text-align:right;color:#dc2626;font-weight:600;"><?php echo htmlspecialchars((string)($_cnt['inactive']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                 </tr>
                                                 <?php endforeach; ?>
                                             </tbody>

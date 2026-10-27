@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 $title="Update Customer";
 error_reporting(0);
@@ -91,7 +91,7 @@ else
 									<table class="headertble">
 									<tr>
 									<td><?php echo $title;?></td>
-									<td><a href="<?=$backlink;?>" title="Go Back">&#9776;</a></td>
+									<td><a href="<?=htmlspecialchars((string)($backlink), ENT_QUOTES, 'UTF-8', false);?>" title="Go Back">&#9776;</a></td>
 									</tr>
 									</table>
 									</h1>
@@ -121,7 +121,7 @@ else
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from ".$invtable_name." where inv_id='$invid'";
+					<?php $select_product_list="select * from ".$invtable_name." where inv_id='".db_esc($invid)."'";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										$result_product_list=mysqli_fetch_array($fetch_product_list);
 											
@@ -136,7 +136,7 @@ else
 											?>
                                             
                                                 <tr>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $Cust_Name;?><br/>M: <?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
@@ -150,8 +150,8 @@ else
 										
 				<form action="update_customer_action" method="post" enctype="multipart/form-data" onsubmit="return confirm('Please make a confirm!')">
 				
-				<input type="hidden" name="invid" value="<?=$invid;?>"/>
-				<input type="hidden" name="invuser" value="<?=$_REQUEST['invuser'];?>"/>
+				<input type="hidden" name="invid" value="<?=htmlspecialchars((string)($invid), ENT_QUOTES, 'UTF-8', false);?>"/>
+				<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>"/>
 				<input type="hidden" name="old_customer_id" value="<?=$CuSTID;?>"/>
 				
 
@@ -166,7 +166,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintstock").innerHTML=xmlhttp.responseText;}}
-var invuser="<?=$getinvuser;?>";
+var invuser="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>";
 var oldcustomerid="<?=$CuSTID;?>";
 xmlhttp.open("GET","loadstockcheck2.php?q="+str + '&invuser='+ invuser + '&oldcustomerid='+ oldcustomerid,true);
 xmlhttp.send();}
@@ -185,8 +185,8 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 			
 			$user_districtID=$result_Customers_list['district_id'];
 			//
-			$select_User_districtName="select * from district where id='$user_districtID'";
-			$fetch_user_districtName=mysqli_query($db_conn,$select_User_districtName);
+			$select_User_districtName="select * from district where id=?";
+			$fetch_user_districtName=db_q($db_conn,$select_User_districtName,[$user_districtID]);
 			$result_user_districtName=mysqli_fetch_array($fetch_user_districtName);
 			$user_districtName=$result_user_districtName['dist_name'];
 			
@@ -198,7 +198,7 @@ while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list))
 			
 			
 ?>
-<option value="<?=$result_Customers_list['temp_id'];?>"><?=$UserName_SHOW;?></option>
+<option value="<?=htmlspecialchars((string)($result_Customers_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=$UserName_SHOW;?></option>
 <?php }?>
 </select>
 							   

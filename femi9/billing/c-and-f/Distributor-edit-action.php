@@ -1,11 +1,11 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("RemoveSpecialChar.php");
 error_reporting(0);
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $update_id=$_REQUEST['update_id'];
-$old_icon=$_REQUEST['old_icon'];
+$old_icon=safe_old_file_param($_REQUEST['old_icon']);
 	
 	$name=str_replace("'","&#39;",$_REQUEST['name']);
 	$gstin=str_replace("'","&#39;",$_POST["gstin"]);
@@ -31,7 +31,7 @@ $insfilename=$old_icon;
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='../stockist/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 	   if($old_icon!="Nil")
@@ -54,7 +54,7 @@ $insfilename=$old_icon;
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='../stockist/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 		   unlink("../stockist/".$old_icon."");
@@ -82,19 +82,19 @@ $insfilename=$old_icon;
 	
 	
 	//update process
-	$update_ss="update distributor set user_icon='$insfilename',name='$name',
-	email='$email',mobile_number='$mobile_number',username='$mobile_number',
-	address='$address',country_code='$country_code',gstin='$gstin',state_id='$state_id',
-    district_id='$district_id',taluk_id='$taluk_id',pincode_id='$pincode_id',shop_onboard='$shop_onboard' 
-	where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update distributor set user_icon=?,name=?,
+	email=?,mobile_number=?,username=?,
+	address=?,country_code=?,gstin=?,state_id=?,
+    district_id=?,taluk_id=?,pincode_id=?,shop_onboard=? 
+	where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,$mobile_number,$address,$country_code,$gstin,$state_id,$district_id,$taluk_id,$pincode_id,$shop_onboard,$update_id]);
 	
 	//Update target amount
 	$target_amount=$_REQUEST['target_amount'];
 	$distributor_id=$_REQUEST['distributor_id'];
 	
-	$upadte129="update distributor_referral set target_amount='$target_amount' where distributor_id='$distributor_id'";
-	mysqli_query($db_conn,$upadte129);
+	$upadte129="update distributor_referral set target_amount=? where distributor_id=?";
+	db_q($db_conn,$upadte129,[$target_amount,$distributor_id]);
 	
 	echo "<script>window.location='Distributor-manage.php?updatedSuccess';</script>";
 	exit;

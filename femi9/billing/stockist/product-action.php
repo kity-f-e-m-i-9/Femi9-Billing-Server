@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 //--------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------
@@ -11,13 +11,13 @@ if(isset($_REQUEST['add-product']))
 	$productName=$_REQUEST['productName'];
 	$productName=str_replace("'","&#39;",$productName);
 	
-	$select_count_product="select count(*) as numProducts from products where temp_id='$temp_id'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	$select_count_product="select count(*) as numProducts from products where temp_id=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$temp_id]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numProducts']==0)
 	{
-		$insert_products="insert into products (temp_id,productName) values ('$temp_id','$productName')";
-		mysqli_query($db_conn,$insert_products);
+		$insert_products="insert into products (temp_id,productName) values (?,?)";
+		db_q($db_conn,$insert_products,[$temp_id,$productName]);
 		
 		echo "<script>window.location='manage-products.php?addesuccess';</script>";
 	}else{
@@ -35,8 +35,8 @@ if(isset($_REQUEST['update-product']))
 	$productName=$_REQUEST['productName'];
 	$productName=str_replace("'","&#39;",$productName);
 	
-	$update_products="update products set productName='$productName' where id='$update_id'";
-	mysqli_query($db_conn,$update_products);
+	$update_products="update products set productName=? where id=?";
+	db_q($db_conn,$update_products,[$productName,$update_id]);
 		
 		echo "<script>window.location='manage-products.php?updatedSuccess';</script>";
 	
@@ -53,14 +53,14 @@ if(isset($_REQUEST['add-district']))
 	$dist_name=$_REQUEST['dist_name'];
 	$dist_name=str_replace("'","&#39;",$dist_name);
 	
-	$select_count_product="select count(*) as numDistrict from district where temp_id='$temp_id'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	$select_count_product="select count(*) as numDistrict from district where temp_id=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$temp_id]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numDistrict']==0)
 	{
 		$insert_products="insert into district (temp_id,dist_name,usertype,userid) values 
-		('$temp_id','$dist_name','admin','0')";
-		mysqli_query($db_conn,$insert_products);
+		(?,?,'admin','0')";
+		db_q($db_conn,$insert_products,[$temp_id,$dist_name]);
 		
 		echo "<script>window.location='manage-district.php?addesuccess';</script>";
 	}else{
@@ -79,8 +79,8 @@ if(isset($_REQUEST['update-district']))
 	$dist_name=$_REQUEST['dist_name'];
 	$dist_name=str_replace("'","&#39;",$dist_name);
 	
-	$update_products="update district set dist_name='$dist_name' where id='$update_id'";
-	mysqli_query($db_conn,$update_products);
+	$update_products="update district set dist_name=? where id=?";
+	db_q($db_conn,$update_products,[$dist_name,$update_id]);
 		
 		echo "<script>window.location='manage-district.php?updatedSuccess';</script>";
 }
@@ -105,14 +105,14 @@ for ($i=0; $i<=$number; $i++)
      $taluk_value = $taluk_ex[$i];
 	 $taluk_value=str_replace("'","&#39;",$taluk_value);	 
 	 
-	 $select_count_product="select count(*) as numDistrict from taluk where dist_id='$dist_id' and taluk='$taluk_value'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	 $select_count_product="select count(*) as numDistrict from taluk where dist_id=? and taluk=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$dist_id,$taluk_value]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numDistrict']==0 && $taluk_value!=NULL)
 	{
 		$insert_products="insert into taluk (dist_id,taluk,ss_id) values 
-		('$dist_id','$taluk_value','$super_stockiest_id')";
-		mysqli_query($db_conn,$insert_products);
+		(?,?,?)";
+		db_q($db_conn,$insert_products,[$dist_id,$taluk_value,$super_stockiest_id]);
 		
 		echo "<script>window.location='manage-taluk.php?addesuccess';</script>";
 	}else{
@@ -134,8 +134,8 @@ if(isset($_REQUEST['update-taluk']))
 	$taluk=$_REQUEST['taluk'];
 	$taluk=str_replace("'","&#39;",$taluk);
 	
-	$update_products="update taluk set dist_id='$dist_id',taluk='$taluk' where id='$update_id'";
-	mysqli_query($db_conn,$update_products);
+	$update_products="update taluk set dist_id=?,taluk=? where id=?";
+	db_q($db_conn,$update_products,[$dist_id,$taluk,$update_id]);
 		
 		echo "<script>window.location='manage-taluk.php?updatedSuccess';</script>";
 }
@@ -163,14 +163,14 @@ for ($i=0; $i<=$number; $i++)
      $pincode_value = $pincode_ex[$i];
 	 $pincode_value=str_replace("'","&#39;",$pincode_value);	 
 	 
-	 $select_count_product="select count(*) as numpincode from pincode where state_id='$state_id' and dist_id='$dist_id' and taluk_id='$taluk_id' and pincode='$pincode_value'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	 $select_count_product="select count(*) as numpincode from pincode where state_id=? and dist_id=? and taluk_id=? and pincode=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$state_id,$dist_id,$taluk_id,$pincode_value]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numpincode']==0 && $pincode_value!=NULL)
 	{
 		$insert_products="insert into pincode (state_id,dist_id,taluk_id,pincode,sid,assigned_user_id) values 
-		('$state_id','$dist_id','$taluk_id','$pincode_value','$stockiest_id','Nil')";
-		mysqli_query($db_conn,$insert_products);
+		(?,?,?,?,?,'Nil')";
+		db_q($db_conn,$insert_products,[$state_id,$dist_id,$taluk_id,$pincode_value,$stockiest_id]);
 		
 		echo "<script>window.location='manage-pincode.php?addesuccess';</script>";
 	}else{
@@ -195,9 +195,9 @@ if(isset($_REQUEST['update-pincode']))
 	$pincode=$_REQUEST['pincode'];
 	$pincode=str_replace("'","&#39;",$pincode);
 	
-	$update_products="update pincode set state_id='$state_id',dist_id='$dist_id',
-	taluk_id='$taluk_id',pincode='$pincode' where id='$update_id'";
-	mysqli_query($db_conn,$update_products);
+	$update_products="update pincode set state_id=?,dist_id=?,
+	taluk_id=?,pincode=? where id=?";
+	db_q($db_conn,$update_products,[$state_id,$dist_id,$taluk_id,$pincode,$update_id]);
 		
 		echo "<script>window.location='manage-pincode.php?updatedSuccess';</script>";
 }

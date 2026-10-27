@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
@@ -9,8 +9,8 @@ $canEditReturn = hasPermission('manage_return_edit');
 	$returnid=base64_decode($_REQUEST['returnid']);
 	$invnum=base64_decode($_REQUEST['invnum']);
 	
-	$select_invoicedetails="select * from user_return_stock where returnid='$returnid' and deleted_at is null";
-	$fetch_invoicedetails=mysqli_query($db_conn,$select_invoicedetails);
+	$select_invoicedetails="select * from user_return_stock where returnid=? and deleted_at is null";
+	$fetch_invoicedetails=db_q($db_conn,$select_invoicedetails,[$returnid]);
 	$result_invoicedtails=mysqli_fetch_array($fetch_invoicedetails);
 	$invid=$result_invoicedtails['invnumber'];
 	$user=$result_invoicedtails['from_usertype'];
@@ -18,11 +18,11 @@ $canEditReturn = hasPermission('manage_return_edit');
 	//Get Invoice Number
 	if($user=="customer")
 	{
-	$select_invoicedetails12="select * from invoice where inv_id='$invid'";
+	$select_invoicedetails12="select * from invoice where inv_id='".db_esc($invid)."'";
 	}else{
-    $select_invoicedetails12="select * from user_invoice where inv_id='$invid'";
+    $select_invoicedetails12="select * from user_invoice where inv_id=?";
 	}
-	$fetch_invoicedetails12=mysqli_query($db_conn,$select_invoicedetails12);
+	$fetch_invoicedetails12=db_q($db_conn,$select_invoicedetails12,[$invid]);
 	$result_invoicedtails12=mysqli_fetch_array($fetch_invoicedetails12);
 ?>
 
@@ -90,7 +90,7 @@ $canEditReturn = hasPermission('manage_return_edit');
 									<td><?=$displaytitle;?>
 									<br/>
 					<div style="font-size:15px;margin-top:10px;">Invoice Number:-</div>
-					<div style="font-size:22px;font-weight:600;color:blue;"><?=$result_invoicedtails12['inv_number'];?></div>
+					<div style="font-size:22px;font-weight:600;color:blue;"><?=htmlspecialchars((string)($result_invoicedtails12['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
 					<div style="font-size:12px;margin-top:5px;"><?=$user;?></div>
 									</td>
 									<td>&nbsp;</td>
@@ -128,16 +128,16 @@ $canEditReturn = hasPermission('manage_return_edit');
                                                     </thead>
                                                     <tbody>
 													<?php
-	$select_INVProductDetails="select * from user_return_stock_items where returnid='$returnid' and deleted_at is null order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_return_stock_items where returnid=? and deleted_at is null order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$returnid]);
 	$count_products_return=mysqli_num_rows($fetch_INVProductDetails);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['prid'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		$TotalAMount=$result_INVProductDetails['total'];
@@ -148,15 +148,15 @@ $canEditReturn = hasPermission('manage_return_edit');
 	?>
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
-<td><?=$result_ProductDetails123['productName'];?></td>
-<td><?=$result_INVProductDetails['qty'];?></td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td align="right"><?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
-<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?>&nbsp;(<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?>&nbsp;(<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
 <?php if ($canEditReturn): ?>
-<a href="cnote_delete.php?returnid=<?=$_REQUEST['returnid'];?>&&rowid=<?=$ItemRowid;?>&&redirurl=cnote_details&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="cnote_delete.php?returnid=<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?=$ItemRowid;?>&&redirurl=cnote_details&&ActionDel"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 <?php endif; ?>
 </td>
                                                         </tr>
@@ -176,7 +176,7 @@ $canEditReturn = hasPermission('manage_return_edit');
                                               <?php if($count_products_return==0){?>	
 											  <div class="col-lg-12" style="text-align:center;">
 							<?php if ($canEditReturn): ?>
-							<a href="cnote_del?returnid=<?=$_REQUEST['returnid'];?>" class="btn btn-primary badge badge-style-bordered badge-danger" type="button" style="width:auto;">Delete Credit Note</a>
+							<a href="cnote_del?returnid=<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>" class="btn btn-primary badge badge-style-bordered badge-danger" type="button" style="width:auto;">Delete Credit Note</a>
 							<?php endif; ?>
 							 </div>
 									<?php }?>
@@ -197,7 +197,7 @@ $canEditReturn = hasPermission('manage_return_edit');
 <?php if($result_invoicedtails['status']=="pending" && $count_products_return>0 && $canEditReturn){?>
 
 <form action="cnote_finish.php" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
-<input type="hidden" name="returnid" value="<?=$_REQUEST['returnid'];?>"/>
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
 
@@ -210,7 +210,7 @@ $canEditReturn = hasPermission('manage_return_edit');
 		   <?php if($resultReturnDtails['discount']==0){?>
 		  <input type="number" onkeyup="totalamount()" id="discount" value="0" min="0" name="discount" required="">
 		   <?php }else{ ?>
-		   <input type="number" value="<?=$resultReturnDtails['discount'];?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
+		   <input type="number" value="<?=htmlspecialchars((string)($resultReturnDtails['discount']), ENT_QUOTES, 'ISO-8859-1', false);?>" onkeyup="totalamount()" id="discount" min="0" name="discount" required="">
 		   <?php }?>
 		 </span></p>
 													<br/>

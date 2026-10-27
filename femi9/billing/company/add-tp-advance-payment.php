@@ -217,7 +217,7 @@ if ($stmt_cp) { $stmt_cp->execute(); $company_profiles = $stmt_cp->get_result()-
                                         <form action="tp-advance-payment-action" method="POST" id="advancePaymentForm" onsubmit="return validateForm();">
 
                                             <!-- CSRF Token -->
-                                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                             <input type="hidden" name="add_tp_advance_payment" value="1">
 
                                             <div class="row">
@@ -228,7 +228,7 @@ if ($stmt_cp) { $stmt_cp->execute(); $company_profiles = $stmt_cp->get_result()-
                                                     <select name="company_id" id="company_id" class="form-select" required>
                                                         <option value="" hidden>Select Company</option>
                                                         <?php foreach ($company_profiles as $cp): ?>
-                                                            <option value="<?php echo $cp['id']; ?>">
+                                                            <option value="<?php echo htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                                                 <?php echo htmlspecialchars($cp['gname']); ?>
                                                             </option>
                                                         <?php endforeach; ?>
@@ -242,7 +242,7 @@ if ($stmt_cp) { $stmt_cp->execute(); $company_profiles = $stmt_cp->get_result()-
                                                     <select name="territory_partner_id" id="territory_partner_id" class="form-select" required>
                                                         <option value=""></option>
                                                         <?php foreach ($tps as $tp): ?>
-                                                            <option value="<?php echo $tp['id']; ?>"
+                                                            <option value="<?php echo htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"
                                                                 data-tp-id="<?php echo htmlspecialchars($tp['tp_id']); ?>"
                                                                 data-mobile="<?php echo htmlspecialchars($tp['mobile'] ?? ''); ?>">
                                                                 <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars($tp['tp_id']); ?>)

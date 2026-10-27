@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 
@@ -10,7 +10,7 @@ include("config.php");
 $file = "Outlet.csv";
 
 // Fetch product data from database
-$select_records = "select * from outlet where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' order by id asc";
+$select_records = "select * from outlet where onboard_userTYPE='".db_esc($onboard_userTYPE)."' and onboard_userID='".db_esc($onboard_userID)."' order by id asc";
 $fetch_records = mysqli_query($db_conn, $select_records);
 
 // Initialize CSV content
@@ -26,7 +26,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_records)) {
 	
 	//state details
 											$state_id=$result_product_list['state_id'];
-								$select_stateList="select * from state where id='$state_id'";
+								$select_stateList="select * from state where id='".db_esc($state_id)."'";
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];
@@ -48,7 +48,7 @@ while ($result_product_list = mysqli_fetch_array($fetch_records)) {
 										
 										//pincode
 $pincode_id=$result_product_list['pincode_id'];
-$select_pincodelist="select * from pincode where id='$pincode_id'";
+$select_pincodelist="select * from pincode where id='".db_esc($pincode_id)."'";
 	$fetch_pincodelist=mysqli_query($db_conn,$select_pincodelist);
 	$result_pincodelist=mysqli_fetch_array($fetch_pincodelist);
 $pincodeshow=$result_pincodelist['pincode'];

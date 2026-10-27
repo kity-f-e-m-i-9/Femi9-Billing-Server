@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
@@ -216,15 +216,15 @@ if (isset($_REQUEST['InvoiceID'])) {
     $Invoice_ID_encode = $_REQUEST['InvoiceID'];
     $Invoice_ID        = base64_decode($_REQUEST['InvoiceID']);
 
-    $res_inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='$Invoice_ID' LIMIT 1"));
+    $res_inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='".db_esc($Invoice_ID)."' LIMIT 1"));
 
     $totalamount         = (float)($res_inv['total'] ?? 0);
-    $Total_Receipt_amount = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(received) FROM receipt WHERE inv_id='$Invoice_ID'"))[0]);
+    $Total_Receipt_amount = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(received) FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."'"))[0]);
     $amount_received_fully = ($Total_Receipt_amount > 0 && $totalamount == $Total_Receipt_amount) ? "1" : "0";
 
     $CustomerID = $res_inv['customer_id'] ?? 0;
     if ($CustomerID != 0) {
-        $res_cust          = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE id='$CustomerID' LIMIT 1"));
+        $res_cust          = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE id='".db_esc($CustomerID)."' LIMIT 1"));
         $inv_customer_name   = $res_cust['name']   ?? '';
         $inv_customer_mobile = $res_cust['mobile']  ?? '';
     } else {
@@ -233,7 +233,7 @@ if (isset($_REQUEST['InvoiceID'])) {
     }
 ?>
 <form action="customer-invoice-action2.php" method="post" enctype="multipart/form-data">
-<input type="hidden" name="inv_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="inv_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 
 <div class="form-section">
 <div class="section-header"><i class="material-icons">edit_document</i>Invoice Details</div>
@@ -241,7 +241,7 @@ if (isset($_REQUEST['InvoiceID'])) {
 <div class="col-md-6">
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
 <?php
-$cnt_items = (int)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM invoice_items WHERE inv_id='$Invoice_ID'"))['n']);
+$cnt_items = (int)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM invoice_items WHERE inv_id='".db_esc($Invoice_ID)."'"))['n']);
 ?>
 <select name="customer_id" class="form-control">
 <option value="<?php echo $CustomerID; ?>" hidden><?php echo htmlspecialchars($inv_customer_name); ?>, <?php echo htmlspecialchars($inv_customer_mobile); ?></option>
@@ -249,7 +249,7 @@ $cnt_items = (int)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS
     $res_custs = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE user_id='$Login_user_IDvl' ORDER BY name ASC");
     while ($rc = mysqli_fetch_array($res_custs)) {
 ?>
-<option value="<?php echo $rc['id']; ?>"><?php echo ucwords($rc['name']); ?>, <?php echo $rc['mobile']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rc['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucwords($rc['name'])), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($rc['mobile']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } } ?>
 </select>
 </div>
@@ -297,7 +297,7 @@ flatpickr("#editInvoiceDate", {
 $res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) {
 ?>
-<option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rp['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 </select>
 </div>
@@ -337,7 +337,7 @@ while ($rp = mysqli_fetch_array($res_prods)) {
 
 <?php
 $TotalAMount123 = 0;
-$res_items = mysqli_query($db_conn, "SELECT ii.*, p.productName, p.hsn FROM invoice_items ii LEFT JOIN products p ON ii.pr_id=p.id WHERE ii.inv_id='$Invoice_ID' ORDER BY ii.id DESC");
+$res_items = mysqli_query($db_conn, "SELECT ii.*, p.productName, p.hsn FROM invoice_items ii LEFT JOIN products p ON ii.pr_id=p.id WHERE ii.inv_id='".db_esc($Invoice_ID)."' ORDER BY ii.id DESC");
 $CountProducts = mysqli_num_rows($res_items);
 $rd = 0;
 ?>
@@ -356,18 +356,18 @@ $rd = 0;
             <td><?php echo ++$rd; ?></td>
             <td><?php echo htmlspecialchars($ri['productName']); ?></td>
             <td><?php echo htmlspecialchars($ri['hsn']); ?></td>
-            <td><?php echo $ri['qty']; ?></td>
-            <td><?php echo $ri['amount']; ?></td>
-            <td><?php echo $ri['discount_amount']; ?> (<?php echo $ri['discount_percentage']; ?>%)</td>
+            <td><?php echo htmlspecialchars((string)($ri['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+            <td><?php echo htmlspecialchars((string)($ri['amount']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+            <td><?php echo htmlspecialchars((string)($ri['discount_amount']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($ri['discount_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
             <td>&#8377;<?php echo inr_format((float)$ri['subtotal'], 2); ?></td>
-            <td><?php echo inr_format((float)$ri['gstamount_total'], 2); ?> (<?php echo $ri['gst_percentage']; ?>%)</td>
+            <td><?php echo inr_format((float)$ri['gstamount_total'], 2); ?> (<?php echo htmlspecialchars((string)($ri['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
             <td><?php echo inr_format((float)$ri['total'], 2); ?></td>
             <?php if ($amount_received_fully == 0): ?>
             <td>
             <?php
-            $cnt_ret2 = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='$Invoice_ID' AND prid='" . $ri['pr_id'] . "'"));
+            $cnt_ret2 = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='".db_esc($Invoice_ID)."' AND prid='" . $ri['pr_id'] . "'"));
             if ($cnt_ret2 == 0) {
-                echo "<a href='customer-del-inv-product.php?inv_id=$Invoice_ID_encode&&rowid=$ItemRowid&&userid=$CustomerID&&actionremove' onclick=\"return confirm('Delete?');\"><span class='badge bg-danger'>Remove</span></a>";
+                echo "<a href='customer-del-inv-product.php?inv_id=".urlencode($Invoice_ID_encode)."&&rowid=$ItemRowid&&userid=$CustomerID&&actionremove' onclick=\"return confirm('Delete?');\"><span class='badge bg-danger'>Remove</span></a>";
             } else {
                 echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";
             }
@@ -382,14 +382,14 @@ $rd = 0;
 
 <?php
 if ($CountProducts == 0 && (float)($res_inv['sub_total'] ?? 0) > 0) {
-    mysqli_query($db_conn, "UPDATE invoice SET sub_total='0',discount='0',total='0' WHERE inv_id='$Invoice_ID'");
+    mysqli_query($db_conn, "UPDATE invoice SET sub_total='0',discount='0',total='0' WHERE inv_id='".db_esc($Invoice_ID)."'");
 }
 $unround_value  = $TotalAMount123 + (float)($res_inv['courier_charges'] ?? 0);
 $roundvalue     = round($unround_value);
 $roundoff       = $roundvalue - $unround_value;
-$already_received = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COALESCE(SUM(received),0) FROM receipt WHERE inv_id='$Invoice_ID'"))[0]);
+$already_received = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COALESCE(SUM(received),0) FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."'"))[0]);
 $balance_due    = max(0, (float)$roundvalue - $already_received);
-$res_receipt    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='$Invoice_ID' ORDER BY id ASC LIMIT 1"));
+$res_receipt    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."' ORDER BY id ASC LIMIT 1"));
 ?>
 
 <div class="invoice-summary-card">
@@ -412,9 +412,9 @@ $res_receipt    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM recei
             </div>
             <form method="post" onsubmit="return confirm('Confirm update?');" action="update_invoice_action.php">
             <input type="hidden" name="invuser" value="customer">
-            <input type="hidden" name="InvoiceID" value="<?php echo $_REQUEST['InvoiceID'] ?? ''; ?>">
-            <input type="hidden" name="action" value="<?php echo $_REQUEST['action'] ?? ''; ?>">
-            <input type="hidden" name="gid" value="<?php echo $_REQUEST['gid'] ?? ''; ?>">
+            <input type="hidden" name="InvoiceID" value="<?php echo htmlspecialchars((string)($_REQUEST['InvoiceID'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+            <input type="hidden" name="action" value="<?php echo htmlspecialchars((string)($_REQUEST['action'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+            <input type="hidden" name="gid" value="<?php echo htmlspecialchars((string)($_REQUEST['gid'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
             <input type="hidden" name="redirurl" value="customer-invoice-add">
             <input type="hidden" name="tblenme" value="2">
             <div class="example-content" style="padding:20px;">
@@ -433,7 +433,7 @@ $res_receipt    = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM recei
 <div class="col-lg-7"><div class="invoice-info">
 <?php if ($amount_received_fully == 0): ?>
 <form action="customer-invoice-submit.php" method="post" enctype="multipart/form-data" onsubmit="return confirm('Submit invoice?');">
-<input type="hidden" name="invoice_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="invoice_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 <input type="hidden" name="sub_total" value="<?php echo $TotalAMount123; ?>">
 <input type="hidden" name="discount" value="0">
 <input type="hidden" name="roundoff" value="<?php echo number_format($roundoff, 2, '.', ''); ?>">
@@ -474,7 +474,7 @@ function receiptamount() {
 <?php if (empty($res_receipt['receipt_method'])): ?>
 <option value="" hidden>Select</option>
 <?php else: ?>
-<option value="<?php echo $res_receipt['receipt_method']; ?>" hidden><?php echo $res_receipt['receipt_method']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($res_receipt['receipt_method']), ENT_QUOTES, 'ISO-8859-1', false); ?>" hidden><?php echo htmlspecialchars((string)($res_receipt['receipt_method']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php endif; ?>
 <option>--None--</option>
 <option>Cash</option>
@@ -542,7 +542,7 @@ function receiptamount() {
                     <label class="form-label">Country Code*</label>
                     <select name="country_code" required class="form-control">
                     <?php $fc = mysqli_query($db_conn, "SELECT * FROM country ORDER BY id ASC"); while ($rc2 = mysqli_fetch_array($fc)) { ?>
-                    <option value="<?php echo $rc2['c_code']; ?>"><?php echo $rc2['c_name']; ?> (<?php echo $rc2['c_code']; ?>)</option>
+                    <option value="<?php echo htmlspecialchars((string)($rc2['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rc2['c_name']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($rc2['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
                     <?php } ?>
                     </select>
                 </div>
@@ -613,7 +613,7 @@ function showInvoiceDuplicate(str) {
 $res_custs = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE user_id='$Login_user_IDvl' ORDER BY name ASC");
 while ($rc = mysqli_fetch_array($res_custs)) {
 ?>
-<option value="<?php echo $rc['id']; ?>"><?php echo ucwords($rc['name']); ?>, <?php echo $rc['mobile']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rc['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucwords($rc['name'])), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($rc['mobile']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 </select>
 </div>
@@ -655,7 +655,7 @@ flatpickr("#bookingDate", invoiceDateOpts);
 $res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) {
 ?>
-<option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rp['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 </select>
 </div>

@@ -1,15 +1,15 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
  error_reporting(0);
  
  $returnid=$_REQUEST['returnid'];
  $returnid_decode=base64_decode($returnid);
  //
- $select_details123="select * from user_return_stock where returnid='$returnid_decode'";
-				$fetch_details123=mysqli_query($db_conn,$select_details123);
+ $select_details123="select * from user_return_stock where returnid=?";
+				$fetch_details123=db_q($db_conn,$select_details123,[$returnid_decode]);
 				$result_details123=mysqli_fetch_array($fetch_details123);
 				
-				$urlname=$_REQUEST['pagename'];
+				$urlname=preg_replace('/[^A-Za-z0-9_\-\/]/', '', (string)($_REQUEST['pagename']));
  
  ?>
 <!DOCTYPE html>
@@ -69,13 +69,13 @@ include("config.php");
                             <div class="col">
                                 <div class="page-description">
 								
-								<a href="<?=$urlname;?>.php" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+								<a href="<?=htmlspecialchars((string)($urlname), ENT_QUOTES, 'UTF-8', false);?>.php" id="linkbackvl">&#8630;&nbsp;Go Back</a>
 								
                                     <h1>
 									Stock Return Details
 									<br/>
 									<div style="font-size:14px;margin-top:10px;">Invoice Number:-</div>
-									<div style="font-size:17px;"><?=$result_details123['invnumber'];?></div>
+									<div style="font-size:17px;"><?=htmlspecialchars((string)($result_details123['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
 									<br/>
 									
 									<?php 
@@ -129,15 +129,15 @@ $i= $start_from;
 											
 											<tbody>
 													<?php
-	$select_INVProductDetails="select * from user_return_stock_items where returnid='$returnid_decode' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_return_stock_items where returnid=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$returnid_decode]);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['prid'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		$TotalAMount=$result_INVProductDetails['total'];
@@ -147,22 +147,22 @@ $i= $start_from;
 	?>
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
-<td><input type="text" readonly class="form-control" style="width:50px;" name="rtnid[]" value="<?=$result_INVProductDetails['id'];?>"></td>
+<td><input type="text" readonly class="form-control" style="width:50px;" name="rtnid[]" value="<?=htmlspecialchars((string)($result_INVProductDetails['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"></td>
 
-<td><?=$result_ProductDetails123['productName'];?></td>
-<td><?=$result_INVProductDetails['qty'];?></td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
 <td>
 <?php if($result_details123['status']=="pending"){?>
-<input type="number" name="damaged_qty[]" class="form-control" style="width:100px;" min="0" max="<?=$result_INVProductDetails['qty'];?>" required="">
+<input type="number" name="damaged_qty[]" class="form-control" style="width:100px;" min="0" max="<?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="">
 <?php }else{?>
-<span style="color:red;"><?=$result_INVProductDetails['damaged_qty'];?></span>
+<span style="color:red;"><?=htmlspecialchars((string)($result_INVProductDetails['damaged_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 <?php }?>
 </td>
 
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
-<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+<td><?=inr_format($result_INVProductDetails['gstamount_total'], 2);?> (<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 
                                                         </tr>
@@ -177,8 +177,8 @@ $i= $start_from;
 													<h1>Update Status</h1>
 													
 
-<input type="hidden" name="returnid" value="<?=$returnid;?>">	
-<input type="hidden" name="urlname" value="<?=$urlname;?>">									   
+<input type="hidden" name="returnid" value="<?=htmlspecialchars((string)($returnid), ENT_QUOTES, 'UTF-8', false);?>">	
+<input type="hidden" name="urlname" value="<?=htmlspecialchars((string)($urlname), ENT_QUOTES, 'UTF-8', false);?>">									   
 
                                         <div class="example-container">
                                         <div class="example-content">

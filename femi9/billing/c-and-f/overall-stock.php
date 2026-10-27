@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
  error_reporting(0);
  
@@ -109,14 +109,14 @@ $successMessage = $_SESSION['successMessage'];
                                             </thead>
 											
 											<tbody>
-			<?php $select_OPStock="select * from stock where user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
+			<?php $select_OPStock="select * from stock where user_type='".db_esc($user_type_Loginvl)."' and user_id='".db_esc($user_id_Loginvl)."'";
 										$Fetch_OPStock=mysqli_query($db_conn,$select_OPStock);
 										while($Result_OPStock=mysqli_fetch_array($Fetch_OPStock))
 										{
 											//Get Product Details
 											$StockProductID=$Result_OPStock['product_id'];
 											
-						$select_productDetils="select * from products where id='$StockProductID'";
+						$select_productDetils="select * from products where id='".db_esc($StockProductID)."'";
 						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
@@ -130,14 +130,14 @@ $successMessage = $_SESSION['successMessage'];
                                                 <tr>
                                                     <td>
 													<a href="#" class="popup-trigger">
-													<?php echo $Result_productDetils["productName"];?></a>
+													<?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></a>
 													</td>
-													<td style="display:none;"><?php echo $Result_OPStock['opening_qty'];?></td>
+													<td style="display:none;"><?php echo htmlspecialchars((string)($Result_OPStock['opening_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td style="display:none;"><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
 													
-						<td align="right" style="display:none;"><?=$Result_OPStock['input_qty'];?></td>
-						<td align="right" style="display:none;"><?=$Result_OPStock['sales_qty'];?></td>
-						<td align="right" style="display:none;"><?=$Result_OPStock['sent_qty'];?></td>
+						<td align="right" style="display:none;"><?=htmlspecialchars((string)($Result_OPStock['input_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+						<td align="right" style="display:none;"><?=htmlspecialchars((string)($Result_OPStock['sales_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+						<td align="right" style="display:none;"><?=htmlspecialchars((string)($Result_OPStock['sent_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						<td align="right"><b><?php echo $ClosingStock;?></b></td>
 						
 						<?php /*?>

@@ -1,9 +1,9 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['ss','st','dt','sdt','shop','cus','stock_request','ot_channels','debit_note','manage_return','demo_free','report','payment_entry','manage_payment_entry','territory_partner']);
 
 $invnumber=$_REQUEST['q'];
 
-$Select_Count_Invoice="select * from internal_transfer_invoice where inv_number='$invnumber'";
-$Fetch_Count_Invoice=mysqli_query($db_conn,$Select_Count_Invoice);
+$Select_Count_Invoice="select * from internal_transfer_invoice where inv_number=?";
+$Fetch_Count_Invoice=db_q($db_conn,$Select_Count_Invoice,[$invnumber]);
 $Result_Count_Invoice=mysqli_num_rows($Fetch_Count_Invoice);
 if($Result_Count_Invoice==0){?>
 <input type="hidden" name="invoice_number_accept" value="1">

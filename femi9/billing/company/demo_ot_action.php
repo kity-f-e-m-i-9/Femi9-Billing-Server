@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('demo_free');
 include("RemoveSpecialChar.php");
 require_once("include/StockService.php");
 
@@ -16,8 +16,8 @@ $inv_number = RemoveSpecialChar($_REQUEST['inv_number']);
 	//---------------
 
 //invoice accept=0
-$Select_Count_Invoice="select * from ot_sales_invoice where inv_number='$inv_number' and cat='$catname'";
-$Fetch_Count_Invoice=mysqli_query($db_conn,$Select_Count_Invoice);
+$Select_Count_Invoice="select * from ot_sales_invoice where inv_number=? and cat=?";
+$Fetch_Count_Invoice=db_q($db_conn,$Select_Count_Invoice,[$inv_number,$catname]);
 $Result_Count_Invoice=mysqli_num_rows($Fetch_Count_Invoice);
 
 	if($Result_Count_Invoice!=0)
@@ -101,8 +101,8 @@ for ($i=0; $i<=$number; $i++)
 	 {
 		 
 		 //count available stock
-	$select_count_AVSTOCK="select * from stock where product_id='$product_id_value' and user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-	$FETCH_count_AVSTOCK=mysqli_query($db_conn,$select_count_AVSTOCK);
+	$select_count_AVSTOCK="select * from stock where product_id=? and user_type=? and user_id=?";
+	$FETCH_count_AVSTOCK=db_q($db_conn,$select_count_AVSTOCK,[$product_id_value,$Login_user_TYPEvl,$godownid]);
 	$RESULT_count_AVSTOCK=mysqli_fetch_array($FETCH_count_AVSTOCK);
 	$AVMstock=$RESULT_count_AVSTOCK['closing_qty'];
 	
@@ -114,8 +114,8 @@ for ($i=0; $i<=$number; $i++)
 	}else{
 	 
 	 //get product details
-	 $selectprdteails="select * from products where id='$product_id_value'";
-	 $fetchprdetails=mysqli_query($db_conn,$selectprdteails);
+	 $selectprdteails="select * from products where id=?";
+	 $fetchprdetails=db_q($db_conn,$selectprdteails,[$product_id_value]);
 	 $resultprdetailis=mysqli_fetch_array($fetchprdetails);
 	 //$pr_price=$resultprdetailis['mrp'];
 	 
@@ -145,15 +145,15 @@ for ($i=0; $i<=$number; $i++)
 		$INVNUMUSER="OT";
 		$inv_number="F9".$randum_number."".$INVNUMUSER."".$format_num."";*/
 		
-	$select_count_INV="select count(*) as numINVOICE from ot_sales_invoice where tempid='$tempid'";
-	$fetch_count_INV=mysqli_query($db_conn,$select_count_INV);
+	$select_count_INV="select count(*) as numINVOICE from ot_sales_invoice where tempid=?";
+	$fetch_count_INV=db_q($db_conn,$select_count_INV,[$tempid]);
 	$result_count_INV=mysqli_fetch_array($fetch_count_INV);
 	if($result_count_INV['numINVOICE']==0)
 	{
 			$INSERT_INVOICE="insert into ot_sales_invoice (tempid,inv_id,inv_number,courier_charges,
 			subtotal,round_off,total,buyer_gsttype,cat) values 
-			('$tempid','$id_only','$inv_number','$courier_charges','0','0','0','$buyer_gsttype','$catname')";
-			mysqli_query($db_conn,$INSERT_INVOICE);
+			(?,?,?,?,'0','0','0',?,?)";
+			db_q($db_conn,$INSERT_INVOICE,[$tempid,$id_only,$inv_number,$courier_charges,$buyer_gsttype,$catname]);
 	}
 		
 		//-------------------------------------------------------------------------
@@ -162,8 +162,8 @@ for ($i=0; $i<=$number; $i++)
 	 $username=$_REQUEST['username'];
 	 $usertype=$_REQUEST['usertype'];
 	 
-	$select_count_product="select count(*) as numCountRcds from ot_sales where tempid='$tempid' and prid='$product_id_value'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	$select_count_product="select count(*) as numCountRcds from ot_sales where tempid=? and prid=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$tempid,$product_id_value]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numCountRcds']==0)
 	{
@@ -173,11 +173,11 @@ for ($i=0; $i<=$number; $i++)
 		customer_address,order_number,amount_received,amount_date,shipping_address,gst_number,
 		order_date,ship_date,hsn,buyer_gsttype,state_id,gst_type,username,usertype)
 		values 
-		('$godownid','$catname','$qty_value','$date','$tempid','$product_id_value',
-		'$rate_value','$discount_value','$sub_total','$total','$gst','$gst_amount','$customer_name','$customer_mobile',
-		'$customer_address','$order_number','$amount_received','$amount_date','$shipping_address','$gst_number',
-		'$order_date','$ship_date','$hsn','$buyer_gsttype','$state_id','$gst_type','$username','$usertype')";
-		mysqli_query($db_conn,$insert_products);
+		(?,?,?,?,?,?,
+		?,?,?,?,?,?,?,?,
+		?,?,?,?,?,?,
+		?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$insert_products,[$godownid,$catname,$qty_value,$date,$tempid,$product_id_value,$rate_value,$discount_value,$sub_total,$total,$gst,$gst_amount,$customer_name,$customer_mobile,$customer_address,$order_number,$amount_received,$amount_date,$shipping_address,$gst_number,$order_date,$ship_date,$hsn,$buyer_gsttype,$state_id,$gst_type,$username,$usertype]);
 
 		//UPDATE STOCK — via StockService so this scopes to the same
 		//unassigned row consistently (no warehouse picker on this form) and
@@ -203,8 +203,8 @@ for ($i=0; $i<=$number; $i++)
 
 
 //GET SUBTOTAL
-	$select_subtotal="select sum(total) from ot_sales where tempid='$tempid'";
-	$fetch_subtotal=mysqli_query($db_conn,$select_subtotal);
+	$select_subtotal="select sum(total) from ot_sales where tempid=?";
+	$fetch_subtotal=db_q($db_conn,$select_subtotal,[$tempid]);
 	$result_subtotal=mysqli_fetch_array($fetch_subtotal);
 	if($result_subtotal[0]!=NULL)
 	{
@@ -212,8 +212,8 @@ for ($i=0; $i<=$number; $i++)
 		$roundvalue=round($unroundvalue);
 		$roundoff=$roundvalue-$unroundvalue;
 		
-		$update_roundvalue="update ot_sales_invoice set subtotal='$unroundvalue',round_off='$roundoff',total='$roundvalue' where tempid='$tempid'";
-		mysqli_query($db_conn,$update_roundvalue);
+		$update_roundvalue="update ot_sales_invoice set subtotal=?,round_off=?,total=? where tempid=?";
+		db_q($db_conn,$update_roundvalue,[$unroundvalue,$roundoff,$roundvalue,$tempid]);
 	} 
 	
 	

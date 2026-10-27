@@ -1,4 +1,4 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php");
 require_once("include/PermissionCheck.php"); requirePermission('products');
 error_reporting(0);
 // Pulled from the Neksomo menu — a purpose-built stock view is coming for that login.
@@ -134,26 +134,26 @@ $get_to_date   = $_REQUEST['todate'] ?? date('Y-m-d');
                                                     $report_prid = $Result_productDetils['id'];
 
                                                     // SALES-1 — user_invoice_items, non-company sellers only.
-                                                    $q1 = mysqli_query($db_conn, "select sum(qty) from user_invoice_items where date='$report_date' and pr_id='$report_prid' and from_user_type IN ($in_list)");
+                                                    $q1 = mysqli_query($db_conn, "select sum(qty) from user_invoice_items where date='".db_esc($report_date)."' and pr_id='".db_esc($report_prid)."' and from_user_type IN ($in_list)");
                                                     $r1 = mysqli_fetch_array($q1);
                                                     $sls1 = $r1[0] ?? 0;
 
                                                     // SALES-2 — invoice_items, non-company sellers only.
-                                                    $q2 = mysqli_query($db_conn, "select sum(qty) from invoice_items where date='$report_date' and pr_id='$report_prid' and user_type IN ($in_list)");
+                                                    $q2 = mysqli_query($db_conn, "select sum(qty) from invoice_items where date='".db_esc($report_date)."' and pr_id='".db_esc($report_prid)."' and user_type IN ($in_list)");
                                                     $r2 = mysqli_fetch_array($q2);
                                                     $sls2 = $r2[0] ?? 0;
 
                                                     $total_sales = (int)$sls1 + (int)$sls2;
 
                                                     // RETURN — user_return_stock_items, non-company recipients only.
-                                                    $q3 = mysqli_query($db_conn, "select sum(qty) from user_return_stock_items where date='$report_date' and prid='$report_prid' and to_usertype IN ($in_list)");
+                                                    $q3 = mysqli_query($db_conn, "select sum(qty) from user_return_stock_items where date='".db_esc($report_date)."' and prid='".db_esc($report_prid)."' and to_usertype IN ($in_list)");
                                                     $r3 = mysqli_fetch_array($q3);
                                                     $total_return = (int)($r3[0] ?? 0);
 
                                                     if ($total_sales == 0 && $total_return == 0) continue;
                                                 ?>
                                                 <tr>
-                                                    <td><?php echo $Result_productDetils["productName"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <td align="right"><?php echo $total_sales;?></td>
                                                     <td align="right"><?php echo $total_return;?></td>
                                                 </tr>

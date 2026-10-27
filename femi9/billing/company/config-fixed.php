@@ -1,11 +1,11 @@
-<?php 
-// Fixed configuration for cron job - command line compatible
-// Database connection parameters - ACTUAL VALUES FROM db-connect.php
-$host = "localhost";
-$username = "femi9software_crm24vl";
-$password = "cPJn1Hgm+0~1Vel#755010.,";
-$database = "femi9software_crm24";
-
+<?php
+// Configuration for the cron job (command-line compatible).
+// Credentials come from shared/.env - never hard-code them here.
+require_once __DIR__ . '/../shared/env-loader.php';
+$host     = $_ENV['DB_HOST'] ?? 'localhost';
+$username = $_ENV['DB_USERNAME'] ?? '';
+$password = $_ENV['DB_PASSWORD'] ?? '';
+$database = $_ENV['DB_NAME'] ?? 'billing0femi9_billingapp';
 // Create database connection
 $db_conn = mysqli_connect($host, $username, $password, $database);
 

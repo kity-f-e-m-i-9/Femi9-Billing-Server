@@ -1,11 +1,11 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include 'config.php';
 error_reporting(0);
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $update_id=$_REQUEST['update_id'];
-	$old_icon=$_REQUEST['old_icon'];
+	$old_icon=safe_old_file_param($_REQUEST['old_icon']);
 	
 	$name=str_replace("'","&#39;",$_REQUEST['name']);
 	$shop_cat=$_POST["shop_cat"];
@@ -25,7 +25,7 @@ $update_id=$_REQUEST['update_id'];
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='../distributor/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 	   if($old_icon!="Nil")
@@ -55,7 +55,7 @@ $insfilename=$old_icon;
 		
                  $uploaddir='../distributor/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 	   if($old_icon!="Nil")
@@ -70,10 +70,10 @@ $insfilename=$old_icon;
 	}
 	
 	//update process
-	$update_ss="update shop set user_icon='$insfilename',name='$name',
-	email='$email',mobile_number='$mobile_number',
-	address='$address',shop_cat='$shop_cat',gstin='$gstin',country_code='$country_code',landline='$landline' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update shop set user_icon=?,name=?,
+	email=?,mobile_number=?,
+	address=?,shop_cat=?,gstin=?,country_code=?,landline=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,$address,$shop_cat,$gstin,$country_code,$landline,$update_id]);
 	
 	echo "<script>window.location='Shop-manage.php?updatedSuccess';</script>";
 	

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -17,8 +17,8 @@ if(isset($_REQUEST['search-records']))
 //state details
 if($state_id!=NULL)
 {
-							   $select_stateList="select * from `state` where id='$state_id'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+							   $select_stateList="select * from `state` where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$state_id]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];
 }
@@ -26,7 +26,7 @@ if($state_id!=NULL)
 										//district details
 										if($dist_id!=NULL)
 										{
-										$select_Distdetails="select * from district where id=$dist_id";
+										$select_Distdetails="select * from district where id='".db_esc($dist_id)."'";
 										$fetch_Distdetails=mysqli_query($db_conn,$select_Distdetails);
 										$result_Distdetails=mysqli_fetch_array($fetch_Distdetails);
 										$district_name=$result_Distdetails['dist_name'];
@@ -35,13 +35,13 @@ if($state_id!=NULL)
 										//taluk details
 										if($talukid!=NULL)
 										{
-										$select_taluk="select * from taluk where id=$talukid";
+										$select_taluk="select * from taluk where id='".db_esc($talukid)."'";
 										$fetch_taluk=mysqli_query($db_conn,$select_taluk);
 										$result_taluk=mysqli_fetch_array($fetch_taluk);
 										$talukname=$result_taluk['taluk'];
 										}	
 	
-	//echo "<script>window.location='untaluk?sestate=".$state_id."&&sedist=".$dist_id."';</script>";
+	//echo "<script>window.location='untaluk?sestate=".urlencode($state_id)."&&sedist=".urlencode($dist_id)."';</script>";
 }
 ?>
 <!DOCTYPE html>
@@ -102,7 +102,7 @@ if($state_id!=NULL)
 									<td><?php echo $title;?></td>
 									<td>
 									<?php if($state_id!=NULL){?>
-									<a href="export_unpincode?stid=<?=$state_id;?>&&did=<?=$dist_id;?>&&tid=<?=$talukid;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
+									<a href="export_unpincode?stid=<?=htmlspecialchars((string)($state_id), ENT_QUOTES, 'UTF-8', false);?>&&did=<?=htmlspecialchars((string)($dist_id), ENT_QUOTES, 'UTF-8', false);?>&&tid=<?=htmlspecialchars((string)($talukid), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
 									<?php }else{?>
 									<a href="#" title="Export" onclick="return confirm('Please select any one search criteria');"><img src="../../assets/images/excel-3-32.png"></a>
 									<?php }?>
@@ -184,33 +184,33 @@ function getXMLHTTP() { //fuction to return the xml http object
 							   <?php if($state_id==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$state_id;?>" hidden=""><?=$state_name;?></option>
+							   <option value="<?=htmlspecialchars((string)($state_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$state_name;?></option>
 							   <?php }?>
 							   <?php $select_stateList="select * from `state` order by `st_name` asc";
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-						   <option value="<?php echo $result_stateList['id'];?>"><?php echo $result_stateList['st_name'];?></option>
+						   <option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   
 							   <!------------District Name--------->
 							   <label for="exampleInputEmail1" class="form-label">District Name</label>
 <div id="statediv">                                               
-		<select name="dist_id" class="form-control" onChange="getCity(<?=$state_id;?>,this.value)">
+		<select name="dist_id" class="form-control" onChange="getCity(<?=htmlspecialchars((string)($state_id), ENT_QUOTES, 'UTF-8', false);?>,this.value)">
 												<?php if($dist_id==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$dist_id;?>" hidden=""><?=$district_name;?></option>
+							   <option value="<?=htmlspecialchars((string)($dist_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$district_name;?></option>
 							   <option value="">--All--</option>
 							   <?php }?>
 							   
-							   <?php $select_product_list233="select * from district where state_id='$state_id' order by dist_name asc";
-										$fetch_product_list233=mysqli_query($db_conn,$select_product_list233);
+							   <?php $select_product_list233="select * from district where state_id=? order by dist_name asc";
+										$fetch_product_list233=db_q($db_conn,$select_product_list233,[$state_id]);
 										while($result_product_list233=mysqli_fetch_array($fetch_product_list233))
 										{
 											?>
-											<option value="<?php echo $result_product_list233['id'];?>"><?php echo $result_product_list233['dist_name'];?></option>
+											<option value="<?php echo htmlspecialchars((string)($result_product_list233['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_product_list233['dist_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 												</select>
 												</div>
@@ -222,16 +222,16 @@ function getXMLHTTP() { //fuction to return the xml http object
 								<?php if($talukid==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$talukid;?>" hidden=""><?=$talukname;?></option>
+							   <option value="<?=htmlspecialchars((string)($talukid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=$talukname;?></option>
 							   <option value="">--All--</option>
 							   <?php }?>
 							   
-				<?php $select_product_list244="select * from taluk where state_id='$state_id' and dist_id='$dist_id' order by taluk asc";
-			$fetch_product_list244=mysqli_query($db_conn,$select_product_list244);
+				<?php $select_product_list244="select * from taluk where state_id=? and dist_id=? order by taluk asc";
+			$fetch_product_list244=db_q($db_conn,$select_product_list244,[$state_id,$dist_id]);
 			while($result_product_list244=mysqli_fetch_array($fetch_product_list244))
 										{
 											?>
-<option value="<?=$result_product_list244['id'];?>"><?=$result_product_list244['taluk'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list244['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_product_list244['taluk']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 								<?php }?>
 												</select>
 												</div>
@@ -275,25 +275,25 @@ $i= $start_from;
 							<?php 
 							if($state_id!=NULL && $dist_id!=NULL && $talukid!=NULL)
 							{
-							$select_product_list="select * from pincode where state_id='$state_id' and dist_id='$dist_id' and taluk_id='$talukid' order by id asc";
+							$select_product_list="select * from pincode where state_id='".db_esc($state_id)."' and dist_id='".db_esc($dist_id)."' and taluk_id='".db_esc($talukid)."' order by id asc";
 							}
 							else if($state_id!=NULL && $dist_id==NULL && $talukid==NULL)
 							{
-							$select_product_list="select * from pincode where state_id='$state_id' order by id asc";
+							$select_product_list="select * from pincode where state_id='".db_esc($state_id)."' order by id asc";
 							}
 							else
 							{
-							$select_product_list="select * from pincode where state_id='$state_id' and dist_id='$dist_id' order by id asc";
+							$select_product_list="select * from pincode where state_id=? and dist_id=? order by id asc";
 							}
 							
-							$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+							$fetch_product_list=db_q($db_conn,$select_product_list,[$state_id,$dist_id]);
 							while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 											//state details
 											$dis_state_id=$result_product_list['state_id'];
-								$select_stateList12="select * from `state` where id='$dis_state_id'";
-							   $fetch_staeList12=mysqli_query($db_conn,$select_stateList12);
+								$select_stateList12="select * from `state` where id=?";
+							   $fetch_staeList12=db_q($db_conn,$select_stateList12,[$dis_state_id]);
 							   $result_stateList12=mysqli_fetch_array($fetch_staeList12);
 							   $dis_state_name=$result_stateList12['st_name'];
 							   
@@ -318,7 +318,7 @@ $i= $start_from;
 									<td><?php echo $dis_state_name;?></td>
 									<td><?php echo $dis_district_name;?></td>
 									<td><?php echo $dis_taluk_name;?></td>
-									<td><?php echo $result_product_list['pincode'];?></td>
+									<td><?php echo htmlspecialchars((string)($result_product_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>
 <?php if($result_product_list["assigned_SID"]=="Nil"){?>
 <span class='badge badge-style-bordered badge-success'>Available</span>

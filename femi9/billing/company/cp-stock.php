@@ -228,7 +228,7 @@ if ($cp_list_res) while ($r = mysqli_fetch_assoc($cp_list_res)) $cp_list[] = $r;
                         <div class="col">
                             <div class="card">
                                 <div class="card-body">
-                                    <form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="filterForm">
+                                    <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>" id="filterForm">
 
                                         <div class="row align-items-end g-3">
                                             <div class="col-md-4">
@@ -269,7 +269,7 @@ if ($cp_list_res) while ($r = mysqli_fetch_assoc($cp_list_res)) $cp_list[] = $r;
                                 <div class="card-header py-3">
                                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
 
-                                        <form method="post" action="<?= $_SERVER['PHP_SELF']; ?>"
+                                        <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>"
                                               class="d-flex align-items-center gap-2">
                                             <input type="hidden" name="cp_id" value="<?= htmlspecialchars($selected_cp_id, ENT_QUOTES); ?>">
                                             <label class="mb-0 text-muted">Show:</label>

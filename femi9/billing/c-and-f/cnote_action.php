@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
@@ -21,10 +21,10 @@ if(isset($_REQUEST['add-return']))
 	}
 	
 	if($tablename!="customers"){
-$selecutomser_dtails="select * from ".$tablename." where temp_id='$from_userid'";
+$selecutomser_dtails="select * from ".$tablename." where temp_id='".db_esc($from_userid)."'";
 	}
 	else{
-		$selecutomser_dtails="select * from ".$tablename." where id='$from_userid'";
+		$selecutomser_dtails="select * from ".$tablename." where id='".db_esc($from_userid)."'";
 	}
 	
 $fetchcutomser_dtails=mysqli_query($db_conn,$selecutomser_dtails);
@@ -44,8 +44,8 @@ if($buyer_GSTIN_count==15){ $buyer_gsttype="register";}else {$buyer_gsttype="unr
 	$invid=$_REQUEST['invid'];
 	
 	//INVOICE DETAILS
-$Select_Invoice_Details="select rwpoints_enable,gst_type from user_invoice where inv_id='$invid'";
-$Fetch_Invoice_Details=mysqli_query($db_conn,$Select_Invoice_Details);
+$Select_Invoice_Details="select rwpoints_enable,gst_type from user_invoice where inv_id=?";
+$Fetch_Invoice_Details=db_q($db_conn,$Select_Invoice_Details,[$invid]);
 $Result_Invoice_Details=mysqli_fetch_array($Fetch_Invoice_Details);
 if($Result_Invoice_Details['rwpoints_enable']!=NULL)
 {
@@ -56,8 +56,8 @@ $gst_type=$Result_Invoice_Details['gst_type'];
 	
 	$prid=$_REQUEST['prid'];
 	//get product gst
-$selectproducts="select * from products where id='$prid'";
-$fetchproducts=mysqli_query($db_conn,$selectproducts);
+$selectproducts="select * from products where id=?";
+$fetchproducts=db_q($db_conn,$selectproducts,[$prid]);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $gst_percentage=$resultproducts['gst'];
 $hsn=$resultproducts['hsn'];
@@ -68,11 +68,11 @@ $hsn=$resultproducts['hsn'];
 	
 	if($from_usertype=="customer")
 	{
-	$select_invoicedetails="select * from invoice_items where inv_id='$invid' and pr_id='$prid'";
+	$select_invoicedetails="select * from invoice_items where inv_id='".db_esc($invid)."' and pr_id='".db_esc($prid)."'";
 	}else{
-	$select_invoicedetails="select * from user_invoice_items where inv_id='$invid' and pr_id='$prid'";
+	$select_invoicedetails="select * from user_invoice_items where inv_id=? and pr_id=?";
 	}
-	$fetch_invoicedetails=mysqli_query($db_conn,$select_invoicedetails);
+	$fetch_invoicedetails=db_q($db_conn,$select_invoicedetails,[$invid,$prid]);
 	$result_invoicedtails=mysqli_fetch_array($fetch_invoicedetails);
 	//
 	$invoiceqty=$result_invoicedtails['qty'];
@@ -97,24 +97,24 @@ $hsn=$resultproducts['hsn'];
 	{
 		$return_date=date("Y-m-d");
 		
-		$seletcountreturn="select count(*) as numreturncheck from user_return_stock where returnid='$returnid'";
-		$fetchcountreturn=mysqli_query($db_conn,$seletcountreturn);
+		$seletcountreturn="select count(*) as numreturncheck from user_return_stock where returnid=?";
+		$fetchcountreturn=db_q($db_conn,$seletcountreturn,[$returnid]);
 		$resultcountreturn=mysqli_fetch_array($fetchcountreturn);
 		if($resultcountreturn['numreturncheck']==0)
 		{
 			
 			$insertreturn="insert into user_return_stock (returnid,invnumber,date,subtotal,discount,total,from_usertype,from_userid,
 			to_usertype,to_userid,status,rwpoints_enable,buyer_gsttype,gst_type) values 
-			('$returnid','$invnumber','$return_date','0','0','0',
-			'$from_usertype','$from_userid','$to_usertype','$to_userid','pending','$rwpoints_enable',
-			'$buyer_gsttype','$gst_type')";
-			mysqli_query($db_conn,$insertreturn);
+			(?,?,?,'0','0','0',
+			?,?,?,?,'pending',?,
+			?,?)";
+			db_q($db_conn,$insertreturn,[$returnid,$invnumber,$return_date,$from_usertype,$from_userid,$to_usertype,$to_userid,$rwpoints_enable,$buyer_gsttype,$gst_type]);
 		}
 		
 		
 		
-		$seletcountreturn2="select count(*) as numreturncheck2 from user_return_stock_items where invnumber='$invnumber' and prid='$prid'";
-		$fetchcountreturn2=mysqli_query($db_conn,$seletcountreturn2);
+		$seletcountreturn2="select count(*) as numreturncheck2 from user_return_stock_items where invnumber=? and prid=?";
+		$fetchcountreturn2=db_q($db_conn,$seletcountreturn2,[$invnumber,$prid]);
 		$resultcountreturn2=mysqli_fetch_array($fetchcountreturn2);
 		if($resultcountreturn2['numreturncheck2']==0)
 		{
@@ -122,39 +122,39 @@ $hsn=$resultproducts['hsn'];
 			$insertreturn="insert into user_return_stock_items (returnid,invnumber,prid,amount,qty,subtotal,gst_percentage,gstamount_total,total,
 			from_usertype,from_userid,to_usertype,to_userid,date,status,hsn,damaged_qty,
 			rwpoints,buyer_gsttype,gst_type) values 
-			('$returnid','$invnumber','$prid','$pr_mrp','$returnqty','$subtotal','$gst_percentage',
-			'$gstamount_total','$total','$from_usertype','$from_userid',
-			'$to_usertype','$to_userid','$return_date','pending','$hsn','$damaged_qty','$rwpoints',
-			'$buyer_gsttype','$gst_type')";
-			mysqli_query($db_conn,$insertreturn);
+			(?,?,?,?,?,?,?,
+			?,?,?,?,
+			?,?,?,'pending',?,?,?,
+			?,?)";
+			db_q($db_conn,$insertreturn,[$returnid,$invnumber,$prid,$pr_mrp,$returnqty,$subtotal,$gst_percentage,$gstamount_total,$total,$from_usertype,$from_userid,$to_usertype,$to_userid,$return_date,$hsn,$damaged_qty,$rwpoints,$buyer_gsttype,$gst_type]);
 			
 			
 		//--------------------------------------------------
 		//STOCK INCREMENT TO RECEIVED USERS (ex:- company)
-		$select_stockDetails="select * from stock where product_id='$prid' and user_type='$to_usertype' and user_id='$to_userid'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
+		$select_stockDetails="select * from stock where product_id=? and user_type=? and user_id=?";
+		$fetch_stockDetails=db_q($db_conn,$select_stockDetails,[$prid,$to_usertype,$to_userid]);
 		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
 		
 		$update_returnqty=$result_stockDetails['sales_qty']-$returnqty;
 		$update_Closing_stock=$result_stockDetails['closing_qty']+$returnqty;
 		
-		$update_stockDetails="update stock set sales_qty='$update_returnqty',closing_qty='$update_Closing_stock' where product_id='$prid' and user_type='$to_usertype' and user_id='$to_userid'";
-		mysqli_query($db_conn,$update_stockDetails);
+		$update_stockDetails="update stock set sales_qty=?,closing_qty=? where product_id=? and user_type=? and user_id=?";
+		db_q($db_conn,$update_stockDetails,[$update_returnqty,$update_Closing_stock,$prid,$to_usertype,$to_userid]);
 		
 		
 		if($from_usertype=="super_stockiest" || $from_usertype=="stockiest" || $from_usertype=="distributor" || $from_usertype=="super_distributor")
 		{
 		
 		//STOCK DECREMENT TO SENT USERS (ex:- super-stockist, stockist, distributor)
-		$select_stockDetails12="select * from stock where product_id='$prid' and user_type='$from_usertype' and user_id='$from_userid'";
-		$fetch_stockDetails12=mysqli_query($db_conn,$select_stockDetails12);
+		$select_stockDetails12="select * from stock where product_id=? and user_type=? and user_id=?";
+		$fetch_stockDetails12=db_q($db_conn,$select_stockDetails12,[$prid,$from_usertype,$from_userid]);
 		$result_stockDetails12=mysqli_fetch_array($fetch_stockDetails12);
 		
 		$update_returnqty12=$result_stockDetails12['input_qty']-$returnqty;
 		$update_Closing_stock12=$result_stockDetails12['closing_qty']-$returnqty;
 		
-		$update_stockDetails12="update stock set input_qty='$update_returnqty12',closing_qty='$update_Closing_stock12' where product_id='$prid' and user_type='$from_usertype' and user_id='$from_userid'";
-		mysqli_query($db_conn,$update_stockDetails12);
+		$update_stockDetails12="update stock set input_qty=?,closing_qty=? where product_id=? and user_type=? and user_id=?";
+		db_q($db_conn,$update_stockDetails12,[$update_returnqty12,$update_Closing_stock12,$prid,$from_usertype,$from_userid]);
 		
 		}
 		//---------------------------------------------

@@ -1,10 +1,10 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 
 $tempid=$_REQUEST['tempid'];
 
-$select_Invoice_Details="select * from demofreedamage where tempid='$tempid'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from demofreedamage where tempid=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$tempid]);
 $countRecords=mysqli_num_rows($fetch_Invoice_Details);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);						
 ?>
@@ -17,7 +17,7 @@ $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <!-- Title -->
-    <title><?=$result_Invoice['inv_number']?> : Demo/Free/Damage Details : <?php echo $business_name;?></title>
+    <title><?=htmlspecialchars((string)($result_Invoice['inv_number']), ENT_QUOTES, 'ISO-8859-1', false)?> : Demo/Free/Damage Details : <?php echo $business_name;?></title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -125,8 +125,8 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-		$select_product_list="select * from demofreedamage where tempid='$tempid' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+		$select_product_list="select * from demofreedamage where tempid=? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 										while($ResultRecords=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -134,8 +134,8 @@ $i= $start_from;
 											
 											//product details
 											$product_id=$ResultRecords['product_id'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						$PR_qty=$ResultRecords["qty"];
@@ -143,11 +143,11 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                   <td><?php echo $Result_productDetils["productName"];?></td>
+                   <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo inr_format($PR_qty, 1);?></td>
 													
 													<td>
-<a href="demofree_delete?Roowid=<?=$RowID;?>&&tempid=<?=$tempid;?>"onclick="return confirm('You want to delete confirm?');">
+<a href="demofree_delete?Roowid=<?=$RowID;?>&&tempid=<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>"onclick="return confirm('You want to delete confirm?');">
 <img src="../../assets/images/delete-32.png"/></a>
 													</td>
                                                 </tr>

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");
@@ -97,7 +97,7 @@ if($get_from_user_type=='stockiest')
 	$LableName="Stockist";
 }
 
-$select890="select * from ".$Tablename." where temp_id='$get_from_user_id'";
+$select890="select * from ".$Tablename." where temp_id='".db_esc($get_from_user_id)."'";
 $fetch890=mysqli_query($db_conn,$select890);
 $result890=mysqli_fetch_array($fetch890);
 $print_userID=$result890['useridtext'];
@@ -120,8 +120,8 @@ $print_userMobile=$result890['mobile_number'];
                                     <div class="card-body">
 									
 <?php 
-$select_supersotkistCOUNT="select count(*) as numMAPP from super_distributor where onboard_userTYPE='$get_from_user_type' and onboard_userID='$get_from_user_id'";
-$fetch_supersotkistCNT=mysqli_query($db_conn,$select_supersotkistCOUNT);
+$select_supersotkistCOUNT="select count(*) as numMAPP from super_distributor where onboard_userTYPE=? and onboard_userID=?";
+$fetch_supersotkistCNT=db_q($db_conn,$select_supersotkistCOUNT,[$get_from_user_type,$get_from_user_id]);
 $result_supersotkistCNT=mysqli_fetch_array($fetch_supersotkistCNT);
 if($result_supersotkistCNT['numMAPP']!=0)
 {
@@ -136,7 +136,7 @@ if($result_supersotkistCNT['numMAPP']!=0)
                                             <div class="mb-3">
                                                 <label class="form-label">
                                                     <strong>Select Super Distributors to Remap:</strong> 
-                                                    (<?php echo $result_supersotkistCNT['numMAPP']; ?> distributors found)
+                                                    (<?php echo htmlspecialchars((string)($result_supersotkistCNT['numMAPP']), ENT_QUOTES, 'ISO-8859-1', false); ?> distributors found)
                                                 </label>
                                                 <div class="mb-2">
                                                     <button type="button" class="btn btn-sm btn-secondary" onclick="selectAllDistributors()">
@@ -151,15 +151,15 @@ if($result_supersotkistCNT['numMAPP']!=0)
 											<ul class="list-group">
 											
 					<?php 
-					$select_supersotkist="select * from super_distributor where onboard_userTYPE='$get_from_user_type' and onboard_userID='$get_from_user_id' order by id asc";
-						$fetch_supersotkist=mysqli_query($db_conn,$select_supersotkist);
+					$select_supersotkist="select * from super_distributor where onboard_userTYPE=? and onboard_userID=? order by id asc";
+						$fetch_supersotkist=db_q($db_conn,$select_supersotkist,[$get_from_user_type,$get_from_user_id]);
 						while($result_supersotkist=mysqli_fetch_array($fetch_supersotkist))
 										{
 											?>
 											
 											<li class="list-group-item">
-        <input class="form-check-input me-1 super-distributor-checkbox" name="distributorid[]" type="checkbox" value="<?=$result_supersotkist['id'];?>" aria-label="...">
-        <?=strtoupper($result_supersotkist['name']);?>, <?=$result_supersotkist['mobile_number'];?>
+        <input class="form-check-input me-1 super-distributor-checkbox" name="distributorid[]" type="checkbox" value="<?=htmlspecialchars((string)($result_supersotkist['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" aria-label="...">
+        <?=htmlspecialchars((string)(strtoupper($result_supersotkist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_supersotkist['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>
     </li>
 	
 	

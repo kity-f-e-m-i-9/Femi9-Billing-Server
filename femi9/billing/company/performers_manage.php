@@ -126,16 +126,16 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
                                             
                     <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><b><?php echo ucwords($result_product_list["usertype"]);?></b></td>
+					<td><b><?php echo htmlspecialchars((string)(ucwords($result_product_list["usertype"])), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 					
 					<td>
 					
-					<?php if($result_product_list["particulars"]!=NULL){ echo $result_product_list["particulars"]; } else
+					<?php if($result_product_list["particulars"]!=NULL){ echo htmlspecialchars((string)($result_product_list["particulars"]), ENT_QUOTES, 'ISO-8859-1', false); } else
 						{ echo "-----";}?></td>
 					
 					<td>
-					<a data-fslightbox="gallery" href="<?=$imgsrcname;?>" title="<?=$result_product_list["title"];?>">
-					<img src="<?=$imgsrcname;?>" style="width:40px;border-radius:10px;" alt="<?=$result_product_list["title"];?>">
+					<a data-fslightbox="gallery" href="<?=$imgsrcname;?>" title="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
+					<img src="<?=$imgsrcname;?>" style="width:40px;border-radius:10px;" alt="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
 					</a>
 					</td>
 					

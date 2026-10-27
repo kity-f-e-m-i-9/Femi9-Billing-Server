@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('stock_request');
 include("config.php");
 require_once("include/StockService.php");
 error_reporting(0);
@@ -30,12 +30,12 @@ error_reporting(0);
 	$stockService = new StockService($db_conn);
 	$createdBy = $_SESSION['LOGIN_USER'] ?? 'system';
 
-$select_count_opstock13="select count(*) as numopstock12 from stock where user_type='$Login_user_TYPEvl' and user_id='$godownid'";
-$fetch_count_opstock13=mysqli_query($db_conn,$select_count_opstock13);
+$select_count_opstock13="select count(*) as numopstock12 from stock where user_type=? and user_id=?";
+$fetch_count_opstock13=db_q($db_conn,$select_count_opstock13,[$Login_user_TYPEvl,$godownid]);
 $result_count_opstock13=mysqli_fetch_array($fetch_count_opstock13);
 if($result_count_opstock13['numopstock12']==0)
 {
-	echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&gid=".$godownid."&&stocknotupdated';</script>";
+	echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&gid=".urlencode($godownid)."&&stocknotupdated';</script>";
 	
 }else{
 	
@@ -53,8 +53,8 @@ $totalamount=$amount*$qty;
 //--------------------------TOTAL, GST, DISCOUNT------------------
 //----------------------------------------------------------------
 //get product gst
-$selectproducts="select * from products where id='$pr_id'";
-$fetchproducts=mysqli_query($db_conn,$selectproducts);
+$selectproducts="select * from products where id=?";
+$fetchproducts=db_q($db_conn,$selectproducts,[$pr_id]);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $gst_percentage=$resultproducts['gst'];
 // The product's own price-tax setting ('inclusive'/'exclusive' — distinct from
@@ -110,7 +110,7 @@ $admin_statecode=$fetch_resultlog['state'];
 		//$tablename="shop";
 	}
 	
-$selecutomser_dtails="select * from ".$tablename." where temp_id='$customer_id'";
+$selecutomser_dtails="select * from ".$tablename." where temp_id='".db_esc($customer_id)."'";
 $fetchcutomser_dtails=mysqli_query($db_conn,$selecutomser_dtails);
 $resultcutomser_dtails=mysqli_fetch_array($fetchcutomser_dtails);
 $customer_state=$resultcutomser_dtails['state_id'];
@@ -125,15 +125,15 @@ else{$gst_type="outer";}
 //--------------------------------------------------------------------------------
 	
 	
-	$select_count_invoice="select count(*) as numInvoice from user_invoice where inv_id='$inv_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$godownid' and to_user_type='$invuser' and to_user_id='$customer_id'";
-	$fetch_count_invoice=mysqli_query($db_conn,$select_count_invoice);
+	$select_count_invoice="select count(*) as numInvoice from user_invoice where inv_id=? and from_user_type=? and from_user_id=? and to_user_type=? and to_user_id=?";
+	$fetch_count_invoice=db_q($db_conn,$select_count_invoice,[$inv_id,$Login_user_TYPEvl,$godownid,$invuser,$customer_id]);
 	$result_count_invoice=mysqli_fetch_array($fetch_count_invoice);
 	if($result_count_invoice['numInvoice']==0)
 	{
 		//1. get last id_only (invoice number generate)
 		/*
-		$select_MaxID="select max(id_only) from user_invoice where from_user_type='$Login_user_TYPEvl' and from_user_id='$godownid'";
-		$fetch_MaxID=mysqli_query($db_conn,$select_MaxID);
+		$select_MaxID="select max(id_only) from user_invoice where from_user_type=? and from_user_id=?";
+		$fetch_MaxID=db_q($db_conn,$select_MaxID,[$Login_user_TYPEvl,$godownid]);
 		$result_MaxID=mysqli_fetch_row($fetch_MaxID);
 	    $id_only=$result_MaxID[0]+1;
 		$format_num = str_pad($id_only, 3, '0', STR_PAD_LEFT);
@@ -153,9 +153,9 @@ else{$gst_type="outer";}
 		$warehouseIdSql = $warehouseId === null ? 'NULL' : (int) $warehouseId;
 		$insert_Invoice="insert into user_invoice (inv_id,id_only,inv_number,date,inv_year,sub_total,discount,total,to_user_type,to_user_id,from_user_type,from_user_id,warehouse_id,gst_type,credit,roundoff,courier_charges,rwpoints_enable,buyer_gsttype)
 		values
-		('$inv_id','$id_only','$inv_number','$date','$inv_year','0','0','0',
-		'$invuser','$customer_id','$Login_user_TYPEvl','$godownid',$warehouseIdSql,'$gst_type','0','0','0','1','$buyer_gsttype')";
-		mysqli_query($db_conn,$insert_Invoice);
+		(?,?,?,?,?,'0','0','0',
+		?,?,?,?,$warehouseIdSql,?,'0','0','0','1',?)";
+		db_q($db_conn,$insert_Invoice,[$inv_id,$id_only,$inv_number,$date,$inv_year,$invuser,$customer_id,$Login_user_TYPEvl,$godownid,$gst_type,$buyer_gsttype]);
 
 	}
 
@@ -165,7 +165,7 @@ else{$gst_type="outer";}
 	
 	if($AVMstock<$qty)
 	{
-		echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".$godownid."';</script>";
+		echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 		
@@ -173,8 +173,8 @@ else{$gst_type="outer";}
 		//insert product details
 		//-------------------------------------------
 		
-	$select_count_invoiceItem="select count(*) as numInvoiceItem from user_invoice_items where inv_id='$inv_id' and pr_id='$pr_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$godownid' and to_user_type='$invuser' and to_user_id='$customer_id'";
-	$fetch_count_invoiceItem=mysqli_query($db_conn,$select_count_invoiceItem);
+	$select_count_invoiceItem="select count(*) as numInvoiceItem from user_invoice_items where inv_id=? and pr_id=? and from_user_type=? and from_user_id=? and to_user_type=? and to_user_id=?";
+	$fetch_count_invoiceItem=db_q($db_conn,$select_count_invoiceItem,[$inv_id,$pr_id,$Login_user_TYPEvl,$godownid,$invuser,$customer_id]);
 	$result_count_invoiceItem=mysqli_fetch_array($fetch_count_invoiceItem);
 	if($result_count_invoiceItem['numInvoiceItem']==0)
 	{
@@ -183,9 +183,9 @@ else{$gst_type="outer";}
 		$insert_InvoiceItems="insert into user_invoice_items (inv_id,pr_id,amount,qty,total,to_user_type,to_user_id,from_user_type,from_user_id,
 		gst_percentage,gstamount_singlepr,gstamount_total,subtotal,
 		discount_percentage,discount_amount,gst_type,hsn,date,rwpoints,buyer_gsttype)
-		values ('$inv_id','$pr_id','$amount','$qty','$total','$invuser','$customer_id','$Login_user_TYPEvl','$godownid','$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal',
-		'$discount_percentage','$discount_amount','$gst_type','$hsn','$date','$rwpoints','$buyer_gsttype')";
-		mysqli_query($db_conn,$insert_InvoiceItems);
+		values (?,?,?,?,?,?,?,?,?,?,?,?,?,
+		?,?,?,?,?,?,?)";
+		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$invuser,$customer_id,$Login_user_TYPEvl,$godownid,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_percentage,$discount_amount,$gst_type,$hsn,$date,$rwpoints,$buyer_gsttype]);
 		
 		//------------------------------
 		//2. stock decrement to company, 3. stock increment to requesting user
@@ -210,15 +210,15 @@ else{$gst_type="outer";}
 		} catch (\Throwable $e) {
 			$db_conn->rollback();
 			error_log("user-invoice-action-req stock update failed: " . $e->getMessage());
-			echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".$godownid."';</script>";
+			echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&InvalidStock&&AlertStockError&&gid=".urlencode($godownid)."';</script>";
 			exit;
 		}
 
-		echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded&&gid=".$godownid."';</script>";
+		echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&AddedSuccess&&FemiAdded&&gid=".urlencode($godownid)."';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&ItemAlreadyExists&&AlertMessage&&gid=".$godownid."';</script>";
+		echo "<script>window.location='stock_request_details?reqid=".base64_encode($inv_id)."&&ItemAlreadyExists&&AlertMessage&&gid=".urlencode($godownid)."';</script>";
 	}
 		
 }

@@ -1,12 +1,12 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 
 $prid=$_REQUEST['prid'];
 $prid=base64_decode($prid);
 
 //fetch product details
-$select_product_list="select * from shop_category where id='$prid'";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from shop_category where id=?";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
 									$result_product_list=mysqli_fetch_array($fetch_product_list);
 									
 									
@@ -19,8 +19,8 @@ if(isset($_REQUEST['update-product']))
 	$catlable=$_REQUEST['catlable'];
 	$catlable=str_replace("'","&#39;",$catlable);
 	
-	$update_products="update shop_category set catlable='$catlable' where id='$update_id'";
-	mysqli_query($db_conn,$update_products);
+	$update_products="update shop_category set catlable=? where id=?";
+	db_q($db_conn,$update_products,[$catlable,$update_id]);
 		
 		echo "<script>window.location='shop-cat-manage?updatedSuccess';</script>";
 	
@@ -99,14 +99,14 @@ if(isset($_REQUEST['update-product']))
                                     </div>--->
                                     <div class="card-body">
 <?php include("validate-scripts.php");?>                                       
-<form action="<?php echo $_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data">
+<form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_id" value="<?php echo $result_product_list["id"]?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false)?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
                                                 <label for="brand" class="form-label">Category Name</label>
-         <input type="text" required="" name="catlable" value="<?=$result_product_list["catlable"]?>" class="form-control" id="brand" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
+         <input type="text" required="" name="catlable" value="<?=htmlspecialchars((string)($result_product_list["catlable"]), ENT_QUOTES, 'ISO-8859-1', false)?>" class="form-control" id="brand" aria-describedby="emailHelp" onkeypress="restrictSpecialChars(event)">
 												<br/>
 												
 												

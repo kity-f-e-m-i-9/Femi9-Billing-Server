@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 ?>
@@ -78,34 +78,34 @@ error_reporting(0);
 								
 								$acman_ID=$result_LoGuserDtails['ss_id'];
 		   
-		   $select_StockistDetails="select * from super_stockiest where temp_id='$acman_ID'";
+		   $select_StockistDetails="select * from super_stockiest where temp_id='".db_esc($acman_ID)."'";
 		   $fetch_StockDetails=mysqli_query($db_conn,$select_StockistDetails);
 		   $result_StockDetails=mysqli_fetch_array($fetch_StockDetails);
 		   
 $district_id=$result_StockDetails['district_id'];
-$select_distict="select * from district where id='$district_id'";
+$select_distict="select * from district where id='".db_esc($district_id)."'";
 	$fetch_district=mysqli_query($db_conn,$select_distict);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 ?>
 							
-							<h1><?=ucwords($result_StockDetails['name']);?>
+							<h1><?=htmlspecialchars((string)(ucwords($result_StockDetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>
 							<span style="font-size:12px;">(Super Stockist)</span>
 							</h1>
 <h2><?=ucwords($district_name)?></h2>
 <table style="font-size:15px;font-weight:bold;">
 <tr>
 <td><i class="material-icons-two-tone">call</i></td>
-<td><a href="tel://<?=$result_StockDetails['mobile_number'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['mobile_number'];?></a></td>
+<td><a href="tel://<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 
 <?php if($result_StockDetails['email']!=NULL){?>
 <tr>
 <td><i class="material-icons-two-tone">email</i></td>
-<td><a href="mailto:<?=$result_StockDetails['email'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['email'];?></a></td>
+<td><a href="mailto:<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php }?>
 
@@ -115,30 +115,30 @@ $district_name=	$result_district['dist_name'];
 										
 										$acman_ID=$result_LoGuserDtails['onboard_userID'];
 		   
-		   $select_StockistDetails="select * from c_and_f where temp_id='$acman_ID'";
+		   $select_StockistDetails="select * from c_and_f where temp_id='".db_esc($acman_ID)."'";
 		   $fetch_StockDetails=mysqli_query($db_conn,$select_StockistDetails);
 		   $result_StockDetails=mysqli_fetch_array($fetch_StockDetails);
 		   
 $state_id=$result_StockDetails['state_id'];
-$select_stae="select * from state where id='$state_id'";
+$select_stae="select * from state where id='".db_esc($state_id)."'";
 	$fetch_stae=mysqli_query($db_conn,$select_stae);
 	$result_stae=mysqli_fetch_array($fetch_stae);
 	?>
 		   
-<h1><?=ucwords($result_StockDetails['name']);?></h1>
-<h2><?=ucwords($result_stae['st_name'])?></h2>
+<h1><?=htmlspecialchars((string)(ucwords($result_StockDetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></h1>
+<h2><?=htmlspecialchars((string)(ucwords($result_stae['st_name'])), ENT_QUOTES, 'ISO-8859-1', false)?></h2>
 <h4>C&F</h4>
 <table style="font-size:15px;font-weight:bold;">
 <tr>
 <td><i class="material-icons-two-tone">call</i></td>
-<td><a href="tel://<?=$result_StockDetails['mobile_number'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['mobile_number'];?></a></td>
+<td><a href="tel://<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php if($result_StockDetails['email']!=NULL){?>
 <tr>
 <td><i class="material-icons-two-tone">email</i></td>
-<td><a href="mailto:<?=$result_StockDetails['email'];?>" style="text-decoration:none;color:blue;">
-<?=$result_StockDetails['email'];?></a></td>
+<td><a href="mailto:<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_StockDetails['email']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php }?>
 </table>
@@ -181,7 +181,7 @@ $select_stae="select * from state where id='$state_id'";
 		$get_stateID=$result_count_REFERID['state_id'];
 		$get_districtID=$result_count_REFERID['district_id'];
 		//
-		$select_DistDetails="select * from district where state_id='$get_stateID' and id='$get_districtID'";
+		$select_DistDetails="select * from district where state_id='".db_esc($get_stateID)."' and id='".db_esc($get_districtID)."'";
 		$fetch_DistDetails=mysqli_query($db_conn,$select_DistDetails);
 		$result_DistDetails=mysqli_fetch_array($fetch_DistDetails);
 		
@@ -196,7 +196,7 @@ $select_stae="select * from state where id='$state_id'";
 		
 		?>
 		
-		<h1><?=ucwords($result_count_REFERID['name']);?>
+		<h1><?=htmlspecialchars((string)(ucwords($result_count_REFERID['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>
 							<span style="font-size:12px;">(<?=$labelname;?>)</span>
 							</h1>
 <h2>
@@ -205,15 +205,15 @@ $select_stae="select * from state where id='$state_id'";
 <table style="font-size:15px;font-weight:bold;">
 <tr>
 <td><i class="material-icons-two-tone">call</i></td>
-<td><a href="tel://<?=$result_count_REFERID['mobile_number'];?>" style="text-decoration:none;color:blue;">
-<?=$result_count_REFERID['mobile_number'];?></a></td>
+<td><a href="tel://<?=htmlspecialchars((string)($result_count_REFERID['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_count_REFERID['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 
 <?php if($result_count_REFERID['email']!=NULL){?>
 <tr>
 <td><i class="material-icons-two-tone">email</i></td>
-<td><a href="mailto:<?=$result_count_REFERID['email'];?>" style="text-decoration:none;color:blue;">
-<?=$result_count_REFERID['email'];?></a></td>
+<td><a href="mailto:<?=htmlspecialchars((string)($result_count_REFERID['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;color:blue;">
+<?=htmlspecialchars((string)($result_count_REFERID['email']), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
 </tr>
 <?php }?>
 

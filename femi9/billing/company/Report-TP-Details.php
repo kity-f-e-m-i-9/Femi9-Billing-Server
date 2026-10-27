@@ -322,7 +322,7 @@ $title = "Report - B2B (Territory Partner)";
                                                 <input type="hidden" name="frdate" value="<?=$from_date;?>">
                                                 <input type="hidden" name="todate" value="<?=$to_date;?>">
                                                 <input type="hidden" name="branch_pincode" value="<?=htmlspecialchars($selected_pincode);?>">
-                                                <input type="hidden" name="buyer_type" value="<?=$selected_buyer_type;?>">
+                                                <input type="hidden" name="buyer_type" value="<?=htmlspecialchars((string)($selected_buyer_type), ENT_QUOTES, 'UTF-8', false);?>">
                                                 <input type="hidden" name="page" value="1">
                                                 <label class="mb-0 text-muted">Show:</label>
                                                 <select name="records_per_page" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
@@ -399,7 +399,7 @@ $title = "Report - B2B (Territory Partner)";
                                                             <small><?=htmlspecialchars($tp['mobile']);?></small>
                                                         </td>
                                                         <td><?=htmlspecialchars($r['inv_number']);?></td>
-                                                        <td><?=$r['buyer_type'];?></td>
+                                                        <td><?=htmlspecialchars((string)($r['buyer_type']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                         <td>
                                                             <?=htmlspecialchars($r['buyer_name']);?><br/>
                                                             <small><b>M:</b> <?=htmlspecialchars($r['buyer_mobile']);?></small>

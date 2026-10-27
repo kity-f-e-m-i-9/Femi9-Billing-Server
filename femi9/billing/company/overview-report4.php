@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -91,7 +91,7 @@ $to_date=$_REQUEST['todate'];
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report4?frdate=<?=$from_date;?>&&todate=<?=$to_date;?>&&lable=<?=$_REQUEST['lable'];?>&&rptlable=<?=$_REQUEST['rptlable'];?>&&out1=<?=$_REQUEST['out1'];?>&&out2=<?=$_REQUEST['out2'];?>&&out3=<?=$_REQUEST['out3'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report4?frdate=<?=htmlspecialchars((string)($from_date), ENT_QUOTES, 'UTF-8', false);?>&&todate=<?=htmlspecialchars((string)($to_date), ENT_QUOTES, 'UTF-8', false);?>&&lable=<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>&&rptlable=<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>&&out2=<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>&&out3=<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -110,15 +110,15 @@ $to_date=$_REQUEST['todate'];
 												<table id="reportdash">
 												<tr>
 												<th>Today</th>
-												<td>:&nbsp;<?=$_REQUEST['out1'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>This&nbsp;Month</th>
-												<td>:&nbsp;<?=$_REQUEST['out2'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Total</th>
-												<td>:&nbsp;<?=$_REQUEST['out3'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												</table>
                                             </div>
@@ -129,22 +129,22 @@ $to_date=$_REQUEST['todate'];
 							</div>
 						<?php }?>
 						
-						<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="lable" value="<?=$_REQUEST['lable'];?>"/>
-<input type="hidden" name="rptlable" value="<?=$_REQUEST['rptlable'];?>"/>
-<input type="hidden" name="out1" value="<?=$_REQUEST['out1'];?>"/>
-<input type="hidden" name="out2" value="<?=$_REQUEST['out2'];?>"/>
-<input type="hidden" name="out3" value="<?=$_REQUEST['out3'];?>"/>
+						<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="lable" value="<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="rptlable" value="<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out1" value="<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out2" value="<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out3" value="<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="setrigger" value="1"/>
 
 <div class="overviewcontainar">
 <div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$from_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($from_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$to_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($to_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
@@ -189,24 +189,24 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from ".$tablename." where valid_from between '$from_date' and '$to_date' order by id asc";
+										<?php $select_product_list="select * from ".$tablename." where valid_from between '".db_esc($from_date)."' and '".db_esc($to_date)."' order by id asc";
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 											
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 											?>
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?=$result_product_list["useridtext"];?></td>
-                                                    <td><?=$result_product_list["name"];?></td>
+													<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                                                    <td><?=htmlspecialchars((string)($result_product_list["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?=$district_name;?></td>
-													<td><?=$result_product_list['mobile_number'];?></td>
+													<td><?=htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?=date("d/M/Y",strtotime($result_product_list["valid_from"]));?></td>
 													</tr>
 										<?php }?>

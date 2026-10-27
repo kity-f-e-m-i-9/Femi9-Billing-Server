@@ -1,11 +1,11 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 
 $invnumber = $_REQUEST['q'] ?? '';
 
 $result = mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COUNT(*) AS n FROM user_invoice WHERE inv_number='$invnumber' AND from_user_type='$Login_user_TYPEvl' AND from_user_id='$Login_user_IDvl'"));
+    "SELECT COUNT(*) AS n FROM user_invoice WHERE inv_number='".db_esc($invnumber)."' AND from_user_type='".db_esc($Login_user_TYPEvl)."' AND from_user_id='".db_esc($Login_user_IDvl)."'"));
 if ((int)$result['n'] === 0) { ?>
 <input type="hidden" name="invoice_number_accept" value="1">
 <?php } else { ?>

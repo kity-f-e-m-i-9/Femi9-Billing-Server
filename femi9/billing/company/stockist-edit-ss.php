@@ -279,8 +279,8 @@ function showDistrictStockistEdit(str) {
     }
     
     var invuser = "stockiest";
-    var current_stockist_id = "<?php echo $result_product_list['id']; ?>";
-    var current_dist_id = "<?php echo $result_product_list['district_id']; ?>";
+    var current_stockist_id = "<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>";
+    var current_dist_id = "<?php echo htmlspecialchars((string)($result_product_list['district_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>";
     
     xmlhttp.open("GET", "loadDistrictStockistEdit.php?q=" + str + "&invuser=" + invuser + "&current_stockist_id=" + current_stockist_id + "&current_dist_id=" + current_dist_id, true);
     xmlhttp.send();
@@ -305,8 +305,8 @@ function showTalukStockistEdit(state_id, dist_id) {
     }
     
     var invuser = "stockiest";
-    var current_stockist_id = "<?php echo $result_product_list['id']; ?>";
-    var current_taluk_id = "<?php echo $result_product_list['taluk_id']; ?>";
+    var current_stockist_id = "<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>";
+    var current_taluk_id = "<?php echo htmlspecialchars((string)($result_product_list['taluk_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>";
     
     xmlhttp.open("GET", "loadTalukStockistEdit.php?state_id=" + state_id + "&dist_id=" + dist_id + "&invuser=" + invuser + "&current_stockist_id=" + current_stockist_id + "&current_taluk_id=" + current_taluk_id, true);
     xmlhttp.send();

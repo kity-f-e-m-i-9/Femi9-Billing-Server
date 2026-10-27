@@ -14,7 +14,7 @@ header('Content-Type: application/json');
 session_name('femi9_company_sess');
 session_start();
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('territory_partner_edit');
 include("config.php");
 require_once("include/GodownAccess.php");
 

@@ -50,6 +50,7 @@ $invoicesByShop = $report['invoices_by_shop'];
 
 ob_end_clean();
 
+require_once __DIR__ . '/../shared/SafeSpreadsheetBinder.php'; \PhpOffice\PhpSpreadsheet\Cell\Cell::setValueBinder(new FemiSafeValueBinder()); // formula-injection guard
 $spreadsheet = new Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Shop Report');

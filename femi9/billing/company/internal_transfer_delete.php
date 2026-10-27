@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['internal_transfer','stock_transfers']);
 include("config.php");
 require_once("include/StockService.php");
 require_once("include/GodownAccess.php");
@@ -19,7 +19,7 @@ $tempid = $_REQUEST['tempid'] ?? '';
 
 if ($rowid <= 0) {
     $_SESSION['sucMessage'] = "Invalid record.";
-    echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=$tempid';</script>";
+    echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=".urlencode($tempid)."';</script>";
     exit;
 }
 
@@ -86,7 +86,7 @@ if ($row) {
             $_SESSION['errorMessage'] = "Cannot delete this transfer — only {$available} of the "
                 . "original {$qty} units are still in stock at the destination (the rest has "
                 . "already been sold or moved on). Please reconcile manually before deleting.";
-            echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=$tempid';</script>";
+            echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=".urlencode($tempid)."';</script>";
             exit;
         }
 
@@ -96,7 +96,7 @@ if ($row) {
         $db_conn->rollback();
         error_log("internal_transfer_delete error: " . $e->getMessage());
         $_SESSION['errorMessage'] = "Delete failed. Please try again.";
-        echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=$tempid';</script>";
+        echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=".urlencode($tempid)."';</script>";
         exit;
     }
 } else {
@@ -108,4 +108,4 @@ if ($row) {
 }
 
 $_SESSION['sucMessage'] = "One Internal Stock Transfer Details Deleted Successfully!";
-echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=$tempid';</script>";
+echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=".urlencode($tempid)."';</script>";

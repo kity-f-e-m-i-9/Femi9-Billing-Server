@@ -1,22 +1,22 @@
-<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); date_default_timezone_set("Asia/Kolkata"); error_reporting(0);
 include("config.php");
 $Invoice_ID=$_REQUEST['invoiceid'];
 //
-$select_Invoice_Details="select * from invoice where inv_id='$Invoice_ID'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from invoice where inv_id=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$Invoice_ID]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 
 //customer details
 $customer_id=$result_Invoice_Details['customer_id'];
-$select_Cusotmer_Details="select * from customers where id='$customer_id'";
-$fetch_Customer_Details=mysqli_query($db_conn,$select_Cusotmer_Details);
+$select_Cusotmer_Details="select * from customers where id=?";
+$fetch_Customer_Details=db_q($db_conn,$select_Cusotmer_Details,[$customer_id]);
 $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 
 // GST computed fresh from the product master at print time (inclusive vs
 // exclusive tax treatment), the same convention as tp-invoice-print.php —
 // not trusted from any value frozen at add-time.
-$select_INVProductDetails="select ii.*, p.productName, p.gst as p_gst, p.gst_type as p_gst_type from invoice_items ii join products p on p.id = ii.pr_id where ii.inv_id='$Invoice_ID' order by ii.id desc";
-$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+$select_INVProductDetails="select ii.*, p.productName, p.gst as p_gst, p.gst_type as p_gst_type from invoice_items ii join products p on p.id = ii.pr_id where ii.inv_id=? order by ii.id desc";
+$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
 $invoice_items=[];
 $TotalAMount123=0; $totalgstamount=0;
 while($row=mysqli_fetch_array($fetch_INVProductDetails)){
@@ -198,7 +198,7 @@ $gsttype=$result_Invoice_Details['gst_type'] ?: 'inner';
 								</td>
 
 								<td>
-									<b>Invoice # :</b> <?php echo $result_Invoice_Details['inv_number'];?><br />
+									<b>Invoice # :</b> <?php echo htmlspecialchars((string)($result_Invoice_Details['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?><br />
 									<b>Date:</b> <?php echo date("d/M/Y",strtotime($result_Invoice_Details['date']));?>
 								</td>
 							</tr>
@@ -217,9 +217,9 @@ $gsttype=$result_Invoice_Details['gst_type'] ?: 'inner';
 								</td>
 
 								<td>
-								<?php echo ucwords($result_Customer_Details['name']);?><br />
-									<?=$result_Customer_Details['mobile'];?><br />
-									<?php echo ucwords($result_Customer_Details['address']);?>
+								<?php echo htmlspecialchars((string)(ucwords($result_Customer_Details['name'])), ENT_QUOTES, 'ISO-8859-1', false);?><br />
+									<?=htmlspecialchars((string)($result_Customer_Details['mobile']), ENT_QUOTES, 'ISO-8859-1', false);?><br />
+									<?php echo htmlspecialchars((string)(ucwords($result_Customer_Details['address'])), ENT_QUOTES, 'ISO-8859-1', false);?>
 								</td>
 							</tr>
 						</table>
@@ -238,9 +238,9 @@ $gsttype=$result_Invoice_Details['gst_type'] ?: 'inner';
 		$ItemRowid=base64_encode($result_INVProductDetails['id']);
 	?>
 				<tr class="item">
-					<td><?=$result_INVProductDetails['productName'];?><?= $result_INVProductDetails['gst_type_item']==='inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
+					<td><?=htmlspecialchars((string)($result_INVProductDetails['productName']), ENT_QUOTES, 'ISO-8859-1', false);?><?= $result_INVProductDetails['gst_type_item']==='inclusive' ? ' <small style="color:#666">(GST incl.)</small>' : ''; ?></td>
 					<td align="right">&#8377;<?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>
-<td align="right"><?=$result_INVProductDetails['qty'];?></td>
+<td align="right"><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td align="right">&#8377;<?php echo inr_format($result_INVProductDetails['total'], 2);?></td>
 				</tr>
 

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -25,9 +25,9 @@ if(isset($_REQUEST['add-offers']))
 	/*$cf_msg=str_replace("'","&#39;",$_REQUEST['cf_msg']);
 	$cf_msg = RemoveSpecialChar($cf_msg); */
 		
-		$insertrecords="UPDATE admin_scroll_msg SET ss_msg='$ss_msg',st_msg='$st_msg',
-		dt_msg='$dt_msg',cf_msg='Nil'";
-		mysqli_query($db_conn,$insertrecords);
+		$insertrecords="UPDATE admin_scroll_msg SET ss_msg=?,st_msg=?,
+		dt_msg=?,cf_msg='Nil'";
+		db_q($db_conn,$insertrecords,[$ss_msg,$st_msg,$dt_msg]);
 
 	echo "<script>window.location='Update_scroll_msg?updatedSuccess';</script>";
 }
@@ -122,15 +122,15 @@ if(isset($_REQUEST['add-offers']))
 											
                                                 
 												<label class="form-label">Super Stockist (Message)</label>
-                               <input type="text" name="ss_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=$result_product_list['ss_msg'];?>">
+                               <input type="text" name="ss_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['ss_msg']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												
 												<label class="form-label">Stockist (Message)</label>
-                               <input type="text" name="st_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=$result_product_list['st_msg'];?>">
+                               <input type="text" name="st_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['st_msg']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												
 												<label class="form-label">Distributor (Message)</label>
-                               <input type="text" name="dt_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=$result_product_list['dt_msg'];?>">
+                               <input type="text" name="dt_msg" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['dt_msg']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												
 												

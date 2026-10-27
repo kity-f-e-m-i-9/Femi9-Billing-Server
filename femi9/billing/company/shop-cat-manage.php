@@ -117,7 +117,7 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["catlable"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["catlable"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 																										<td>
 													    <div class="actions-group">
 													        <a href="shop-cat-edit?prid=<?php echo $product_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>

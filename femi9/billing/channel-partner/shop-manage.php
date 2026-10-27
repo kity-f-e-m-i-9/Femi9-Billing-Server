@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -72,8 +72,8 @@ $i = $start_from;
                                             </thead>
                                             <tbody>
 <?php
-$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID='$Login_user_IDvl' AND s.onboard_userTYPE='$Login_user_TYPEvl' ORDER BY s.id DESC";
-$fetch_shops = mysqli_query($db_conn, $select_shops);
+$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID=? AND s.onboard_userTYPE=? ORDER BY s.id DESC";
+$fetch_shops = db_q($db_conn,$select_shops,[$Login_user_IDvl,$Login_user_TYPEvl]);
 while ($result_shop = mysqli_fetch_array($fetch_shops)) {
     $rowid = base64_encode($result_shop["id"]);
 ?>

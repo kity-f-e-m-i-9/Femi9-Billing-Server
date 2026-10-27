@@ -1,4 +1,4 @@
-<?php include("checksession.php");  include("config.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");  include("config.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -126,8 +126,8 @@ $i= $start_from;
 										{
 											
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
@@ -136,8 +136,8 @@ $district_name=	$result_district['dist_name'];
 					
 					//super stockist Details
 					$candf_id=$result_product_list['onboard_userID'];
-$select_cfdetails="select * from c_and_f where temp_id='$candf_id'";
-	$fetch_cfdetails=mysqli_query($db_conn,$select_cfdetails);
+$select_cfdetails="select * from c_and_f where temp_id=?";
+	$fetch_cfdetails=db_q($db_conn,$select_cfdetails,[$candf_id]);
 	$result_cfdetails=mysqli_fetch_array($fetch_cfdetails);
 					
 						?>
@@ -145,19 +145,19 @@ $select_cfdetails="select * from c_and_f where temp_id='$candf_id'";
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					D:&nbsp;<?php echo $district_name;?></td>
-					<td><?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					
-					<?php /*?><td><b><?php echo $result_product_list["username"];?></b></td>
-					<td>&#8377; <?php echo $result_product_list["plan_amount"];?><br/>
-					<?php echo $result_product_list["valid_months"];?> Days<br/>
+					<?php /*?><td><b><?php echo htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
+					<td>&#8377; <?php echo htmlspecialchars((string)($result_product_list["plan_amount"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?php echo htmlspecialchars((string)($result_product_list["valid_months"]), ENT_QUOTES, 'ISO-8859-1', false);?> Days<br/>
 					<?php echo date("d/m/Y",strtotime($result_product_list["valid_from"]));?>
 					(to) <?php echo date("d/m/Y",strtotime($result_product_list["valid_to"]));?>
 					</td>
 					
-					<td><?php echo $result_product_list["ref_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["ref_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<?php */?>
 					
 					<td>
@@ -176,8 +176,8 @@ $select_cfdetails="select * from c_and_f where temp_id='$candf_id'";
 </td>
 
 <td>
-<?=ucwords($result_cfdetails['name']);?><br/>
-<?=ucwords($result_cfdetails['mobile_number']);?>
+<?=htmlspecialchars((string)(ucwords($result_cfdetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<?=htmlspecialchars((string)(ucwords($result_cfdetails['mobile_number'])), ENT_QUOTES, 'ISO-8859-1', false);?>
 </td>
 
 

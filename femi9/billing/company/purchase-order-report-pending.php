@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $title="Purchase Order Report : Pending";
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");
@@ -92,13 +92,13 @@ error_reporting(0);
 							{
 											$reqid=$result_pincode_list['reqid'];
 											//get product details
-$select_productsitems="select sum(qty) from stock_request_items where reqid='$reqid'";
+$select_productsitems="select sum(qty) from stock_request_items where reqid='".db_esc($reqid)."'";
 $fetch_productsitems=mysqli_query($db_conn,$select_productsitems);
 $result_prodcutsitems=mysqli_fetch_array($fetch_productsitems);
 //
 /*$prid=$result_prodcutsitems['prid'];
 //
-$select_products="select * from products where id='$prid'";
+$select_products="select * from products where id='".db_esc($prid)."'";
 $fetch_products=mysqli_query($db_conn,$select_products);
 $result_products=mysqli_fetch_array($fetch_products);
 $productname=strtoupper($result_products['productName']);*/
@@ -148,8 +148,8 @@ $displaytousersdetai=" ".$lblevl2."<br/>".strtoupper($tousername)."
 						<td><?=date("d/m/Y",strtotime($result_pincode_list['date']));?></td>
                                       
 									  <td>
-									  <?=$lblevl;?><br/><?=strtoupper($result_fromusers['name'])?>
-									  <br/><b>Mob:</b> <?=$result_fromusers['mobile_number'];?>
+									  <?=$lblevl;?><br/><?=htmlspecialchars((string)(strtoupper($result_fromusers['name'])), ENT_QUOTES, 'ISO-8859-1', false)?>
+									  <br/><b>Mob:</b> <?=htmlspecialchars((string)($result_fromusers['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>
 									  </td>
 													
 									  <td>

@@ -1,10 +1,10 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['ss','st','dt','sdt','shop','cus','stock_request','ot_channels','debit_note','manage_return','demo_free','report','payment_entry','manage_payment_entry','territory_partner']);
 include("config.php");
 require_once("include/StockService.php");
 
 $returnid       = base64_decode($_REQUEST['returnid'] ?? '');
-$urlname        = $_REQUEST['urlname'] ?? 'stock_return_pending';
+$urlname        = preg_replace('/[^A-Za-z0-9_\-\/]/', '', (string)($_REQUEST['urlname'] ?? 'stock_return_pending'));
 $updatestatus   = $_REQUEST['updatestatus'] ?? '';
 $createdBy      = $_SESSION['LOGIN_USER'] ?? 'system';
 $stockService   = new StockService($db_conn);
@@ -45,7 +45,7 @@ if (!$returnHeader) {
 
 // Idempotency guard — don't process if already accepted or rejected
 if ($returnHeader['status'] !== 'pending') {
-    echo "<script>window.location='{$urlname}?updatedsuccess';</script>";
+    echo "<script>window.location='".preg_replace('/[^A-Za-z0-9_\-\/]/','',$urlname)."?updatedsuccess';</script>";
     exit;
 }
 
@@ -188,5 +188,5 @@ if ($updatestatus === 'accept') {
     }
 }
 
-echo "<script>window.location='{$urlname}?updatedsuccess';</script>";
+echo "<script>window.location='".preg_replace('/[^A-Za-z0-9_\-\/]/','',$urlname)."?updatedsuccess';</script>";
 ?>

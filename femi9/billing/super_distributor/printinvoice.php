@@ -1,10 +1,10 @@
-<?php include("checksession.php"); date_default_timezone_set("Asia/Kolkata"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); date_default_timezone_set("Asia/Kolkata"); error_reporting(0);
 include("config.php");
 $Invoice_ID=$_REQUEST['invid'];
 $Invoice_ID=base64_decode($Invoice_ID);
 //
-$select_Invoice_Details="select * from user_invoice where inv_id='$Invoice_ID'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from user_invoice where inv_id=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$Invoice_ID]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 
 //customer details
@@ -18,15 +18,15 @@ $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 
 //state details
 $state_id=$result_Customer_Details['state_id'];
-$select_state_dtails="select * from state where id='$state_id'";
-$fetch_state_dtails=mysqli_query($db_conn,$select_state_dtails);
+$select_state_dtails="select * from state where id=?";
+$fetch_state_dtails=db_q($db_conn,$select_state_dtails,[$state_id]);
 $result_state_dtails=mysqli_fetch_array($fetch_state_dtails);
 $state_name=$result_state_dtails['st_name'];
 
 //district details
 $district_id=$result_Customer_Details['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 ?>
@@ -130,22 +130,22 @@ $district_name=	$result_district['dist_name'];
 <hr/>
 <p class="cusdetaiis">
 Consignee (Ship to):<br/>
-<b><?php echo ucwords($result_Customer_Details['name']);?></b><br/>
-GSTIN: <?=$result_Customer_Details['gstin'];?><br/>
+<b><?php echo htmlspecialchars((string)(ucwords($result_Customer_Details['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+GSTIN: <?=htmlspecialchars((string)($result_Customer_Details['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 State : <?=$state_name;?>, District: <?=$district_name?>
 </p>
 <hr/>
 <p class="cusdetaiis">
 Buyer (Bill to):<br/>
-<b><?php echo ucwords($result_Customer_Details['name']);?></b><br/>
-GSTIN: <?=$result_Customer_Details['gstin'];?><br/>
+<b><?php echo htmlspecialchars((string)(ucwords($result_Customer_Details['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+GSTIN: <?=htmlspecialchars((string)($result_Customer_Details['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 State : <?=$state_name;?>, District: <?=$district_name?>
 </p>
 </td>
 <td valign="top">
 <table id="second_topvl">
 <tr id="border_nbottom">
-<td>Invoice #<br/><b><?php echo $result_Invoice_Details['inv_number'];?></b></td>
+<td>Invoice #<br/><b><?php echo htmlspecialchars((string)($result_Invoice_Details['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 <td>Invoice Date:<br/><b><?php echo date("d M Y",strtotime($result_Invoice_Details['date']));?></b></td>
 </tr>
 <tr id="border_nbottom" valign="top">
@@ -190,15 +190,15 @@ Terms of Delivery<br/>
 </tr>
 
 <?php
-	$select_INVProductDetails="select * from user_invoice_items where inv_id='$Invoice_ID' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_invoice_items where inv_id=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['pr_id'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		$TotalAMount=$result_INVProductDetails['total'];
@@ -209,7 +209,7 @@ Terms of Delivery<br/>
 	?>
 <tr>
 <td>1</td>
-<td><b><?=$result_ProductDetails123['productName'];?></b></td>
+<td><b><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 <td id="rightlaign">961900</td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_INVProductDetails['amount'], 2);?></td>

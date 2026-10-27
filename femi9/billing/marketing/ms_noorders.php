@@ -1,4 +1,4 @@
-<?php include("checksession.php"); include 'config.php'; error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); include 'config.php'; error_reporting(0);
 if($result_LoGuserDtails['user_position']==0){
 	echo "<script>window.location='dashboard.php';</script>";exit;
 }
@@ -18,8 +18,8 @@ $se_taluk = $_REQUEST['se_taluk'] ?? '';
 // Marketing staff selected name for dropdown
 $result_msDetails12 = [];
 if(!empty($se_msid)) {
-    $select_msDetails12 = "SELECT * FROM marketing_staff WHERE id='$se_msid'";
-    $fetch_msDetails12  = mysqli_query($db_conn, $select_msDetails12);
+    $select_msDetails12 = "SELECT * FROM marketing_staff WHERE id=?";
+    $fetch_msDetails12  = db_q($db_conn,$select_msDetails12,[$se_msid]);
     $result_msDetails12 = mysqli_fetch_array($fetch_msDetails12);
 }
 
@@ -99,7 +99,7 @@ else
                         </div>
 
                         <!-- Search Form -->
-                        <form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+                        <form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
                             <div class="overviewcontainar">
 
                                 <div id="searchleftcont">
@@ -133,13 +133,13 @@ else
                                         <?php if(empty($se_msid)): ?>
                                         <option value="" hidden>Select</option>
                                         <?php else: ?>
-                                        <option value="<?=$se_msid?>" hidden><?=strtoupper($result_msDetails12['ms_name'])?>, <?=$result_msDetails12['ms_mobile']?></option>
+                                        <option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false)?>" hidden><?=htmlspecialchars((string)(strtoupper($result_msDetails12['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false)?>, <?=htmlspecialchars((string)($result_msDetails12['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false)?></option>
                                         <?php endif; ?>
                                         <?php
                                         $fetch_ms = mysqli_query($db_conn, "SELECT * FROM marketing_staff ORDER BY ms_name ASC");
                                         while($r = mysqli_fetch_array($fetch_ms)):
                                         ?>
-                                        <option value="<?=$r['id']?>"><?=strtoupper($r['ms_name'])?>, <?=$r['ms_mobile']?></option>
+                                        <option value="<?=htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars((string)(strtoupper($r['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false)?>, <?=htmlspecialchars((string)($r['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false)?></option>
                                         <?php endwhile; ?>
                                     </select>
                                 </div>
@@ -189,8 +189,8 @@ else
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
                                                     <td>
-                                                        <?=$row['ms_name']?><br/>
-                                                        <?=$row['ms_mobile']?>
+                                                        <?=htmlspecialchars((string)($row['ms_name']), ENT_QUOTES, 'ISO-8859-1', false)?><br/>
+                                                        <?=htmlspecialchars((string)($row['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false)?>
                                                     </td>
                                                     <td>
                                                         <?=htmlspecialchars($row['shop_name'])?>

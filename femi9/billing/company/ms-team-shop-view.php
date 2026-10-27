@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms');
 require_once("include/TeamLevelColors.php");
@@ -86,8 +86,8 @@ if (!empty($allIds)) {
             "SELECT o.ms_id, COUNT(DISTINCT o.shop_id) AS cnt
              FROM ms_orders o JOIN ms_shop s ON s.id = o.shop_id
              WHERE o.ms_id IN ($idList) AND o.new_order='yes'
-                   AND o.order_date BETWEEN '$fromDate' AND '$toDate'
-                   AND DATE(s.created_at) < '$fromDate'
+                   AND o.order_date BETWEEN '".db_esc($fromDate)."' AND '".db_esc($toDate)."'
+                   AND DATE(s.created_at) < '".db_esc($fromDate)."'
              GROUP BY o.ms_id"
         );
         if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['oldshops'] = (int)$r['cnt']; } }
@@ -155,9 +155,9 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
     $html .= '<td><span class="stat-pill">&#8377;' . number_format($sum['target'], 0) . '</span></td>';
     $html .= '<td><span class="stat-pill" style="color:#0ca30c;">&#8377;' . number_format($sum['achieved'], 0) . '</span></td>';
     $html .= '<td><span class="stat-pill" style="color:' . ($balance > 0 ? '#dc2626' : '#0ca30c') . ';">&#8377;' . number_format($balance, 0) . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . $sum['oldshops'] . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . $sum['got'] . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . $sum['no'] . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['oldshops']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['got']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['no']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
     $html .= '<td><span class="stat-pill">' . ($sum['got'] + $sum['no']) . '</span></td>';
     $html .= '<td>';
     $html .= '<div class="actions-cell">';

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
 include("config.php");
 include("RemoveSpecialChar.php");
 error_reporting(1);
@@ -42,15 +42,16 @@ if(isset($_REQUEST['add-customer']))
 		$db_conn->query("ALTER TABLE marketing_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
 	}
 
-	$select_count_product="select count(*) as numProducts from marketing_staff where ms_mobile='$ms_mobile'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	$select_count_product="select count(*) as numProducts from marketing_staff where ms_mobile=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$ms_mobile]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numProducts']==0)
 	{
 		$insert_products="insert into marketing_staff (ms_name,ms_mobile,password,ms_email,ms_address,country_code,account_status,team_level_id,manager_id,monthly_target_amount)
-		values ('$ms_name','$ms_mobile','$password','$ms_email','$ms_address',
-		'$country_code','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").")";
+		values ('$ms_name','$ms_mobile','".db_esc(femi_password_hash((string)($password)))."','$ms_email','$ms_address',
+		'".db_esc($country_code)."','active',".($team_level_id > 0 ? $team_level_id : "NULL").",".($manager_id > 0 ? $manager_id : "NULL").",".($monthly_target_amount !== null ? $monthly_target_amount : "NULL").")";
 		mysqli_query($db_conn,$insert_products);
+		femi_flag_must_change($db_conn, 'marketing', (string)$ms_mobile); // starts on the shared default password: force a change at first login
 		$new_ms_id = mysqli_insert_id($db_conn);
 
 		if ($new_ms_id && !empty($_POST['location_ids']) && is_array($_POST['location_ids'])) {
@@ -134,7 +135,7 @@ if(isset($_REQUEST['update-customer']))
 	}
 
 	$update_products="update marketing_staff set ms_name='$ms_name',ms_email='$ms_email',
-	ms_address='$ms_address',country_code='$country_code',team_level_id=".($team_level_id > 0 ? $team_level_id : "NULL").",manager_id=".($manager_id > 0 ? $manager_id : "NULL").",monthly_target_amount=".($monthly_target_amount !== null ? $monthly_target_amount : "NULL")." where id='$update_id'";
+	ms_address='$ms_address',country_code='".db_esc($country_code)."',team_level_id=".($team_level_id > 0 ? $team_level_id : "NULL").",manager_id=".($manager_id > 0 ? $manager_id : "NULL").",monthly_target_amount=".($monthly_target_amount !== null ? $monthly_target_amount : "NULL")." where id='".db_esc($update_id)."'";
 	mysqli_query($db_conn,$update_products);
 
 		$db_conn->query("CREATE TABLE IF NOT EXISTS marketing_staff_locations (

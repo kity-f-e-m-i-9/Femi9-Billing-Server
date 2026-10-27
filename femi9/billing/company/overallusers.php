@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; 
 // Load environment variables FIRST
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -358,8 +358,8 @@ $xlurl="excel_distributor_users";
                                                     $district_id=$result_product_list['district_id'];					
                                                     if(is_numeric($district_id))
                                                     {	
-                                                        $select_distict="select * from district where id='$district_id'";
-                                                        $fetch_district=mysqli_query($db_conn,$select_distict);
+                                                        $select_distict="select * from district where id=?";
+                                                        $fetch_district=db_q($db_conn,$select_distict,[$district_id]);
                                                         $result_district=mysqli_fetch_array($fetch_district);
                                                         $district_name=$result_district['dist_name'];
                                                     }else{
@@ -370,8 +370,8 @@ $xlurl="excel_distributor_users";
                                                     $taluk_id=$result_product_list['taluk_id'];
                                                     if(is_numeric($taluk_id))
                                                     {
-                                                        $select_taluk="select * from taluk where id='$taluk_id'";
-                                                        $fetch_taluk=mysqli_query($db_conn,$select_taluk);
+                                                        $select_taluk="select * from taluk where id=?";
+                                                        $fetch_taluk=db_q($db_conn,$select_taluk,[$taluk_id]);
                                                         $result_taluk=mysqli_fetch_array($fetch_taluk);
                                                         $taluk_name=$result_taluk['taluk'];
                                                     }
@@ -411,26 +411,26 @@ $xlurl="excel_distributor_users";
                                                 
                                                 <tr>
                                                     <td class="text-center serial-number"><?php echo ++$i; ?></td>
-                                                    <td class="text-center"><?=$result_product_list["useridtext"];?></td>
-                                                    <td><span class="user-name"><?php echo ucwords($result_product_list["name"]);?></span></td>
+                                                    <td class="text-center"><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                                                    <td><span class="user-name"><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                                                     
                                                     <td class="text-center">
-                                                        <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo $result_product_list["id"];?>" title="Click to Update Mobile Number">
-                                                        <?=$result_product_list["country_code"];?>&nbsp;<?=$result_product_list["mobile_number"];?>
+                                                        <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" title="Click to Update Mobile Number">
+                                                        <?=htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
                                                         </a>
                                                         
-                                                        <div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+                                                        <div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
                                                             <div class="modal-dialog">
                                                                 <div class="modal-content">
                                                                     <div class="modal-header">
                                                                         <h5 class="modal-title" id="exampleModalLiveLabel">Update Mobile Number<br/>
-                                                                        <?=$result_product_list["mobile_number"];?>
+                                                                        <?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
                                                                         </h5>
                                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                     </div>
                                                                     <form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_mobile_action">	
-                                                                        <input type="hidden" name="old_mobile_number" value="<?=$result_product_list["mobile_number"];?>">
-                                                                        <input type="hidden" name="update_usertype" value="<?=$_REQUEST['invuser'];?>">
+                                                                        <input type="hidden" name="old_mobile_number" value="<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
+                                                                        <input type="hidden" name="update_usertype" value="<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>">
                                                                         
                                                                         <div class="example-content" style="padding:20px;">
                                                                             <div class="form-floating mb-3">
@@ -448,7 +448,7 @@ $xlurl="excel_distributor_users";
                                                     
                                                     <td class="text-center"><?php echo $district_name;?></td>
                                                     <td class="text-center"><?=$taluk_name;?></td>
-                                                    <td class="text-center"><?=$result_product_list["username"];?></td>
+                                                    <td class="text-center"><?=htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     
                                                     <td class="text-center">
                                                         <?php 
@@ -458,18 +458,18 @@ $xlurl="excel_distributor_users";
                                                         $passwordError = false;
                                                         
                                                         try {
-                                                            $decryptedPassword = $encryption->decrypt($storedPassword);
+                                                            throw new Exception('hidden'); // passwords are hashed and can no longer be displayed
                                                         } catch (Exception $e) {
                                                             // If decryption fails, it might be plain text
                                                             if (strlen($storedPassword) < 50) {
-                                                                $decryptedPassword = $storedPassword; // Plain text
+                                                                $passwordError = true;
                                                             } else {
                                                                 $passwordError = true;
                                                             }
                                                         }
                                                         
                                                         if ($passwordError) {
-                                                            echo '<span class="text-danger">Error</span>';
+                                                            femi_password_hidden_cell($tablename, $result_product_list['id']);
                                                         } else {
                                                             $rowIdUnique = $result_product_list["id"];
                                                             ?>
@@ -505,7 +505,7 @@ $xlurl="excel_distributor_users";
                                                         ?>
                                                             <a href="inactive_user?usr=distributor&backurl=overallusers&usrid=<?=$rowid;?>&usrname=<?=$encoded_name;?>&userlabel=Distributor" 
                                                                class="status-link" 
-                                                               onclick="return confirm('You want to confirm Deactivate this (<?php echo strtoupper($result_product_list["name"]);?>) user?');" 
+                                                               onclick="return confirm('You want to confirm Deactivate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>) user?');" 
                                                                data-bs-toggle="tooltip" 
                                                                data-bs-placement="top" 
                                                                title="Click to Deactivate user">
@@ -518,7 +518,7 @@ $xlurl="excel_distributor_users";
                                                         ?>
                                                             <a href="active_user?usr=distributor&backurl=overallusers&usrid=<?=$rowid;?>&usrname=<?=$encoded_name;?>&userlabel=Distributor" 
                                                                class="status-link" 
-                                                               onclick="return confirm('You want to confirm Activate this (<?php echo strtoupper($result_product_list["name"]);?>) user?');" 
+                                                               onclick="return confirm('You want to confirm Activate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>) user?');" 
                                                                data-bs-toggle="tooltip" 
                                                                data-bs-placement="top" 
                                                                title="Click to Activate user">
@@ -535,24 +535,24 @@ $xlurl="excel_distributor_users";
                                                         <td>
                                                             <div style="display:flex; align-items:center; gap:8px;">
                                                                 <span>Company</span>
-                                                                <a href="JavaScript:newPopup('update_referral_dt.php?distributorid=<?=$result_product_list['temp_id'];?>');">
+                                                                <a href="JavaScript:newPopup('update_referral_dt.php?distributorid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>');">
                                                                     <button class='btn-update'>Update</button>
                                                                 </a>
                                                             </div>
                                                         </td>
                                                         <td class="text-center">---</td>
                                                     <?php }else{?>
-                                                        <td class="text-center"><?=$result_referralDetails['ref_by_user_id'];?></td>
+                                                        <td class="text-center"><?=htmlspecialchars((string)($result_referralDetails['ref_by_user_id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                         <td>
                                                             <div style="display:flex; flex-direction:column; gap:4px;">
-                                                                <span class="user-name"><?=$result_count_REFERID['name'];?></span>
+                                                                <span class="user-name"><?=htmlspecialchars((string)($result_count_REFERID['name']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                                                 <span style="font-size:11px;color:#888;"><?=$labelname;?></span>
-                                                                <a href="JavaScript:newPopup('update_referral_dt.php?distributorid=<?=$result_product_list['temp_id'];?>');">
+                                                                <a href="JavaScript:newPopup('update_referral_dt.php?distributorid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>');">
                                                                     <button class='btn-update'>Update</button>
                                                                 </a>
                                                             </div>
                                                         </td>
-                                                        <td class="text-center"><?=$result_count_REFERID['mobile_number'];?></td>
+                                                        <td class="text-center"><?=htmlspecialchars((string)($result_count_REFERID['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <?php }?>
                                                     
                                                     <script type="text/javascript">

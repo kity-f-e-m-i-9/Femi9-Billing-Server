@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -218,7 +218,7 @@ if ($WD_user_type === 'territory_partner') {
 
     $district_id = $result_onbaord_user_records['district_id'] ?? 0;
     if ($district_id) {
-        $r_dist = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='$district_id'"));
+        $r_dist = mysqli_fetch_array(mysqli_query($db_conn, "SELECT dist_name FROM district WHERE id='".db_esc($district_id)."'"));
         $district_name = $r_dist['dist_name'] ?? '';
     }
 }
@@ -227,13 +227,13 @@ if ($WD_user_type === 'territory_partner') {
                     <tr>
                     <td><?php echo ++$i; ?></td>
 					<td><?=htmlspecialchars(ucwords(str_replace('_', ' ', $WD_user_type)));?></td>
-					<td><?=$result_onbaord_user_records['useridtext'];?></td>
+					<td><?=htmlspecialchars((string)($result_onbaord_user_records['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_onbaord_user_records['name']);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_onbaord_user_records['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					<?php echo $district_name;?>
 					</td>
 					
-					<td><?=$result_onbaord_user_records["country_code"];?>&nbsp;<?=$result_onbaord_user_records["mobile_number"];?></td>
+					<td><?=htmlspecialchars((string)($result_onbaord_user_records["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_onbaord_user_records["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td><?=inr_format($result_product_list['amount'], 2);?></td>
 					<td><?=date("d/m/Y",strtotime($result_product_list['date']));?><br/>
@@ -243,19 +243,19 @@ if ($WD_user_type === 'territory_partner') {
 					
 					<!---------------Approval Form Open------------------>
 					<td>
-					<a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo $result_product_list["id"];?>" title="Click to Update Mobile Number">
+					<a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" title="Click to Update Mobile Number">
 					Approved
 					</a>
 					
-					<div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+					<div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
 													
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
                                                                 <h5 class="modal-title" id="exampleModalLiveLabel"><u>Approval Withdraw</u><br/>
-																<?php echo ucwords($result_onbaord_user_records['name']);?></b><br/>
+																<?php echo htmlspecialchars((string)(ucwords($result_onbaord_user_records['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					<?php echo $district_name;?><br/>
-					<?=$result_onbaord_user_records["country_code"];?>&nbsp;<?=$result_onbaord_user_records["mobile_number"];?><br/>
+					<?=htmlspecialchars((string)($result_onbaord_user_records["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_onbaord_user_records["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 					
 					<?php 
 $select_admin_settings2233="select tds_percentage from admin_settings where id='1'";
@@ -294,8 +294,8 @@ $sent_amount=inr_format($sent_amount, 2);
   </div>
   
 <?php 
-/*$selectcoutprofileDetaiils223="select * from users_profile where user_tempid='$WD_user_id' and usertype='$WD_user_type'";
-$fetchcountprofileDetails223=mysqli_query($db_conn,$selectcoutprofileDetaiils223);
+/*$selectcoutprofileDetaiils223="select * from users_profile where user_tempid=? and usertype=?";
+$fetchcountprofileDetails223=db_q($db_conn,$selectcoutprofileDetaiils223,[$WD_user_id,$WD_user_type]);
 $resultcountprofileDetails223=mysqli_fetch_array($fetchcountprofileDetails223);*/
 ?>
 
@@ -306,27 +306,27 @@ $resultcountprofileDetails223=mysqli_fetch_array($fetchcountprofileDetails223);*
 
    <div class="table-row">
     <div class="table-cell">Accout Name</div>
-    <div class="table-cell"><?=$result_product_list['acname'];?></div>
+    <div class="table-cell"><?=htmlspecialchars((string)($result_product_list['acname']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
   </div>
   <div class="table-row">
     <div class="table-cell">Account Number</div>
-    <div class="table-cell"><?=$result_product_list['acnumber'];?></div>
+    <div class="table-cell"><?=htmlspecialchars((string)($result_product_list['acnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
   </div>
    <div class="table-row">
     <div class="table-cell">Bank Name</div>
-    <div class="table-cell"><?=$result_product_list['bankname'];?></div>
+    <div class="table-cell"><?=htmlspecialchars((string)($result_product_list['bankname']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
   </div>
    <!----<div class="table-row">
     <div class="table-cell">Branch Name</div>
-    <div class="table-cell"><?=$result_product_list['branchname'];?></div>
+    <div class="table-cell"><?=htmlspecialchars((string)($result_product_list['branchname']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
   </div>---->
    <div class="table-row">
     <div class="table-cell">IFS Code</div>
-    <div class="table-cell"><?=$result_product_list['ifsc'];?></div>
+    <div class="table-cell"><?=htmlspecialchars((string)($result_product_list['ifsc']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
   </div>
   <div class="table-row">
     <div class="table-cell">PAN Number</div>
-    <div class="table-cell"><?=$result_product_list['pannumber'];?></div>
+    <div class="table-cell"><?=htmlspecialchars((string)($result_product_list['pannumber']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
   </div>
   
 </div>
@@ -339,7 +339,7 @@ $resultcountprofileDetails223=mysqli_fetch_array($fetchcountprofileDetails223);*
                                                             </div>
 									<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="withdraw_approval">	
 	
-									<input type="hidden" name="request_row_id" value="<?=$result_product_list['id'];?>">
+									<input type="hidden" name="request_row_id" value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 									<input type="hidden" name="updated_date" value="<?=date("Y-m-d");?>">
 									<input type="hidden" name="updated_time" value="<?=date("H:i:s");?>">
 									<input type="hidden" name="TDS_percentage" value="<?=$tds_percentage;?>">

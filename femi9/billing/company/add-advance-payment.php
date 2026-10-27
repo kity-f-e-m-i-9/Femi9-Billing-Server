@@ -237,7 +237,7 @@ if ($stmt_company) {
                                         <form action="advance-payment-action.php" method="POST" id="advancePaymentForm" onsubmit="return validateForm();">
                                             
                                             <!-- CSRF Token -->
-                                            <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                             
                                             <!-- Receiver Info (Hidden - Auto-filled from session) -->
                                             <input type="hidden" name="to_user_id" value="<?php echo htmlspecialchars($logged_user_id); ?>">
@@ -252,7 +252,7 @@ if ($stmt_company) {
                                                     <select name="company_id" id="company_id" class="form-select" required>
                                                         <option value="" hidden>Select Company</option>
                                                         <?php foreach ($company_profiles as $company): ?>
-                                                            <option value="<?php echo $company['id']; ?>">
+                                                            <option value="<?php echo htmlspecialchars((string)($company['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                                                 <?php echo htmlspecialchars($company['gname']); ?>
                                                             </option>
                                                         <?php endforeach; ?>

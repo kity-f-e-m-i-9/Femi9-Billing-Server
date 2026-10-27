@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 ?>
 <!DOCTYPE html>
@@ -96,22 +96,22 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from stock_request where touserid='$Login_user_IDvl' and tousertype='$Login_user_TYPEvl' and status='pending' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+					<?php $select_product_list="select * from stock_request where touserid=? and tousertype=? and status='pending' order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_IDvl,$Login_user_TYPEvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											$reqid=$result_product_list['reqid'];
 											$distributorid=$result_product_list['fromuserid'];
 											
 											//get distributor details
-				$select_distlist="select * from distributor where temp_id='$distributorid'";
-				$fetch_distlist=mysqli_query($db_conn,$select_distlist);
+				$select_distlist="select * from distributor where temp_id=?";
+				$fetch_distlist=db_q($db_conn,$select_distlist,[$distributorid]);
 				$result_distlist=mysqli_fetch_array($fetch_distlist);
 				$distributorname=$result_distlist['name'];
 				
 				//get qty total
-				$select_qtytotal="select sum(qty) from stock_request_items where reqid='$reqid'";
-				$fetch_qtytotal=mysqli_query($db_conn,$select_qtytotal);
+				$select_qtytotal="select sum(qty) from stock_request_items where reqid=?";
+				$fetch_qtytotal=db_q($db_conn,$select_qtytotal,[$reqid]);
 				$result_qtytotal=mysqli_fetch_array($fetch_qtytotal);
 				$totalqty=$result_qtytotal[0];
 				?>

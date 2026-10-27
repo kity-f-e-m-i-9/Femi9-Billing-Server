@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 
 include("checksession.php");
 include("config.php"); error_reporting(0);
@@ -20,13 +20,13 @@ if($buyer_GSTIN_count==15){ $buyer_gsttype="register";}else {$buyer_gsttype="unr
 //-------------------------------------------------------------------------------
 
 //UPDATE BUYER-GST-TYPE
-$update_invoice_gsttype="update ot_sales_invoice set buyer_gsttype='$buyer_gsttype' where tempid='$tempid'";
+$update_invoice_gsttype="update ot_sales_invoice set buyer_gsttype='".db_esc($buyer_gsttype)."' where tempid='".db_esc($tempid)."'";
 mysqli_query($db_conn,$update_invoice_gsttype);
 //
-$update_invoice_gsttype2="update ot_sales set buyer_gsttype='$buyer_gsttype' where tempid='$tempid'";
+$update_invoice_gsttype2="update ot_sales set buyer_gsttype='".db_esc($buyer_gsttype)."' where tempid='".db_esc($tempid)."'";
 mysqli_query($db_conn,$update_invoice_gsttype2);
 //
-$update_invoice_gsttype23="update ot_sales_return set buyer_gsttype='$buyer_gsttype' where tempid='$tempid'";
+$update_invoice_gsttype23="update ot_sales_return set buyer_gsttype='".db_esc($buyer_gsttype)."' where tempid='".db_esc($tempid)."'";
 mysqli_query($db_conn,$update_invoice_gsttype23);
 	
 }

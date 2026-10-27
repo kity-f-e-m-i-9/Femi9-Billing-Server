@@ -110,7 +110,7 @@ $mappedIds = get_neksomo_product_mapping($db_conn, $id);
                                     </p>
 
                                     <form action="neksomo-product-map-action.php" method="post">
-                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <input type="hidden" name="neksomo_product_id" value="<?php echo (int)$product['id']; ?>">
 
                                         <input type="text" id="productFilter" class="form-control" placeholder="Search company products..." style="margin-bottom:10px;">

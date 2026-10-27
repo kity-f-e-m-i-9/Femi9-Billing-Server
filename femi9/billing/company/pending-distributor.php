@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 include("config.php");
 //
 $Coupon_category="Distributor";
@@ -138,8 +138,8 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 //
 $district_id=$result_product_list['district_id'];
 if (is_numeric($district_id)) {
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 }
@@ -148,8 +148,8 @@ else{$district_name=$result_product_list['district_id'];}
 //
 $taluk_id=$result_product_list['taluk_id'];
 if (is_numeric($taluk_id)) {
-$select_taluklist="select * from taluk where id='$taluk_id'";
-	$fetch_taluklist=mysqli_query($db_conn,$select_taluklist);
+$select_taluklist="select * from taluk where id=?";
+	$fetch_taluklist=db_q($db_conn,$select_taluklist,[$taluk_id]);
 	$result_taluklist=mysqli_fetch_array($fetch_taluklist);
 $taluk_name=$result_taluklist['taluk'];
 }else{$taluk_name=$result_product_list['taluk_id'];}
@@ -157,8 +157,8 @@ $taluk_name=$result_taluklist['taluk'];
 //
 /*$pincode_id=$result_product_list['pincode_id'];
 if (is_numeric($pincode_id)) {
-$select_pincodelist="select * from pincode where id='$pincode_id'";
-	$fetch_pincodelist=mysqli_query($db_conn,$select_pincodelist);
+$select_pincodelist="select * from pincode where id=?";
+	$fetch_pincodelist=db_q($db_conn,$select_pincodelist,[$pincode_id]);
 	$result_pincodelist=mysqli_fetch_array($fetch_pincodelist);
 $pincodeshow=$result_pincodelist['pincode'];
 }else{ $pincodeshow=$result_product_list['pincode_id'];}*/
@@ -194,25 +194,25 @@ $select_ssdetails="select * from ".$tblanem." where temp_id='$supersid'";
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					D:&nbsp;<?=ucwords($district_name);?><br/>T:&nbsp;<?=ucwords($taluk_name);?>
 					<br/>P:&nbsp;<?=$pincodeshow;?>
 					</td>
-					<td><?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<?php /*?>
 					<!----<td>
 					<a href="JavaScript:newPopup('update-username.php?pageNme=distributor&&prid=<?php echo $rowid;?>&&ActionUpdate');" data-bs-toggle="tooltip" data-bs-placement="top" title="Update Username">
-			        <b><?php echo $result_product_list["username"];?></b></a>
+			        <b><?php echo htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></b></a>
 					</td>---->
 					
-					<td>&#8377; <?php echo $result_product_list["plan_amount"];?><br/>
-					<?php echo $result_product_list["valid_months"];?> Days<br/>
+					<td>&#8377; <?php echo htmlspecialchars((string)($result_product_list["plan_amount"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?php echo htmlspecialchars((string)($result_product_list["valid_months"]), ENT_QUOTES, 'ISO-8859-1', false);?> Days<br/>
 					<?php echo date("d/m/Y",strtotime($result_product_list["valid_from"]));?>
 					(to) <?php echo date("d/m/Y",strtotime($result_product_list["valid_to"]));?>
 					</td>
 					
-					<td><?php echo $result_product_list["ref_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["ref_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<?php */?>
 					
 					<td>
@@ -232,8 +232,8 @@ $select_ssdetails="select * from ".$tblanem." where temp_id='$supersid'";
 
 
 <td>
-<?=ucwords($result_ssdetails['name']);?><br/>
-<?=ucwords($result_ssdetails['mobile_number']);?><br/>
+<?=htmlspecialchars((string)(ucwords($result_ssdetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<?=htmlspecialchars((string)(ucwords($result_ssdetails['mobile_number'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 <?=$lableshow_user;?>
 </td>
 
@@ -251,7 +251,7 @@ function newPopup(url) {
 			
 						<td>
 			    <div class="actions-group">
-			        <a href="delete_distributor_approval.php?distributorid=<?php echo $rowid;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm this Distributor (<?php echo ucwords($result_product_list["><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+			        <a href="delete_distributor_approval.php?distributorid=<?php echo $rowid;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm this Distributor (<?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>)')"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 			    </div>
 			</td>
 			

@@ -61,7 +61,7 @@ if ($header && $item && (int)$item['prid'] > 0) {
         error_log("stock_return_delete.php error: " . $e->getMessage());
     }
 
-    echo "<script>window.location='stock_return_add2.php?returnid={$returnid_encode}&&invnumber={$invnumber_encode}&&DeleteSuccess';</script>";
+    echo "<script>window.location='stock_return_add2.php?returnid=".urlencode($returnid_encode)."&&invnumber={$invnumber_encode}&&DeleteSuccess';</script>";
 } else {
     echo "<script>window.location='stock-return-manage.php';</script>";
 }

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -25,7 +25,7 @@ $gstin       = str_replace("'", "&#39;", $_POST["gstin"]       ?? '');
 $user_icon   = "Nil";
 
 // Duplicate check
-$chk = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM shop WHERE temp_id='$temp_id'"));
+$chk = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM shop WHERE temp_id='".db_esc($temp_id)."'"));
 if ((int)$chk['n'] > 0) {
     echo "<script>window.location='shop-add.php?distalready';</script>"; exit;
 }
@@ -44,10 +44,10 @@ mysqli_query($db_conn, "INSERT INTO shop
      taluk_id,firka_id,distributor_id,pincode_id,gstin,onboard_userTYPE,onboard_userID,
      address,userid,useridtext,shop_cat,country_code,landline)
     VALUES
-    ('$state_id','$temp_id','$user_icon','$name','$district_id','$email','$mobile',
-     'Nil','Nil','0','1','$valid_from','$valid_to','Nil','Nil','Nil','Nil','Nil','Nil','Nil',
-     '$taluk_id','$firka_id','','$pincode_id','$gstin',
-     '$Login_user_TYPEvl','$Login_user_IDvl',
-     '$address','$userid','$useridtext','$shop_cat','$country_code','$landline')");
+    ('".db_esc($state_id)."','".db_esc($temp_id)."','".db_esc($user_icon)."','".db_esc($name)."','".db_esc($district_id)."','".db_esc($email)."','".db_esc($mobile)."',
+     'Nil','Nil','0','1','".db_esc($valid_from)."','".db_esc($valid_to)."','Nil','Nil','Nil','Nil','Nil','Nil','Nil',
+     '".db_esc($taluk_id)."','".db_esc($firka_id)."','','".db_esc($pincode_id)."','".db_esc($gstin)."',
+     '".db_esc($Login_user_TYPEvl)."','".db_esc($Login_user_IDvl)."',
+     '".db_esc($address)."','".db_esc($userid)."','".db_esc($useridtext)."','".db_esc($shop_cat)."','".db_esc($country_code)."','".db_esc($landline)."')");
 
 echo "<script>window.location='shop-manage.php?addedsuccess';</script>";

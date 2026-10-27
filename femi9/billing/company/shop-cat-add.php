@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('shop');
 
 
@@ -10,13 +10,13 @@ if(isset($_REQUEST['add-product']))
 	$catlable=$_REQUEST['catlable'];
 	$catlable=str_replace("'","&#39;",$catlable);
 	
-	$select_count_product="select count(*) as numProducts from shop_category where catlable='$catlable'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	$select_count_product="select count(*) as numProducts from shop_category where catlable=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$catlable]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numProducts']==0)
 	{
-		$insert_products="insert into shop_category (catlable) values ('$catlable')";
-		mysqli_query($db_conn,$insert_products);
+		$insert_products="insert into shop_category (catlable) values (?)";
+		db_q($db_conn,$insert_products,[$catlable]);
 		
 		echo "<script>window.location='shop-cat-manage?addesuccess';</script>";
 	}else{
@@ -104,7 +104,7 @@ if(isset($_REQUEST['add-product']))
 									<?php if(isset($_REQUEST['alreadyexists'])){?><div class="alert alert-danger">Shop (Retailers) Category already exists !</div>
 									<?php }?>
   <?php include("validate-scripts.php");?>                                     
-<form action="<?php echo $_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data">
+<form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" method="post" enctype="multipart/form-data">
 
                                         <div class="example-container">
                                             <div class="example-content">

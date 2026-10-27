@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('location');
 error_reporting(0);
 
@@ -126,8 +126,8 @@ $i= $start_from;
 											
 											//state details
 											$state_id=$result_pincode_list['state_id'];
-								$select_stateList="select * from `state` where id='$state_id'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+								$select_stateList="select * from `state` where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$state_id]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];
 							   
@@ -153,8 +153,8 @@ $i= $start_from;
 													<td><?php echo $state_name;?></td>
                                                     <td><?php echo $district_name;?></td>
 													<td><?php echo $talulk_name;?></td>
-													<td><?php echo $result_pincode_list['id'];?></td>
-													<td><?php echo $result_pincode_list['pincode'];?></td>
+													<td><?php echo htmlspecialchars((string)($result_pincode_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_pincode_list['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 																										<td>
 													    <div class="actions-group">
 													        <a href="edit-pincode?prid=<?php echo $row_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>

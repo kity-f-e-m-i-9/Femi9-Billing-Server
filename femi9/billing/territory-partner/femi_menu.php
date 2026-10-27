@@ -1,6 +1,6 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 $_menu_tp_id     = (int)($Login_user_IDvl ?? 0);
-$_menu_tp_row    = mysqli_fetch_assoc(mysqli_query($db_conn, "SELECT stock_initialized FROM territory_partners WHERE id='$_menu_tp_id' AND is_active=1 LIMIT 1"));
+$_menu_tp_row    = mysqli_fetch_assoc(mysqli_query($db_conn, "SELECT stock_initialized FROM territory_partners WHERE id='".db_esc($_menu_tp_id)."' AND is_active=1 LIMIT 1"));
 $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 1;
 ?>
 <div class="app-menu">

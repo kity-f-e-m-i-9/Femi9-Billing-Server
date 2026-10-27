@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requireAdminOnly();
 $title="Whatsapp Settings";
 
@@ -12,8 +12,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST")
 	$wa_id=$_REQUEST['wa_id'];
 	$url=$_REQUEST['url'];
  
- $update_news_password="update admin_whatsapp_configuration set api_key='$api_key',wa_id='$wa_id',url='$url'";
- mysqli_query($db_conn,$update_news_password);
+ $update_news_password="update admin_whatsapp_configuration set api_key=?,wa_id=?,url=?";
+ db_q($db_conn,$update_news_password,[$api_key,$wa_id,$url]);
  
  echo "<script>window.location='wp-settings?UpdatedSuccess';</script>";
 			
@@ -101,13 +101,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST")
 											
 												
 				<label class="form-label">API KEY</label>
-                <input type="text" required value="<?=$result_wp_settings['api_key'];?>" name="api_key" class="form-control">
+                <input type="text" required value="<?=htmlspecialchars((string)($result_wp_settings['api_key']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="api_key" class="form-control">
 				
 				<label class="form-label">WA ID</label>
-                <input type="text" required value="<?=$result_wp_settings['wa_id'];?>" name="wa_id" class="form-control">
+                <input type="text" required value="<?=htmlspecialchars((string)($result_wp_settings['wa_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="wa_id" class="form-control">
 				
 				<label class="form-label">URL</label>
-                <input type="text" required value="<?=$result_wp_settings['url'];?>" name="url" class="form-control">
+                <input type="text" required value="<?=htmlspecialchars((string)($result_wp_settings['url']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="url" class="form-control">
 												
 												<br/>
 												

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $title="Edit Outlet";
@@ -9,8 +9,8 @@ $message_title="Outlet";
 $Coupon_category="Outlet";
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from outlet where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from outlet where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -90,14 +90,14 @@ $select_product_list="select * from outlet where id='$get_id'";
                                        
 <form action="Outlet-edit-action" method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!');">
 
-<input type="hidden" name="update_id" value="<?=$result_product_list['id'];?>">
-<input type="hidden" name="old_icon" value="<?=$result_product_list['user_icon'];?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="old_icon" value="<?=htmlspecialchars((string)($result_product_list['user_icon']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
 											
             <label class="form-label">Name</label>
-            <input type="text" required="" name="name" value="<?php echo $result_product_list['name'];?>" class="form-control">
+            <input type="text" required="" name="name" value="<?php echo htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 			
 			<?php
 			if($result_product_list["user_icon"]!="Nil"){$imgsrcname="".$result_product_list["user_icon"]."";}else{$imgsrcname="../../assets/images/no image.jpg";}
@@ -113,19 +113,19 @@ $select_product_list="select * from outlet where id='$get_id'";
 									
 <br/>									
 			<label class="form-label">Mobile Number</label>
-            <input type="text" value="<?php echo $result_product_list['mobile_number'];?>" required="" name="mobile_number" class="form-control">
+            <input type="text" value="<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" name="mobile_number" class="form-control">
 			
 			<br/>									
 			<label class="form-label">Email ID</label>
-            <input type="text" value="<?php echo $result_product_list['email'];?>" required="" name="email" class="form-control">
+            <input type="text" value="<?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" name="email" class="form-control">
 			
 			<br/>									
 			<label class="form-label">Address*</label>
-            <textarea name="address" class="form-control" required="required"><?php echo $result_product_list['address'];?></textarea>
+            <textarea name="address" class="form-control" required="required"><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			
 			<br/>
 			<label class="form-label">Password</label>
-            <input type="text" value="<?php echo $result_product_list['password'];?>" required="" name="password" class="form-control">
+            <input type="text" value="<?php echo '••••••••';?>" required="" name="password" class="form-control">
 			
 			
 	<br/>

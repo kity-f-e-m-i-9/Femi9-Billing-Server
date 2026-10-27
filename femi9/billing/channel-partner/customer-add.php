@@ -73,7 +73,7 @@ $advBalance = 0;
         $fetchCountry = mysqli_query($db_conn, "SELECT * FROM country ORDER BY id ASC");
         while ($resultCountry = mysqli_fetch_array($fetchCountry)) {
         ?>
-        <option value="<?php echo $resultCountry['c_code']; ?>"><?php echo $resultCountry['c_name']; ?> (<?php echo $resultCountry['c_code']; ?>)</option>
+        <option value="<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
         <?php } ?>
         </select>
     </div>

@@ -257,7 +257,7 @@ $i = 0;
                                 <h3><?php echo $total_count; ?></h3>
                                 <p>Total Payments</p>
                                 <p style="font-size:11.5px;color:#9ca3af;margin-top:4px;">
-                                    <?php echo $stats_by_type['napkin']['count']; ?> Napkin &middot; <?php echo $stats_by_type['diaper']['count']; ?> Diaper
+                                    <?php echo htmlspecialchars((string)($stats_by_type['napkin']['count']), ENT_QUOTES, 'ISO-8859-1', false); ?> Napkin &middot; <?php echo htmlspecialchars((string)($stats_by_type['diaper']['count']), ENT_QUOTES, 'ISO-8859-1', false); ?> Diaper
                                 </p>
                             </div>
                         </div>
@@ -310,7 +310,7 @@ $i = 0;
                                             <select name="tp_id" id="tpPayerSelect" class="form-control">
                                                 <option value="">All Payers</option>
                                                 <?php foreach ($tps as $tp): ?>
-                                                <option value="<?php echo $tp['id']; ?>" <?php echo $filter_tp == $tp['id'] ? 'selected' : ''; ?>>
+                                                <option value="<?php echo htmlspecialchars((string)($tp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo $filter_tp == $tp['id'] ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($tp['name']); ?> (<?php echo htmlspecialchars($tp['tp_id']); ?>)
                                                 </option>
                                                 <?php endforeach; ?>
@@ -321,7 +321,7 @@ $i = 0;
                                             <select name="company_id" class="form-control">
                                                 <option value="">All Receivers</option>
                                                 <?php foreach ($company_profiles as $cp): ?>
-                                                <option value="<?php echo $cp['id']; ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
+                                                <option value="<?php echo htmlspecialchars((string)($cp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" <?php echo $filter_company == $cp['id'] ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($cp['gname']); ?>
                                                 </option>
                                                 <?php endforeach; ?>
@@ -428,13 +428,13 @@ $i = 0;
                                                     </td>
                                                     <td><?php echo htmlspecialchars($p['created_by']); ?></td>
                                                     <td>
-                                                        <a href="tp-advance-payment-receipt.php?id=<?php echo $p['id']; ?>" target="_blank" class="btn btn-sm btn-info text-white btn-action me-1" title="View Receipt">
+                                                        <a href="tp-advance-payment-receipt.php?id=<?php echo urlencode((string)$p['id']); ?>" target="_blank" class="btn btn-sm btn-info text-white btn-action me-1" title="View Receipt">
                                                             <i class="material-icons" style="font-size:16px;vertical-align:middle;">receipt_long</i>
                                                         </a>
-                                                        <button type="button" class="btn btn-sm btn-warning btn-action edit-btn me-1" data-id="<?php echo $p['id']; ?>" title="Edit Payment">
+                                                        <button type="button" class="btn btn-sm btn-warning btn-action edit-btn me-1" data-id="<?php echo htmlspecialchars((string)($p['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" title="Edit Payment">
                                                             <i class="material-icons" style="font-size:16px;vertical-align:middle;">edit</i>
                                                         </button>
-                                                        <button type="button" class="btn btn-sm btn-danger btn-action delete-btn" data-id="<?php echo $p['id']; ?>" title="Delete Payment">
+                                                        <button type="button" class="btn btn-sm btn-danger btn-action delete-btn" data-id="<?php echo htmlspecialchars((string)($p['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>" title="Delete Payment">
                                                             <i class="material-icons" style="font-size:16px;vertical-align:middle;">delete</i>
                                                         </button>
                                                     </td>
@@ -545,7 +545,7 @@ $(document).ready(function () {
 
         $.post('get-tp-advance-payment-edit-form.php', {
             id: id,
-            csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+            csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
         })
         .done(function (response) {
             $('#editModalContent').html(response);
@@ -594,7 +594,7 @@ $(document).ready(function () {
 
         $.post('delete-tp-advance-payment-action.php', {
             id: id,
-            csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+            csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
         })
         .done(function (response) {
             if (response.success) {

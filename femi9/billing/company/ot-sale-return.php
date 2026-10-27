@@ -1,12 +1,12 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 require_once("include/StockService.php");
 date_default_timezone_set("Asia/Kolkata");
 
 $tempid=base64_decode($_REQUEST['tempid']);
-$select_product_list="select * from ot_sales where tempid='$tempid'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from ot_sales where tempid=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 
 // Company Profile that this sale's return belongs to — shown read-only
@@ -41,8 +41,8 @@ if(isset($_REQUEST['addReturn']))
 	$qty=$_REQUEST['qty'];
 
 //GET SALES QTY
-$select_sls_details="select * from ot_sales where tempid='$tempid' and prid='$product_id'";
-$fetch_sls_details=mysqli_query($db_conn,$select_sls_details);
+$select_sls_details="select * from ot_sales where tempid=? and prid=?";
+$fetch_sls_details=db_q($db_conn,$select_sls_details,[$tempid,$product_id]);
 $result_sls_details=mysqli_fetch_array($fetch_sls_details);
 $Total_sls_qty=$result_sls_details['qty'];
 $buyer_gsttype=$result_sls_details['buyer_gsttype'];
@@ -69,8 +69,8 @@ if($buyer_GSTIN_count==15){ $buyer_gsttype="register";}else {$buyer_gsttype="unr
 if($qty<=$Total_sls_qty)
 {
 	
-$select_count_product="select count(*) as numCountRcds from ot_sales_return where tempid='$tempid' and prid='$product_id'";
-$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+$select_count_product="select count(*) as numCountRcds from ot_sales_return where tempid=? and prid=?";
+$fetch_count_product=db_q($db_conn,$select_count_product,[$tempid,$product_id]);
 $result_count_product=mysqli_fetch_array($fetch_count_product);
 if($result_count_product['numCountRcds']==0)
 	{
@@ -214,7 +214,7 @@ if($result_count_product['numCountRcds']==0)
                             <div class="col-md-12">
                                 <div class="card">
                                    <div class="card-header">
-                                        <h5 class="card-title">Order Number : <?=$result_product_list['order_number'];?></h5>
+                                        <h5 class="card-title">Order Number : <?=htmlspecialchars((string)($result_product_list['order_number']), ENT_QUOTES, 'ISO-8859-1', false);?></h5>
                                     </div>
                                     <div class="card-body">
                                        
@@ -222,8 +222,8 @@ if($result_count_product['numCountRcds']==0)
 	 
 	 <?php if($result_product_list["amount_received"]==0){?>
 <form method="post" enctype="multipart/form-data" onsubmit="return confirm('Add this return? Stock will be credited back to the selected Godown (physical) immediately.');">
-<input type="hidden" name="tempid" value="<?=$tempid?>">
-<input type="hidden" name="godownid" value="<?=$result_product_list['godownid'];?>">
+<input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false)?>">
+<input type="hidden" name="godownid" value="<?=htmlspecialchars((string)($result_product_list['godownid']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
                                         <div class="example-container">
                                         <div class="example-content">
@@ -239,8 +239,8 @@ if($result_count_product['numCountRcds']==0)
 // duplicate check below still blocks a resubmit either way, but hiding
 // them stops a product from being offered for "return" a second time
 // once it's already gone back through the proper stock-reversing flow.
-$select_product_listSD="select * from ot_sales where tempid='$tempid' and prid not in (select prid from ot_sales_return where tempid='$tempid')";
-$fetch_product_listSD=mysqli_query($db_conn,$select_product_listSD);
+$select_product_listSD="select * from ot_sales where tempid=? and prid not in (select prid from ot_sales_return where tempid=?)";
+$fetch_product_listSD=db_q($db_conn,$select_product_listSD,[$tempid,$tempid]);
 while($result_product_listSD=mysqli_fetch_array($fetch_product_listSD))
 {
 
@@ -248,7 +248,7 @@ $select_product_list12="select * from products where id='".$result_product_listS
 $fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
 $result_product_list12=mysqli_fetch_array($fetch_product_list12);
 ?>
-<option value="<?=$result_product_list12['id'];?>" data-maxqty="<?=(int)$result_product_listSD['qty'];?>"><?=$result_product_list12['productName'];?> (Invoiced Qty: <?=(int)$result_product_listSD['qty'];?>)</option>
+<option value="<?=htmlspecialchars((string)($result_product_list12['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" data-maxqty="<?=(int)$result_product_listSD['qty'];?>"><?=htmlspecialchars((string)($result_product_list12['productName']), ENT_QUOTES, 'ISO-8859-1', false);?> (Invoiced Qty: <?=(int)$result_product_listSD['qty'];?>)</option>
 <?php }?>
 </select>
 <input type="number" placeholder="Return Qty" min="0" id="returnQtyInput" name="qty" class="form-control" required=""/>
@@ -305,8 +305,8 @@ function updateReturnQtyMax() {
 											
 											
 											<tbody>
-		<?php $select_RtnDetails="select * from ot_sales_return where tempid='$tempid' order by id asc";
-				$fetch_RtnDetails=mysqli_query($db_conn,$select_RtnDetails);
+		<?php $select_RtnDetails="select * from ot_sales_return where tempid=? order by id asc";
+				$fetch_RtnDetails=db_q($db_conn,$select_RtnDetails,[$tempid]);
 										while($result_RtnDetails=mysqli_fetch_array($fetch_RtnDetails))
 										{
 											
@@ -318,8 +318,8 @@ $pass_rtnid=base64_encode($result_RtnDetails['id']);
 $pass_tempid=base64_encode($tempid);
 										?>
                                                 <tr>
-                                                    <td><?php echo $result_product_list12SD["productName"];?></td>
-													<td><?php echo $result_RtnDetails["qty"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list12SD["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_RtnDetails["qty"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo date("d/m/Y",strtotime($result_RtnDetails["return_date"]));?></td>
 													
 													

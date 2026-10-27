@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('cus');
 include("config.php");
 error_reporting(0);
@@ -125,7 +125,7 @@ $to_date=date("Y-m-d");
 $from_date = date ("Y-m-d", strtotime("-2 days", strtotime($to_date)));
 						}
 ?>
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -193,8 +193,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from invoice where user_type='$Login_user_TYPEvl' and date between '$from_date' and '$to_date' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from invoice where user_type=? and date between ? and ? order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$from_date,$to_date]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											//customer details
@@ -212,7 +212,7 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 													<td>
 													<?php if($CuSTID!=0){?>
@@ -228,7 +228,7 @@ $i= $start_from;
 			if($result_count_return==0){
 			?>
 													
-													<a href="update_customer3.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$result_product_list["inv_id"];?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
+													<a href="update_customer3.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
 													</a>
 			<?php } else{ echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";}?>
 			<!----------END CUSTOMER UPDATE***--------->
@@ -257,7 +257,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 }
 ?>
 				<td><?php echo inr_format($result_product_list["total"], 2);?>
-				<br/><a href="add-receipt?invid=<?=$result_product_list["inv_id"];?>&&invuser=<?=$getinvuser;?>"><?=$msgpayment;?></a>
+				<br/><a href="add-receipt?invid=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>&&invuser=<?=$getinvuser;?>"><?=$msgpayment;?></a>
 				</td>
 													
 													
@@ -275,7 +275,7 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 													
 																										<td>
 													    <div class="actions-group">
-													        <a href="customer-user-invoice-add?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$INVID_encode;?>&&gid=<?=$result_product_list['user_id'];?>&&action=edit" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+													        <a href="customer-user-invoice-add?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$INVID_encode;?>&&gid=<?=htmlspecialchars((string)($result_product_list['user_id']), ENT_QUOTES, 'ISO-8859-1', false);?>&&action=edit" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
 													    </div>
 													</td>
 													

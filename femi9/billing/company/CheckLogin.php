@@ -48,6 +48,31 @@ function checkLoginRateLimit($key, $maxAttempts = 5, $timeWindow = 900) {
     return true;
 }
 
+
+// Function to record a failed attempt (without this the limiter never triggers)
+function recordFailedAttempt($key) {
+    $rateLimitFile = __DIR__ . '/logs/login_rate_limit.json';
+    $fp = @fopen($rateLimitFile, 'c+');
+    if (!$fp) { return; }
+    if (flock($fp, LOCK_EX)) {
+        $raw = stream_get_contents($fp);
+        $rateLimits = json_decode($raw ?: '[]', true);
+        if (!is_array($rateLimits)) { $rateLimits = []; }
+        $now = time();
+        foreach ($rateLimits as $k => $v) {            // drop stale entries
+            if (($now - ($v['time'] ?? 0)) > 3600) { unset($rateLimits[$k]); }
+        }
+        $count = ($rateLimits[$key]['count'] ?? 0) + 1;
+        $rateLimits[$key] = ['count' => $count, 'time' => $now];
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($rateLimits));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+    }
+    fclose($fp);
+}
+
 // Check if form was submitted
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['login'])) {
     header('Location: index.php');
@@ -102,38 +127,19 @@ try {
     // Check if user exists
     if (!$user) {
         logLoginAttempt($mobileNumber, false, 'User not found');
+        recordFailedAttempt($rateLimitKey);
         // Don't reveal if user exists or not (security best practice)
         throw new Exception('Invalid mobile number or password');
     }
     
-    // Verify password
-    $encryption = new EncryptionService();
-    $storedPassword = $user['password'];
-    $isPasswordValid = false;
-    
-    try {
-        // Try to decrypt password (new encrypted format)
-        $decryptedPassword = $encryption->decrypt($storedPassword);
-        $isPasswordValid = ($password === $decryptedPassword);
-    } catch (Exception $e) {
-        // If decryption fails, it might be plain text (old format)
-        // Check if it matches plain text
-        $isPasswordValid = ($password === $storedPassword);
-        
-        // If password matches in plain text, encrypt it now for future
-        if ($isPasswordValid) {
-            $encryptedPassword = $encryption->encrypt($password);
-            $updateStmt = mysqli_prepare($db_conn,
-                "UPDATE admin_log SET password = ? WHERE username = ?"
-            );
-            mysqli_stmt_bind_param($updateStmt, "ss", $encryptedPassword, $mobileNumber);
-            mysqli_stmt_execute($updateStmt);
-            mysqli_stmt_close($updateStmt);
-        }
-    }
-    
+    // Verify password (bcrypt hash; legacy AES/plain-text rows are accepted once
+    // and re-stored as a hash on this successful login)
+    require_once __DIR__ . '/../shared/PasswordService.php';
+    $isPasswordValid = femi_password_verify($db_conn, $password, (string)$user['password'], 'admin_log', 'username', $mobileNumber);
+
     if (!$isPasswordValid) {
         logLoginAttempt($mobileNumber, false, 'Invalid password');
+        recordFailedAttempt($rateLimitKey);
         throw new Exception('Invalid mobile number or password');
     }
     

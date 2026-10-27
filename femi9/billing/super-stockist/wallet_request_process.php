@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
@@ -20,8 +20,8 @@ if(isset($_REQUEST['sent_money_request']))
 	
 	
 	//if alread pending request available
-	$select_pending_req="select id from wallet_withdraw where user_type='$user_type' and user_id='$user_id' and req_status='pending'";
-	$fetch_pending_req=mysqli_query($db_conn,$select_pending_req);
+	$select_pending_req="select id from wallet_withdraw where user_type=? and user_id=? and req_status='pending'";
+	$fetch_pending_req=db_q($db_conn,$select_pending_req,[$user_type,$user_id]);
 	$result_pending_req=mysqli_num_rows($fetch_pending_req);
 	if($result_pending_req!=0)
 	{
@@ -31,8 +31,8 @@ if(isset($_REQUEST['sent_money_request']))
 	}
 	
 	
-		$seletcountreturn="select * from wallet_withdraw where req_id='$req_id'";
-		$fetchcountreturn=mysqli_query($db_conn,$seletcountreturn);
+		$seletcountreturn="select * from wallet_withdraw where req_id=?";
+		$fetchcountreturn=db_q($db_conn,$seletcountreturn,[$req_id]);
 		$resultcountreturn=mysqli_num_rows($fetchcountreturn);
 		if($resultcountreturn==0)
 		{
@@ -44,23 +44,23 @@ if(isset($_REQUEST['sent_money_request']))
 			
 			$insertreturn="insert into wallet_withdraw (amount,req_id,req_status,user_type,user_id,date,time,remarks,updated_date,updated_time,
 			TDS_percentage,TDS_deduction,sent_amount,acname,acnumber,bankname,ifsc,pannumber) values 
-			('$request_amount','$req_id','$req_status','$user_type','$user_id','$date','$time',
-			'$remarks','$updated_date','$updated_time','0','0','0','$acname','$acnumber','$bankname','$ifsc','$pannumber')";
-			mysqli_query($db_conn,$insertreturn);
+			(?,?,?,?,?,?,?,
+			?,?,?,'0','0','0',?,?,?,?,?)";
+			db_q($db_conn,$insertreturn,[$request_amount,$req_id,$req_status,$user_type,$user_id,$date,$time,$remarks,$updated_date,$updated_time,$acname,$acnumber,$bankname,$ifsc,$pannumber]);
 			
 			// Check and update PAN number in user table if empty
 			if(!empty($pannumber))
                 {
                 	// Check if PAN is empty in user table
-                	$check_pan="select pannumber from users_profile where user_tempid='$user_id' and usertype='$user_type'";
-                	$fetch_pan=mysqli_query($db_conn,$check_pan);
+                	$check_pan="select pannumber from users_profile where user_tempid=? and usertype=?";
+                	$fetch_pan=db_q($db_conn,$check_pan,[$user_id,$user_type]);
                 	$row_pan=mysqli_fetch_assoc($fetch_pan);
                 	
                 	if(empty($row_pan['pannumber']))
                 	{
                 		// Update PAN number in user table
-                		$update_pan="update users_profile set pannumber='$pannumber' where user_tempid='$user_id' and usertype='$user_type'";
-                		mysqli_query($db_conn,$update_pan);
+                		$update_pan="update users_profile set pannumber=? where user_tempid=? and usertype=?";
+                		db_q($db_conn,$update_pan,[$pannumber,$user_id,$user_type]);
                 	}
                 }
 		}

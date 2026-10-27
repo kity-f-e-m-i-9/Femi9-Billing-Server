@@ -129,7 +129,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
                         <p class="text-muted" style="font-size:13px;">This rate feeds Gross Profit on the MIS Report for products not mapped into Neksomo. For Neksomo-mapped products, use the Neksomo login's own Purchase Rate entry instead — this entry has no effect on those.</p>
 
                         <form action="llp-purchase-rate-action.php" method="post" id="rateForm">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="add-record" value="1">
                         <div id="hiddenRateInputs"></div>
 

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 include("config.php");
 //
 $Coupon_category="Super-Distributor";
@@ -135,8 +135,8 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 //
 $district_id=$result_product_list['district_id'];
 if (is_numeric($district_id)) {
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 }
@@ -145,8 +145,8 @@ else{$district_name=$result_product_list['district_id'];}
 //
 $taluk_id=$result_product_list['taluk_id'];
 if (is_numeric($taluk_id)) {
-$select_taluklist="select * from taluk where id='$taluk_id'";
-	$fetch_taluklist=mysqli_query($db_conn,$select_taluklist);
+$select_taluklist="select * from taluk where id=?";
+	$fetch_taluklist=db_q($db_conn,$select_taluklist,[$taluk_id]);
 	$result_taluklist=mysqli_fetch_array($fetch_taluklist);
 $taluk_name=$result_taluklist['taluk'];
 }else{$taluk_name=$result_product_list['taluk_id'];}
@@ -183,11 +183,11 @@ $select_ssdetails="select * from ".$tblanem." where temp_id='$supersid'";
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					D:&nbsp;<?=ucwords($district_name);?><br/>T:&nbsp;<?=ucwords($taluk_name);?>
 					<br/>P:&nbsp;<?=$pincodeshow;?>
 					</td>
-					<td><?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td>
 			<?php 
@@ -206,8 +206,8 @@ $select_ssdetails="select * from ".$tblanem." where temp_id='$supersid'";
 
 
 <td>
-<?=ucwords($result_ssdetails['name']);?><br/>
-<?=ucwords($result_ssdetails['mobile_number']);?><br/>
+<?=htmlspecialchars((string)(ucwords($result_ssdetails['name'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<?=htmlspecialchars((string)(ucwords($result_ssdetails['mobile_number'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 <?=$lableshow_user;?>
 </td>
 
@@ -225,7 +225,7 @@ function newPopup(url) {
 			
 						<td>
 			    <div class="actions-group">
-			        <a href="super_Distributor_del_approval.php?distributorid=<?php echo base64_encode($result_product_list['temp_id']);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm this Distributor (<?php echo ucwords($result_product_list["><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+			        <a href="super_Distributor_del_approval.php?distributorid=<?php echo base64_encode($result_product_list['temp_id']);?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm this Distributor (<?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>)')"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 			    </div>
 			</td>
 			

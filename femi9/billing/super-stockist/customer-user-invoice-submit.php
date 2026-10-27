@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); 
 include("config.php"); 
 error_reporting(0);
@@ -10,8 +10,8 @@ if(isset($_REQUEST['invoice-submit']))
 {
 	$invoice_id=$_REQUEST['invoice_id'];
 	
-	$selectdetails="select * from invoice where inv_id='$invoice_id'";
-	$fetchdetails=mysqli_query($db_conn,$selectdetails);
+	$selectdetails="select * from invoice where inv_id=?";
+	$fetchdetails=db_q($db_conn,$selectdetails,[$invoice_id]);
 	$resultdetails=mysqli_fetch_array($fetchdetails);
 	$Login_user_IDvl=$resultdetails['user_id']; 
 	
@@ -21,12 +21,12 @@ if($_REQUEST['update_invoice_date']!=NULL)
 $update_invoice_date=date("Y-m-d",strtotime($_REQUEST['update_invoice_date']));
 
 //1
-$update_invoice12="update invoice set date='$update_invoice_date' where inv_id='$invoice_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-mysqli_query($db_conn,$update_invoice12);
+$update_invoice12="update invoice set date=? where inv_id=? and user_type=? and user_id=?";
+db_q($db_conn,$update_invoice12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
 //2	
-$update_invoice_ITEMS12="update invoice_items set date='$update_invoice_date' where inv_id='$invoice_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-mysqli_query($db_conn,$update_invoice_ITEMS12);
+$update_invoice_ITEMS12="update invoice_items set date=? where inv_id=? and user_type=? and user_id=?";
+db_q($db_conn,$update_invoice_ITEMS12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
 	}
 //--------------------------------------------
@@ -44,14 +44,14 @@ mysqli_query($db_conn,$update_invoice_ITEMS12);
 	//DELETE RECEIPT DETAILS IF EDIT FUNCTION
 	if($_SESSION['ACTIONEDIT']=="edit"){
 		
-		$delReceipt="delete from receipt where inv_id='$invoice_id'";
-		mysqli_query($db_conn,$delReceipt);
+		$delReceipt="delete from receipt where inv_id=?";
+		db_q($db_conn,$delReceipt,[$invoice_id]);
 	}
 	
 	
 	//INSERT RECEIPT DETAILS
-	$insertreceiptcount="select count(*) as numreceipt from receipt where receiptid='$invoice_id'";
-	$fetchreceipt=mysqli_query($db_conn,$insertreceiptcount);
+	$insertreceiptcount="select count(*) as numreceipt from receipt where receiptid=?";
+	$fetchreceipt=db_q($db_conn,$insertreceiptcount,[$invoice_id]);
 	$resultreceipt=mysqli_fetch_array($fetchreceipt);
 	if($resultreceipt['numreceipt']==0)
 	{
@@ -76,7 +76,7 @@ mysqli_query($db_conn,$update_invoice_ITEMS12);
 		$insertreceipt="insert into receipt (receiptid,inv_id,invoice_amount,received,receivable,date,from_user_type,
 		from_user_id,to_user_type,to_user_id,receipt_method,receipt_remarks) 
 		values 
-		('$invoice_id','$invoice_id','$total_amount','$receivedamount','$receivableamount','$receiptdate','".$resultdetails['user_type']."','".$resultdetails['user_id']."','$usertype','$userid','$receipt_method','$receipt_remarks')";
+		('".db_esc($invoice_id)."','".db_esc($invoice_id)."','$total_amount','".db_esc($receivedamount)."','$receivableamount','$receiptdate','".$resultdetails['user_type']."','".$resultdetails['user_id']."','$usertype','$userid','".db_esc($receipt_method)."','$receipt_remarks')";
 		mysqli_query($db_conn,$insertreceipt);
 	}
 	//-------------------------------------
@@ -84,9 +84,9 @@ mysqli_query($db_conn,$update_invoice_ITEMS12);
 	
 	if($_REQUEST['invoice_id']!=NULL)
 	{
-		$update_invoice="update invoice set sub_total='$SubTotal',discount='$discount',
-	total='$total_amount',roundoff='$roundoff',courier_charges='$courier_charges' where inv_id='$invoice_id' and user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-	$invoice_update_result = mysqli_query($db_conn,$update_invoice);
+		$update_invoice="update invoice set sub_total=?,discount=?,
+	total=?,roundoff=?,courier_charges=? where inv_id=? and user_type=? and user_id=?";
+	$invoice_update_result = db_q($db_conn,$update_invoice,[$SubTotal,$discount,$total_amount,$roundoff,$courier_charges,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 	
 	// ============================================================================
 	// ✨ DAILY REWARD INTEGRATION - Check and award daily reward

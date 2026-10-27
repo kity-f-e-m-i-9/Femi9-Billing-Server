@@ -1,4 +1,4 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); 
 require_once("include/PermissionCheck.php");
 $__perm_map = array (
   'super_stockiest' => 'ss',
@@ -702,7 +702,7 @@ $is_advance_mandatory = isAdvancePaymentMandatory($getinvuser);
 								<?php if(isset($_REQUEST['stocknotupdated'])){?>
 								<div class="alert alert-danger">
 								    <i class="material-icons" style="vertical-align: middle; margin-right: 8px;">warning</i>
-								    Please update opening stock (<?=$result_Godown['gname'];?>)!
+								    Please update opening stock (<?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?>)!
 								</div>
 								<?php }?>
 								
@@ -736,7 +736,7 @@ $is_advance_mandatory = isAdvancePaymentMandatory($getinvuser);
 								        <?php } ?>
 								        <?=$displaytitle;?>
 								    </h1>
-								    <a href="user-manage-invoice?invuser=<?=$getinvuser;?>" class="menu-link" title="Manage Invoices">
+								    <a href="user-manage-invoice?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>" class="menu-link" title="Manage Invoices">
 								        <i class="material-icons">list</i>
 								    </a>
 								</div>
@@ -752,7 +752,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintPrice").innerHTML=xmlhttp.responseText;}}
-var invuser="<?=$getinvuser;?>";
+var invuser="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>";
 xmlhttp.open("GET","loadPrice.php?q="+str + '&invuser='+ invuser,true);
 xmlhttp.send();}
 </script>
@@ -775,13 +775,13 @@ function totalkm(){
 		$Invoice_ID=base64_decode($_REQUEST['InvoiceID']);
 					
 		//get invoice details
-		$select_InvoieDetails="select * from user_invoice where inv_id='$Invoice_ID'";
-		$fetch_InvoieDetails=mysqli_query($db_conn,$select_InvoieDetails);
+		$select_InvoieDetails="select * from user_invoice where inv_id=?";
+		$fetch_InvoieDetails=db_q($db_conn,$select_InvoieDetails,[$Invoice_ID]);
 		$result_InvoieDetails=mysqli_fetch_array($fetch_InvoieDetails);
 		
 //RECEIPT AMOUNT		
 $totalamount=$result_InvoieDetails["total"];
-$selectcountreceipt="select sum(received) from receipt where inv_id='".$Invoice_ID."'";
+$selectcountreceipt="select sum(received) from receipt where inv_id='".db_esc($Invoice_ID)."'";
 $fetchcountreceipt=mysqli_query($db_conn,$selectcountreceipt);
 $resulcountreceipt=mysqli_fetch_array($fetchcountreceipt);
 $Total_Receipt_amount=$resulcountreceipt[0];
@@ -797,9 +797,9 @@ else{ $amount_received_fully="0";}
 													
 <form action="user-invoice-action2" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="inv_id" value="<?=$Invoice_ID;?>">
-<input type="hidden" name="invuser" value="<?=$getinvuser?>">
-<input type="hidden" name="godownid" value="<?=$result_InvoieDetails['from_user_id'];?>">
+<input type="hidden" name="inv_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>">
+<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>">
+<input type="hidden" name="godownid" value="<?=htmlspecialchars((string)($result_InvoieDetails['from_user_id']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
 <!-- Invoice Details Section -->
 <div class="form-section">
@@ -812,7 +812,7 @@ else{ $amount_received_fully="0";}
         <div class="col-md-6 mb-3">
             <label class="form-label">Company Profile</label>
             <select name="godownid" class="form-control" disabled>
-                <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+                <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
             </select>
         </div>
 
@@ -837,14 +837,14 @@ else{ $amount_received_fully="0";}
             <label class="form-label"><?=$lablenamedisplay;?> <span class="required">*</span></label>
             
             <?php
-            $select_countitems="select count(*) as numitemscount from user_invoice_items where inv_id='$Invoice_ID'";
-            $fetch_countitems=mysqli_query($db_conn,$select_countitems);
+            $select_countitems="select count(*) as numitemscount from user_invoice_items where inv_id=?";
+            $fetch_countitems=db_q($db_conn,$select_countitems,[$Invoice_ID]);
             $result_countitems=mysqli_fetch_array($fetch_countitems);
             $totalcountitems=$result_countitems['numitemscount'];
             ?>
             
             <select name="customer_id" class="form-control" <?php if($totalcountitems>0){echo 'disabled';}?> id="customer-select-edit">
-                <option value="<?php echo $CustomerID;?>"><?php echo $result_CUSTDetails['name'];?>, <?php echo $result_CUSTDetails['mobile_number'];?></option>
+                <option value="<?php echo $CustomerID;?>"><?php echo htmlspecialchars((string)($result_CUSTDetails['name']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php echo htmlspecialchars((string)($result_CUSTDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
                 <?php 
                 if($totalcountitems==0) {
                     if($getinvuser=="candf"){
@@ -855,8 +855,8 @@ else{ $amount_received_fully="0";}
                     $fetch_Customers_list=mysqli_query($db_conn,$selectCusList);
                     while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list)) {
                         $user_districtID=$result_Customers_list['district_id'];
-                        $select_User_districtName="select * from district where id='$user_districtID'";
-                        $fetch_user_districtName=mysqli_query($db_conn,$select_User_districtName);
+                        $select_User_districtName="select * from district where id=?";
+                        $fetch_user_districtName=db_q($db_conn,$select_User_districtName,[$user_districtID]);
                         $result_user_districtName=mysqli_fetch_array($fetch_user_districtName);
                         $user_districtName=$result_user_districtName['dist_name'];
                         
@@ -866,7 +866,7 @@ else{ $amount_received_fully="0";}
                             $UserName_SHOW="".strtoupper($result_Customers_list['name']).", ".$result_Customers_list['mobile_number']."";	
                         }
                 ?>
-                <option value="<?php echo $result_Customers_list['temp_id'];?>"><?php echo $UserName_SHOW;?></option>
+                <option value="<?php echo htmlspecialchars((string)($result_Customers_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo $UserName_SHOW;?></option>
                 <?php
                     }
                 }
@@ -887,7 +887,7 @@ else{ $amount_received_fully="0";}
         
         <div class="col-md-6 mb-3">
             <label class="form-label">Invoice Date <span class="required">*</span></label>
-            <input type="date" readonly name="date" value="<?=$result_InvoieDetails['date'];?>" required="" class="form-control">
+            <input type="date" readonly name="date" value="<?=htmlspecialchars((string)($result_InvoieDetails['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" required="" class="form-control">
         </div>
     </div>
 </div>
@@ -911,7 +911,7 @@ else{ $amount_received_fully="0";}
                     $fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
                     while($result_Products_list=mysqli_fetch_array($fetch_Products_list)) {
                     ?>
-                    <option value="<?php echo $result_Products_list['id'];?>"><?php echo $result_Products_list['productName'];?></option>
+                    <option value="<?php echo htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
                     <?php }?>
                 </select>
             </div>
@@ -988,8 +988,8 @@ else{ $amount_received_fully="0";}
         </thead>
         <tbody>
         <?php
-        $select_INVProductDetails="select * from user_invoice_items where inv_id='$Invoice_ID' order by id desc";
-        $fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+        $select_INVProductDetails="select * from user_invoice_items where inv_id=? order by id desc";
+        $fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
         $CountProducts=mysqli_num_rows($fetch_INVProductDetails);
         
         if($CountProducts==0) {
@@ -1005,8 +1005,8 @@ else{ $amount_received_fully="0";}
         
         while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails)) {
             $InV_Product_ID=$result_INVProductDetails['pr_id'];
-            $select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-            $fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+            $select_ProductDetails123="select * from products where id=?";
+            $fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
             $result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
             
             $TotalAMount=$result_INVProductDetails['total'];
@@ -1016,23 +1016,23 @@ else{ $amount_received_fully="0";}
         ?>
             <tr>
                 <td><?php echo $rd=$rd+1;?></td>
-                <td><strong><?=$result_ProductDetails123['productName'];?></strong></td>
-                <td><?=$result_ProductDetails123['hsn'];?></td>
-                <td><?=$result_INVProductDetails['qty'];?></td>
-                <td>₹<?=$result_INVProductDetails['amount'];?></td>
-                <td>₹<?=$result_INVProductDetails['discount_amount'];?> <small>(<?=$result_INVProductDetails['discount_percentage'];?>%)</small></td>
+                <td><strong><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></strong></td>
+                <td><?=htmlspecialchars((string)($result_ProductDetails123['hsn']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                <td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                <td>₹<?=htmlspecialchars((string)($result_INVProductDetails['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+                <td>₹<?=htmlspecialchars((string)($result_INVProductDetails['discount_amount']), ENT_QUOTES, 'ISO-8859-1', false);?> <small>(<?=htmlspecialchars((string)($result_INVProductDetails['discount_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</small></td>
                 <td><strong>₹<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></strong></td>
-                <td>₹<?=$result_INVProductDetails['gstamount_total'];?> <small>(<?=$result_INVProductDetails['gst_percentage'];?>%)</small></td>
+                <td>₹<?=htmlspecialchars((string)($result_INVProductDetails['gstamount_total']), ENT_QUOTES, 'ISO-8859-1', false);?> <small>(<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</small></td>
                 <td><strong>₹<?php echo inr_format($TotalAMount, 2);?></strong></td>
                 <?php if($amount_received_fully==0){?>
                 <td>
                 <?php 
-                $select_count_return="select * from user_return_stock_items where invnumber='$Invoice_ID' and prid='$InV_Product_ID'";
-                $fetch_count_return=mysqli_query($db_conn,$select_count_return);
+                $select_count_return="select * from user_return_stock_items where invnumber=? and prid=?";
+                $fetch_count_return=db_q($db_conn,$select_count_return,[$Invoice_ID,$InV_Product_ID]);
                 $result_count_return=mysqli_num_rows($fetch_count_return);
                 if($result_count_return==0){
                 ?>
-                <a href="user-del-inv-product?inv_id=<?php echo $Invoice_ID_encode;?>&&rowid=<?php echo $ItemRowid;?>&&&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove" 
+                <a href="user-del-inv-product?inv_id=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?php echo $ItemRowid;?>&&&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&userid=<?=$CustomerID;?>&&actionremove" 
                    onclick="return confirm('Delete this product from invoice?');" 
                    class="badge-remove">
                    <i class="material-icons" style="font-size: 14px; vertical-align: middle;">delete</i> Remove
@@ -1057,10 +1057,10 @@ else{ $amount_received_fully="0";}
                 <p><strong>Invoice Number:</strong> 
                     <?php if($get_action=="edit") {?>
                     <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive">
-                        <?php echo $result_InvoieDetails['inv_number'];?> <i class="material-icons" style="font-size: 16px;">edit</i>
+                        <?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?> <i class="material-icons" style="font-size: 16px;">edit</i>
                     </a>
                     <?php }else{?>
-                    <span><?php echo $result_InvoieDetails['inv_number'];?></span>
+                    <span><?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                     <?php }?>
                 </p>
                 
@@ -1071,15 +1071,15 @@ else{ $amount_received_fully="0";}
                             <div class="modal-header">
                                 <h5 class="modal-title" id="exampleModalLiveLabel">
                                     Update Invoice Number<br/>
-                                    <small class="text-muted"><?php echo $result_InvoieDetails['inv_number'];?></small>
+                                    <small class="text-muted"><?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></small>
                                 </h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <form method="post" onsubmit="return confirm('Confirm update?');" action="update_invoice_action">	
-                                <input type="hidden" name="invuser" value="<?php echo $_REQUEST['invuser'];?>">
-                                <input type="hidden" name="InvoiceID" value="<?php echo $_REQUEST['InvoiceID'];?>">
-                                <input type="hidden" name="action" value="<?php echo $_REQUEST['action'];?>">
-                                <input type="hidden" name="gid" value="<?php echo $_REQUEST['gid'];?>">
+                                <input type="hidden" name="invuser" value="<?php echo htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>">
+                                <input type="hidden" name="InvoiceID" value="<?php echo htmlspecialchars((string)($_REQUEST['InvoiceID']), ENT_QUOTES, 'UTF-8', false);?>">
+                                <input type="hidden" name="action" value="<?php echo htmlspecialchars((string)($_REQUEST['action']), ENT_QUOTES, 'UTF-8', false);?>">
+                                <input type="hidden" name="gid" value="<?php echo htmlspecialchars((string)($_REQUEST['gid']), ENT_QUOTES, 'UTF-8', false);?>">
                                 <input type="hidden" name="redirurl" value="user-invoice-add">
                                 <input type="hidden" name="tblenme" value="1">
                                 
@@ -1111,8 +1111,8 @@ else{ $amount_received_fully="0";}
                 $usertype=$result_InvoieDetails['to_user_type'];
                 $userid=$result_InvoieDetails['to_user_id'];
                 
-                $selectcredit_amount="select * from return_credit where usertype='$usertype' and userid='$userid'";
-                $fetchcredit_amount=mysqli_query($db_conn,$selectcredit_amount);
+                $selectcredit_amount="select * from return_credit where usertype=? and userid=?";
+                $fetchcredit_amount=db_q($db_conn,$selectcredit_amount,[$usertype,$userid]);
                 $resultcredit_amount=mysqli_fetch_array($fetchcredit_amount);
                 $creditamount="0";
                 if($creditamount!=NULL) {
@@ -1140,7 +1140,7 @@ else{ $amount_received_fully="0";}
             }
             
             function validateForm() {
-                const customerType = '<?php echo $getinvuser; ?>';
+                const customerType = '<?php echo htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>';
                 const advanceTypes = ['super_stockiest', 'stockiest'];
                 const requiresAdvance = advanceTypes.includes(customerType);
                 
@@ -1171,7 +1171,7 @@ else{ $amount_received_fully="0";}
             </script>
             
             <form action="user-invoice-submit" id="myForm" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
-                <input type="hidden" name="invoice_id" value="<?=$Invoice_ID;?>"/>
+                <input type="hidden" name="invoice_id" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>"/>
                 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
                 <?php $_SESSION['INVOICEFINISH']="1";?>
                 
@@ -1181,8 +1181,8 @@ else{ $amount_received_fully="0";}
                 
                 <?php 
                 if($CountProducts==0 && $result_InvoieDetails['sub_total']>0) {
-                    $update_zero_invoice="update user_invoice set sub_total='0',discount='0',total='0' where inv_id='$Invoice_ID'";
-                    mysqli_query($db_conn,$update_zero_invoice);		
+                    $update_zero_invoice="update user_invoice set sub_total='0',discount='0',total='0' where inv_id=?";
+                    db_q($db_conn,$update_zero_invoice,[$Invoice_ID]);		
                 }
                 ?>
                 
@@ -1199,7 +1199,7 @@ else{ $amount_received_fully="0";}
                     
                     <div class="bold">
                         Courier Charges
-                        <span><input type="number" value="<?=$result_InvoieDetails['courier_charges'];?>" name="courier_charges" min="0" required onKeyup="totalamount()" id="cucharge" class="form-control"></span>
+                        <span><input type="number" value="<?=htmlspecialchars((string)($result_InvoieDetails['courier_charges']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="courier_charges" min="0" required onKeyup="totalamount()" id="cucharge" class="form-control"></span>
                     </div>
                     
                     <div class="bold">
@@ -1247,7 +1247,7 @@ else{ $amount_received_fully="0";}
                     
                         if ($get_action === 'edit') {
                             $sel_rcpt = mysqli_query($db_conn,
-                                "SELECT COALESCE(SUM(received), 0) AS total_received FROM receipt WHERE inv_id = '$Invoice_ID'"
+                                "SELECT COALESCE(SUM(received), 0) AS total_received FROM receipt WHERE inv_id = '".db_esc($Invoice_ID)."'"
                             );
                             $res_rcpt        = mysqli_fetch_assoc($sel_rcpt);
                             $already_received = (float)$res_rcpt['total_received'];
@@ -1333,7 +1333,7 @@ else{ $amount_received_fully="0";}
                         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
                         <div class="bold">
                             Invoice Date
-                            <span><input type="date" name="update_invoice_date" class="form-control" id="bookingDateu" value="<?=$result_InvoieDetails['date'];?>"></span>
+                            <span><input type="date" name="update_invoice_date" class="form-control" id="bookingDateu" value="<?=htmlspecialchars((string)($result_InvoieDetails['date']), ENT_QUOTES, 'ISO-8859-1', false);?>"></span>
                         </div>
                         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
                         <script>
@@ -1400,9 +1400,9 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
 
 <input type="hidden" name="randum_number" value="<?=$randum_number?>">
 <input type="hidden" name="inv_id" value="<?=$inv_id?>">
-<input type="hidden" name="invuser" value="<?=$getinvuser?>">
-<input type="hidden" name="username" value="<?=$_SESSION['LOGIN_USER'];?>">
-<input type="hidden" name="usertype" value="<?=$Result_Log_users_Dtails134['usertype'];?>">
+<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>">
+<input type="hidden" name="username" value="<?=htmlspecialchars((string)($_SESSION['LOGIN_USER']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="usertype" value="<?=htmlspecialchars((string)($Result_Log_users_Dtails134['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
 <!-- New Invoice Form Section -->
 <div class="form-section">
@@ -1435,7 +1435,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
             var invField = document.getElementById('inv_number');
             if (!invField) { return; }
             if (invField.value.trim() !== '' && !invNumberAutoFilled) { return; }
-            var invuser = '<?=$getinvuser;?>';
+            var invuser = '<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>';
             var url = 'load_next_invoice_number.php?invuser=' + encodeURIComponent(invuser) + (productId ? '&pid=' + encodeURIComponent(productId) : '');
             fetch(url)
                 .then(function(r) { return r.json(); })
@@ -1475,7 +1475,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
                 $fetch_Godown=mysqli_query($db_conn,$select_Godown);
                 while($result_Godown=mysqli_fetch_array($fetch_Godown)) {
                 ?>
-                <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+                <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
                 <?php }?>
             </select>
             <div id="opstock"></div>
@@ -1523,8 +1523,8 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
                 $fetch_Customers_list=mysqli_query($db_conn,$selectCusList);
                 while($result_Customers_list=mysqli_fetch_array($fetch_Customers_list)) {
                     $user_districtID=$result_Customers_list['district_id'];
-                    $select_User_districtName="select * from district where id='$user_districtID'";
-                    $fetch_user_districtName=mysqli_query($db_conn,$select_User_districtName);
+                    $select_User_districtName="select * from district where id=?";
+                    $fetch_user_districtName=db_q($db_conn,$select_User_districtName,[$user_districtID]);
                     $result_user_districtName=mysqli_fetch_array($fetch_user_districtName);
                     $user_districtName=$result_user_districtName['dist_name'];
                     
@@ -1534,7 +1534,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
                         $UserName_SHOW="".strtoupper($result_Customers_list['name']).", ".$result_Customers_list['mobile_number']."";	
                     }
                 ?>
-                <option value="<?=$result_Customers_list['temp_id'];?>"><?=$UserName_SHOW;?></option>
+                <option value="<?=htmlspecialchars((string)($result_Customers_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=$UserName_SHOW;?></option>
                 <?php }?>
             </select>
             
@@ -1551,7 +1551,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
             xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
             if (xmlhttp.readyState==4 && xmlhttp.status==200){
             document.getElementById("txtHintstock").innerHTML=xmlhttp.responseText;}}
-            var invuser="<?=$getinvuser;?>";
+            var invuser="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>";
             xmlhttp.open("GET","loadstockcheck.php?q="+str + '&invuser='+ invuser,true);
             xmlhttp.send();
         }
@@ -1592,7 +1592,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
                     $fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
                     while($result_Products_list=mysqli_fetch_array($fetch_Products_list)) {
                     ?>
-                    <option value="<?=$result_Products_list['id'];?>"><?=$result_Products_list['productName'];?></option>
+                    <option value="<?=htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
                     <?php }?>
                 </select>
             </div>
@@ -1686,7 +1686,7 @@ $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";
         if (!customerSelect || !godownSelect) return;
         
         const customerId = customerSelect.value;
-        const customerType = '<?php echo $getinvuser; ?>';
+        const customerType = '<?php echo htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>';
         const godownId = godownSelect.value;
         
         if (!customerId || !godownId) {

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -77,7 +77,7 @@ else
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<!-----<td><a href="export_report7?modelval=<?=$_REQUEST['modelval'];?>&&out1=<?=$_REQUEST['out1'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>---->
+									<!-----<td><a href="export_report7?modelval=<?=htmlspecialchars((string)($_REQUEST['modelval']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>---->
 									</tr>
 									</table>
 									</h1>
@@ -96,7 +96,7 @@ else
 											
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title"><?=$DISPLAY_LABLE;?></span>
-                                                <span class="widget-stats-amount"><?=base64_decode($_REQUEST['out1']);?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)(base64_decode($_REQUEST['out1'])), ENT_QUOTES, 'UTF-8', false);?></span>
                                             </div>
                                         </div>
                                     </div>
@@ -154,8 +154,8 @@ $i= $start_from;
 											$state_id_VLSS1=$resultRcd_VLSS1['state_id'];
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 
-$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-	$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+	$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 			$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 $district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 
@@ -164,8 +164,8 @@ if($resultRcd_VLSS1['taluk_id']!=NULL)
 {
 $taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 										
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 }
@@ -195,9 +195,9 @@ if($Total_SS_outstanding>0){
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultRcd_VLSS1["useridtext"];?></td>
-							<td><?=$resultRcd_VLSS1["name"];?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+                            <td><?=htmlspecialchars((string)($resultRcd_VLSS1["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							
 			<?php if($usertype_stock=="stockiest" || $usertype_stock=="distributor" || $usertype_stock=="shop"){?>

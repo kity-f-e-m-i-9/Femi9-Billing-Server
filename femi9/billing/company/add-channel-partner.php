@@ -147,7 +147,7 @@ if (empty($_SESSION['csrf_token'])) {
                     </div>
 
                     <form action="channel-partner-action" method="post" enctype="multipart/form-data">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="action" value="insert-channel-partner">
 
                     <div class="row">

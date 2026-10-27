@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php"); 
 
@@ -43,42 +43,42 @@ include 'insert_wallet_cashback.php';
 //---------------------------------------------------
 //Insert Reward points onetime - billing to customers
 //---------------------------------------------------
-$select_zero_points="select id,pr_id,qty from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and date<='2025-07-31'";
-$fetch_zero_points=mysqli_query($db_conn,$select_zero_points);
+$select_zero_points="select id,pr_id,qty from invoice_items where user_type=? and user_id=? and date<='2025-07-31'";
+$fetch_zero_points=db_q($db_conn,$select_zero_points,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while($result_zero_points=mysqli_fetch_array($fetch_zero_points))
 {
 	$zero_pr_id=$result_zero_points['pr_id'];
 	$zero_row_id=$result_zero_points['id'];
 	$zero_pr_qty=$result_zero_points['qty'];
 	
-$selectproducts_zero="select rwpoints from products where id='$zero_pr_id'";
-$fetchproducts_zero=mysqli_query($db_conn,$selectproducts_zero);
+$selectproducts_zero="select rwpoints from products where id=?";
+$fetchproducts_zero=db_q($db_conn,$selectproducts_zero,[$zero_pr_id]);
 $resultproducts_zero=mysqli_fetch_array($fetchproducts_zero);
 $rwpoints_zero_update=$resultproducts_zero['rwpoints']*$zero_pr_qty;
 
-$update_reward_points234="update invoice_items set rwpoints='$rwpoints_zero_update',
-rwpoints_sls='$rwpoints_zero_update' where id='$zero_row_id'";
-mysqli_query($db_conn,$update_reward_points234);
+$update_reward_points234="update invoice_items set rwpoints=?,
+rwpoints_sls=? where id=?";
+db_q($db_conn,$update_reward_points234,[$rwpoints_zero_update,$rwpoints_zero_update,$zero_row_id]);
 }
 
 //-----------------------------------------------------------
 //-----------------------------------------------------------
-$select_zero_points2="select id,pr_id,qty from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and date<='2025-08-04' and to_user_type='shop'";
-$fetch_zero_points2=mysqli_query($db_conn,$select_zero_points2);
+$select_zero_points2="select id,pr_id,qty from user_invoice_items where from_user_type=? and from_user_id=? and date<='2025-08-04' and to_user_type='shop'";
+$fetch_zero_points2=db_q($db_conn,$select_zero_points2,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while($result_zero_points2=mysqli_fetch_array($fetch_zero_points2))
 {
 	$zero_pr_id2=$result_zero_points2['pr_id'];
 	$zero_row_id2=$result_zero_points2['id'];
 	$zero_pr_qty2=$result_zero_points2['qty'];
 	
-$selectproducts_zero2="select rwpoints from products where id='$zero_pr_id2'";
-$fetchproducts_zero2=mysqli_query($db_conn,$selectproducts_zero2);
+$selectproducts_zero2="select rwpoints from products where id=?";
+$fetchproducts_zero2=db_q($db_conn,$selectproducts_zero2,[$zero_pr_id2]);
 $resultproducts_zero2=mysqli_fetch_array($fetchproducts_zero2);
 $rwpoints_zero_update2=$resultproducts_zero2['rwpoints']*$zero_pr_qty2;
 
-$update_reward_points234="update user_invoice_items set rwpoints_sls='$rwpoints_zero_update2' 
-where id='$zero_row_id2'";
-mysqli_query($db_conn,$update_reward_points234);
+$update_reward_points234="update user_invoice_items set rwpoints_sls=? 
+where id=?";
+db_q($db_conn,$update_reward_points234,[$rwpoints_zero_update2,$zero_row_id2]);
 }
 ?>
 <!DOCTYPE html>
@@ -273,7 +273,7 @@ mysqli_query($db_conn,$update_reward_points234);
 						$result_Scrolld_message=mysqli_fetch_array($fetch_Scrolld_message);
 						?>
 						<div class="scroll-horizontal">
-  <div><?=$result_Scrolld_message['st_msg'];?></div>
+  <div><?=htmlspecialchars((string)($result_Scrolld_message['st_msg']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
 </div>
 
 		<?php /*?>
@@ -290,12 +290,13 @@ mysqli_query($db_conn,$update_reward_points234);
 		$st_ref_userid_conc="".$st_ref_userid."".$st_ref_userid2."";
 		
 		$tblename=$_REQUEST['tblename'];
+		if (!in_array($tblename, ['distributor','super_stockiest','stockiest','super_distributor'], true)) { http_response_code(400); exit('Invalid request'); } // table name goes into SQL: allowlist only
 		
 		if($st_ref_type=="company")
 		{
 		    
-		    $UPDATE_REFERED="update stockist_referral set st_ref_type='$st_ref_type',st_ref_userid='company',updated='1' where stockist_id='$stockist_id'";
-			mysqli_query($db_conn,$UPDATE_REFERED);
+		    $UPDATE_REFERED="update stockist_referral set st_ref_type=?,st_ref_userid='company',updated='1' where stockist_id=?";
+			db_q($db_conn,$UPDATE_REFERED,[$st_ref_type,$stockist_id]);
 							
 			echo "<script>window.location='dashboard?referedupdated';</script>";
 		    
@@ -308,14 +309,14 @@ mysqli_query($db_conn,$update_reward_points234);
 				exit;
 			}
 		
-		$select_count_REFERID="select * from ".$tblename." where useridtext='$st_ref_userid_conc'";
+		$select_count_REFERID="select * from ".$tblename." where useridtext='".db_esc($st_ref_userid_conc)."'";
 		$fetch_count_REFERID=mysqli_query($db_conn,$select_count_REFERID);
 		$result_count_REFERID=mysqli_num_rows($fetch_count_REFERID);
 		if($result_count_REFERID==1)
 		{
 							
-							$UPDATE_REFERED="update stockist_referral set st_ref_type='$st_ref_type',st_ref_userid='$st_ref_userid_conc',updated='1' where stockist_id='$stockist_id'";
-							mysqli_query($db_conn,$UPDATE_REFERED);
+							$UPDATE_REFERED="update stockist_referral set st_ref_type=?,st_ref_userid=?,updated='1' where stockist_id=?";
+							db_q($db_conn,$UPDATE_REFERED,[$st_ref_type,$st_ref_userid_conc,$stockist_id]);
 							
 							echo "<script>window.location='dashboard?referedupdated';</script>";
 							
@@ -424,8 +425,8 @@ xmlhttp.send();}
 						date_default_timezone_set("Asia/Kolkata");
 						$dashDate=date("Y-m-d");
 						
-						$select_offers="select * from offers_manage where expired_date>='$dashDate' and usertype='$Login_user_TYPEvl' order by expired_date asc";
-						$fetch_offers=mysqli_query($db_conn,$select_offers);
+						$select_offers="select * from offers_manage where expired_date>=? and usertype=? order by expired_date asc";
+						$fetch_offers=db_q($db_conn,$select_offers,[$dashDate,$Login_user_TYPEvl]);
 						$CountOffers=mysqli_num_rows($fetch_offers);
 						if($CountOffers>0)
 						{
@@ -443,12 +444,12 @@ xmlhttp.send();}
 			<div class="offer">	
 
 <?php if($result_offers['offer_img']!=NULL){?>			
-      <a data-fslightbox="gallery" href="../company/offers_img/<?=$result_offers['offer_img'];?>" title="<?=ucwords($result_offers['offer_title']);?>">
-					<img src="../company/offers_img/<?=$result_offers['offer_img'];?>" alt="<?=ucwords($result_offers['offer_title']);?>">
+      <a data-fslightbox="gallery" href="../company/offers_img/<?=htmlspecialchars((string)($result_offers['offer_img']), ENT_QUOTES, 'ISO-8859-1', false);?>" title="<?=htmlspecialchars((string)(ucwords($result_offers['offer_title'])), ENT_QUOTES, 'ISO-8859-1', false);?>">
+					<img src="../company/offers_img/<?=htmlspecialchars((string)($result_offers['offer_img']), ENT_QUOTES, 'ISO-8859-1', false);?>" alt="<?=htmlspecialchars((string)(ucwords($result_offers['offer_title'])), ENT_QUOTES, 'ISO-8859-1', false);?>">
 					</a>
 <?php }?>
 					
-      <h3><?=ucwords($result_offers['offer_title']);?></h3>
+      <h3><?=htmlspecialchars((string)(ucwords($result_offers['offer_title'])), ENT_QUOTES, 'ISO-8859-1', false);?></h3>
 	  <p>Offers Valid Upto : <?=date("d/m/Y",strtotime($result_offers['expired_date']));?></p>
     </div>
    
@@ -466,8 +467,8 @@ xmlhttp.send();}
 						<!----------------------Start Top Performers page----------------------->
 						<br/>
 						<?php 
-						$select_top_performers="select * from top_performar where usertype='$Login_user_TYPEvl' order by id desc";
-						$fetch_top_performers=mysqli_query($db_conn,$select_top_performers);
+						$select_top_performers="select * from top_performar where usertype=? order by id desc";
+						$fetch_top_performers=db_q($db_conn,$select_top_performers,[$Login_user_TYPEvl]);
 						$Count_top_performers=mysqli_num_rows($fetch_top_performers);
 						$result_top_performers=mysqli_fetch_array($fetch_top_performers);
 						
@@ -482,11 +483,11 @@ xmlhttp.send();}
 			<div class="offer">
 
 			<?php if($result_top_performers['particulars']!=NULL){?>
-<h3><?=ucwords($result_top_performers['particulars']);?></h3>		
+<h3><?=htmlspecialchars((string)(ucwords($result_top_performers['particulars'])), ENT_QUOTES, 'ISO-8859-1', false);?></h3>		
 			<?php }?>
 			
-      <a data-fslightbox="gallery" href="../company/top_performers_photo/<?=$result_top_performers['per_photo'];?>" title="<?=ucwords($result_top_performers['particulars']);?>">
-					<img src="../company/top_performers_photo/<?=$result_top_performers['per_photo'];?>" alt="<?=ucwords($result_top_performers['particulars']);?>">
+      <a data-fslightbox="gallery" href="../company/top_performers_photo/<?=htmlspecialchars((string)($result_top_performers['per_photo']), ENT_QUOTES, 'ISO-8859-1', false);?>" title="<?=htmlspecialchars((string)(ucwords($result_top_performers['particulars'])), ENT_QUOTES, 'ISO-8859-1', false);?>">
+					<img src="../company/top_performers_photo/<?=htmlspecialchars((string)($result_top_performers['per_photo']), ENT_QUOTES, 'ISO-8859-1', false);?>" alt="<?=htmlspecialchars((string)(ucwords($result_top_performers['particulars'])), ENT_QUOTES, 'ISO-8859-1', false);?>">
 					</a>
       
     </div>
@@ -504,13 +505,13 @@ xmlhttp.send();}
 						
 						
 						<?php
-$sltsumqty_request="select count(*) as numcountrequ from stock_request where status='pending' and tousertype='$Login_user_TYPEvl' and touserid='$Login_user_IDvl'";
-						$fetch_sumqty_request=mysqli_query($db_conn,$sltsumqty_request);
+$sltsumqty_request="select count(*) as numcountrequ from stock_request where status='pending' and tousertype=? and touserid=?";
+						$fetch_sumqty_request=db_q($db_conn,$sltsumqty_request,[$Login_user_TYPEvl,$Login_user_IDvl]);
 						$result_sumqty_request=mysqli_fetch_array($fetch_sumqty_request);
 						$toalqyt=$result_sumqty_request['numcountrequ'];
 
-						$select_count_request="select * from stock_request where status='pending' and tousertype='$Login_user_TYPEvl' and touserid='$Login_user_IDvl'";
-						$fetch_count_request=mysqli_query($db_conn,$select_count_request);
+						$select_count_request="select * from stock_request where status='pending' and tousertype=? and touserid=?";
+						$fetch_count_request=db_q($db_conn,$select_count_request,[$Login_user_TYPEvl,$Login_user_IDvl]);
 						$result_count_request=mysqli_fetch_array($fetch_count_request);
 						//
 						$stockreqid=$result_count_request['reqid'];
@@ -569,14 +570,14 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
                                             </div>
 	<?php 
 	//SUM LAST MONTH POINT
-	$SLCT_LM_POINTS="select sum(rwpoints) from user_invoice_items where to_user_type='$Login_user_TYPEvl' and to_user_id='$Login_user_IDvl' and date between '$last_from_date' and '$last_to_date'";
-	$FETCH_LM_POINTS=mysqli_query($db_conn,$SLCT_LM_POINTS);
+	$SLCT_LM_POINTS="select sum(rwpoints) from user_invoice_items where to_user_type=? and to_user_id=? and date between ? and ?";
+	$FETCH_LM_POINTS=db_q($db_conn,$SLCT_LM_POINTS,[$Login_user_TYPEvl,$Login_user_IDvl,$last_from_date,$last_to_date]);
 	$RESULT_LM_POINTS=mysqli_fetch_array($FETCH_LM_POINTS);
 	if($RESULT_LM_POINTS[0]>0){$TotalPoints_LM=$RESULT_LM_POINTS[0];}else{$TotalPoints_LM="0";}
 	
 	//SUM LAST MONTH POINT
-	$SLCT_LM_POINTS_RTN="select sum(rwpoints) from user_return_stock_items where from_usertype='$Login_user_TYPEvl' and from_userid='$Login_user_IDvl' and date between '$last_from_date' and '$last_to_date'";
-	$FETCH_LM_POINTS_RTN=mysqli_query($db_conn,$SLCT_LM_POINTS_RTN);
+	$SLCT_LM_POINTS_RTN="select sum(rwpoints) from user_return_stock_items where from_usertype=? and from_userid=? and date between ? and ?";
+	$FETCH_LM_POINTS_RTN=db_q($db_conn,$SLCT_LM_POINTS_RTN,[$Login_user_TYPEvl,$Login_user_IDvl,$last_from_date,$last_to_date]);
 	$RESULT_LM_POINTS_RTN=mysqli_fetch_array($FETCH_LM_POINTS_RTN);
 	if($RESULT_LM_POINTS_RTN[0]>0){$TotalPoints_LM_RTN=$RESULT_LM_POINTS_RTN[0];}else{$TotalPoints_LM_RTN="0";}
 	
@@ -604,14 +605,14 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
                                             </div>
 	<?php 
 	//SUM LAST MONTH POINT
-	$SLCT_CRNT_POINTS="select sum(rwpoints) from user_invoice_items where to_user_type='$Login_user_TYPEvl' and to_user_id='$Login_user_IDvl' and date between '$current_from_date' and '$current_to_date'";
-	$FETCH_CRNT_POINTS=mysqli_query($db_conn,$SLCT_CRNT_POINTS);
+	$SLCT_CRNT_POINTS="select sum(rwpoints) from user_invoice_items where to_user_type=? and to_user_id=? and date between ? and ?";
+	$FETCH_CRNT_POINTS=db_q($db_conn,$SLCT_CRNT_POINTS,[$Login_user_TYPEvl,$Login_user_IDvl,$current_from_date,$current_to_date]);
 	$RESULT_CRNT_POINTS=mysqli_fetch_array($FETCH_CRNT_POINTS);
 	if($RESULT_CRNT_POINTS[0]>0){$TotalPoints_CRNT=$RESULT_CRNT_POINTS[0];}else{$TotalPoints_CRNT="0";}
 	
 	//SUM LAST MONTH POINT
-	$SLCT_CRNT_POINTS_RTN="select sum(rwpoints) from user_return_stock_items where from_usertype='$Login_user_TYPEvl' and from_userid='$Login_user_IDvl' and date between '$current_from_date' and '$current_to_date'";
-	$FETCH_CRNT_POINTS_RTN=mysqli_query($db_conn,$SLCT_CRNT_POINTS_RTN);
+	$SLCT_CRNT_POINTS_RTN="select sum(rwpoints) from user_return_stock_items where from_usertype=? and from_userid=? and date between ? and ?";
+	$FETCH_CRNT_POINTS_RTN=db_q($db_conn,$SLCT_CRNT_POINTS_RTN,[$Login_user_TYPEvl,$Login_user_IDvl,$current_from_date,$current_to_date]);
 	$RESULT_CRNT_POINTS_RTN=mysqli_fetch_array($FETCH_CRNT_POINTS_RTN);
 	if($RESULT_CRNT_POINTS_RTN[0]>0){$TotalPoints_CRNT_RTN=$RESULT_CRNT_POINTS_RTN[0];}else{$TotalPoints_CRNT_RTN="0";}
 	
@@ -646,8 +647,8 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
                                                 <i class="material-icons-outlined">paid</i>
                                             </div>
 	<?php 
-	$select_availablestocks="select sum(closing_qty) from stock where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-	$fetch_availablestocks=mysqli_query($db_conn,$select_availablestocks);
+	$select_availablestocks="select sum(closing_qty) from stock where user_type=? and user_id=?";
+	$fetch_availablestocks=db_q($db_conn,$select_availablestocks,[$Login_user_TYPEvl,$Login_user_IDvl]);
 	$result_availablestocks=mysqli_fetch_array($fetch_availablestocks);
 	if($result_availablestocks[0]>0){$Totavalstocks=$result_availablestocks[0];}else{$Totavalstocks="0";}
 	?>
@@ -676,39 +677,39 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
                                    <span class="widget-stats-title">Distributor wise Available Stocks</span>
                                    <span class="widget-stats-amount">
 								   <?php 
-	$EMPTYSTOCKISTSTOCKS="DELETE FROM temp_stocks_stockist WHERE ss_id='$Login_user_IDvl'";
-	mysqli_query($db_conn,$EMPTYSTOCKISTSTOCKS);
+	$EMPTYSTOCKISTSTOCKS="DELETE FROM temp_stocks_stockist WHERE ss_id=?";
+	db_q($db_conn,$EMPTYSTOCKISTSTOCKS,[$Login_user_IDvl]);
 	
 	$stokiststock_usertype="distributor";
-	$select_stockistcount12="select temp_id from distributor where stockiest_id='$Login_user_IDvl'";
-	$fetch_stockistcount12=mysqli_query($db_conn,$select_stockistcount12);
+	$select_stockistcount12="select temp_id from distributor where stockiest_id=?";
+	$fetch_stockistcount12=db_q($db_conn,$select_stockistcount12,[$Login_user_IDvl]);
 	while($result_stockistcount12=mysqli_fetch_array($fetch_stockistcount12))
 	{
 		
 	$stockistIDvl=$result_stockistcount12['temp_id'];
 	//
-	$select_stockistcount_stocks="select sum(closing_qty) from stock where user_type='$stokiststock_usertype' and user_id='$stockistIDvl'";
-	$fetch_stockistcount_stocks=mysqli_query($db_conn,$select_stockistcount_stocks);
+	$select_stockistcount_stocks="select sum(closing_qty) from stock where user_type=? and user_id=?";
+	$fetch_stockistcount_stocks=db_q($db_conn,$select_stockistcount_stocks,[$stokiststock_usertype,$stockistIDvl]);
 	$result_stockistcount_stocks=mysqli_fetch_array($fetch_stockistcount_stocks);
 	if($result_stockistcount_stocks[0]!=NULL){
 	$Total_stocks_stockist=$result_stockistcount_stocks[0];
 	}else{$Total_stocks_stockist="0";}
 	
-	$sltcountduplicate="select count(*) as numDupvl from temp_stocks_stockist where usertype='$stokiststock_usertype' and userid='$stockistIDvl' and ss_id='$Login_user_IDvl'";
-	$fetcghountduplicate=mysqli_query($db_conn,$sltcountduplicate);
+	$sltcountduplicate="select count(*) as numDupvl from temp_stocks_stockist where usertype=? and userid=? and ss_id=?";
+	$fetcghountduplicate=db_q($db_conn,$sltcountduplicate,[$stokiststock_usertype,$stockistIDvl,$Login_user_IDvl]);
 	$resultghountduplicate=mysqli_fetch_array($fetcghountduplicate);
 	if($resultghountduplicate['numDupvl']==0)
 	{
 		$insertstockiststocks="insert into temp_stocks_stockist (usertype,userid,stocks,ss_id) 
-		values ('$stokiststock_usertype','$stockistIDvl','$Total_stocks_stockist','$Login_user_IDvl')";
-		mysqli_query($db_conn,$insertstockiststocks);
+		values (?,?,?,?)";
+		db_q($db_conn,$insertstockiststocks,[$stokiststock_usertype,$stockistIDvl,$Total_stocks_stockist,$Login_user_IDvl]);
 	}
 	
 	}
 	
 	//display stocks - stockist wise
-	$sltcountduplicate1345="select sum(stocks) from temp_stocks_stockist where ss_id='$Login_user_IDvl'";
-	$fetcghountduplicate1345=mysqli_query($db_conn,$sltcountduplicate1345);
+	$sltcountduplicate1345="select sum(stocks) from temp_stocks_stockist where ss_id=?";
+	$fetcghountduplicate1345=db_q($db_conn,$sltcountduplicate1345,[$Login_user_IDvl]);
 	$resultghountduplicate1345=mysqli_fetch_array($fetcghountduplicate1345);
 	if($resultghountduplicate1345[0]>0){$TotavalstocksDIST=$resultghountduplicate1345[0];}
 	else{$TotavalstocksDIST="0";}
@@ -736,13 +737,13 @@ $last_to_date=date("Y-m-".$nof_of_days_month2."",strtotime($last_month));
                                                 <i class="material-icons-outlined">person</i>
                                             </div>
                                  <?php 
-	$select_stockistcount="select count(*) as numcountstockist from distributor where stockiest_id='$Login_user_IDvl'";
-	$fetch_stockistcount=mysqli_query($db_conn,$select_stockistcount);
+	$select_stockistcount="select count(*) as numcountstockist from distributor where stockiest_id=?";
+	$fetch_stockistcount=db_q($db_conn,$select_stockistcount,[$Login_user_IDvl]);
 	$result_stockistcount=mysqli_fetch_array($fetch_stockistcount);
 	?>
                        <div class="widget-stats-content flex-fill">
                        <span class="widget-stats-title">Distributor's</span>
-                       <span class="widget-stats-amount"><?=$result_stockistcount['numcountstockist'];?></span>
+                       <span class="widget-stats-amount"><?=htmlspecialchars((string)($result_stockistcount['numcountstockist']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                        </div>
                                         </div>
                                     </div>

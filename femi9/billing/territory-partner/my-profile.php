@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -49,14 +49,14 @@ if (isset($_REQUEST['updateprofile'])) {
     $deliveryaddress = $_REQUEST['deliveryaddress'] ?? '';
 
     // Logo upload
-    $old_logo   = $_REQUEST['old_logo'] ?? '';
+    $old_logo   = safe_old_file_param($_REQUEST['old_logo']) ?? '';
     $logo_value = $old_logo;
     if (!empty($_FILES['logo']['name'])) {
         $ext = strtolower(pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION));
         if (in_array($ext, ['jpg', 'jpeg', 'png'])) {
             $newname   = 'tp_logo_' . $Login_user_IDvl . '_' . time() . '.' . $ext;
             $uploaddir = __DIR__ . '/bussiness_logo/';
-            if (move_uploaded_file($_FILES['logo']['tmp_name'], $uploaddir . $newname)) {
+            if (safe_move_uploaded_file($_FILES['logo']['tmp_name'], $uploaddir . $newname)) {
                 if ($old_logo && file_exists($uploaddir . $old_logo)) {
                     unlink($uploaddir . $old_logo);
                 }

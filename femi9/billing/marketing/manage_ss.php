@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
  error_reporting(0);?>
 <!DOCTYPE html>
@@ -112,8 +112,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-<?php $select_product_list="select * from ms_shop where ms_id='$markeingSTFID' order by id desc";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+<?php $select_product_list="select * from ms_shop where ms_id=? order by id desc";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$markeingSTFID]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {																
 
@@ -123,8 +123,8 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 					
 //shop category
 $shop_cat=$result_product_list['shop_cat'];
-$select_shopcatt="select * from shop_category where id='$shop_cat'";
-$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
+$select_shopcatt="select * from shop_category where id=?";
+$fetch_shopcatt=db_q($db_conn,$select_shopcatt,[$shop_cat]);
 $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 $shopcat_name=$result_shopcatt['catlable'];
 ?>
@@ -136,24 +136,24 @@ $shopcat_name=$result_shopcatt['catlable'];
 					</td>
 					<td><?=$shopcat_name;?></td>
 					<td>
-					<b><?php echo strtoupper($result_product_list["name"]);?></td>
-					<td><?=ucwords($result_product_list["state_name"]);?></td>
-					<td><?=ucwords($result_product_list["district_name"]);?></td>
-					<td><?=$result_product_list["taluk_name"];?></td>
-					<td><?=$result_product_list["pincode"];?></td>
+					<b><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list["state_name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list["district_name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["taluk_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["pincode"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
-					<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
-					<td><?php if($result_product_list["landline"]!=NULL){ echo $result_product_list["landline"]; }else{ echo "---";}?></td>
-					<td><?php if($result_product_list["email"]!=NULL){ echo $result_product_list["email"]; }else{ echo "---";}?></td>
-					<td><?php echo $result_product_list["address"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php if($result_product_list["landline"]!=NULL){ echo htmlspecialchars((string)($result_product_list["landline"]), ENT_QUOTES, 'ISO-8859-1', false); }else{ echo "---";}?></td>
+					<td><?php if($result_product_list["email"]!=NULL){ echo htmlspecialchars((string)($result_product_list["email"]), ENT_QUOTES, 'ISO-8859-1', false); }else{ echo "---";}?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["address"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
 					<?php if($result_product_list["latitude"]!=NULL && $result_product_list["longitude"]!=NULL){?>
-					<a href="https://www.google.com/maps?q=<?php echo $result_product_list["latitude"];?>,<?php echo $result_product_list["longitude"];?>" target="_blank" title="<?php echo htmlspecialchars($result_product_list["google_location"]);?>">View</a>
+					<a href="https://www.google.com/maps?q=<?php echo htmlspecialchars((string)($result_product_list["latitude"]), ENT_QUOTES, 'ISO-8859-1', false);?>,<?php echo htmlspecialchars((string)($result_product_list["longitude"]), ENT_QUOTES, 'ISO-8859-1', false);?>" target="_blank" title="<?php echo htmlspecialchars($result_product_list["google_location"]);?>">View</a>
 					<?php }elseif($result_product_list["google_location"]!=NULL){?>
 					<a href="https://www.google.com/maps/search/?api=1&query=<?php echo urlencode($result_product_list["google_location"]);?>" target="_blank" title="<?php echo htmlspecialchars($result_product_list["google_location"]);?>">View</a>
 					<?php }else { echo "---";}?>
 					</td>
-					<td><?php if($result_product_list["gstin"]!=NULL){ echo $result_product_list["gstin"]; }else{ echo "---";}?></td>
+					<td><?php if($result_product_list["gstin"]!=NULL){ echo htmlspecialchars((string)($result_product_list["gstin"]), ENT_QUOTES, 'ISO-8859-1', false); }else{ echo "---";}?></td>
 					
 			
 													

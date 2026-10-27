@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -6,8 +6,8 @@ include("config.php");
 
 $get_id=base64_decode($_REQUEST['prid']);
 
-$select_product_list="select * from top_performar where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from top_performar where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 
 if($result_product_list["per_photo"]!=NULL){
@@ -18,7 +18,7 @@ if(isset($_REQUEST['add-offers']))
 {
 
 $tempid=$_REQUEST['tempid'];
-$old_img=$_REQUEST['old_img'];
+$old_img=safe_old_file_param($_REQUEST['old_img']);
 
 	//UPLOAD BUSINESS LOGO
 	$file_extension_PRPH4 = pathinfo($_FILES['per_photo']['name'], PATHINFO_EXTENSION);
@@ -30,7 +30,7 @@ $DATETIME_PRPH4=date("YmdHis");
 $filename_PRPH4="Pr4".$DATETIME_PRPH4."".$tempid.".".$file_extension_PRPH4."";
 $uploaddir_PRPH4='top_performers_photo/';
 $uploadfile_PRPH4=$uploaddir_PRPH4.$filename_PRPH4;
-move_uploaded_file($_FILES['per_photo']['tmp_name'],$uploadfile_PRPH4);
+safe_move_uploaded_file($_FILES['per_photo']['tmp_name'],$uploadfile_PRPH4);
    
    unlink("top_performers_photo/".$old_img."");
 }
@@ -45,9 +45,9 @@ else
 	
 	$usertype=$_REQUEST['usertype'];
 		
-		$insertrecords="UPDATE top_performar SET usertype='$usertype',particulars='$particulars',
-		per_photo='$filename_PRPH4' WHERE tempid='$tempid'";
-		mysqli_query($db_conn,$insertrecords);
+		$insertrecords="UPDATE top_performar SET usertype=?,particulars=?,
+		per_photo=? WHERE tempid=?";
+		db_q($db_conn,$insertrecords,[$usertype,$particulars,$filename_PRPH4,$tempid]);
 
 	echo "<script>window.location='performers_manage?updatedSuccess';</script>";
 }
@@ -132,15 +132,15 @@ else
 <?php include("validate-scripts.php");?>
 <form method="post" enctype="multipart/form-data" id="uploadForm">
 
-<input type="hidden" name="tempid" value="<?=$result_product_list['tempid'];?>">
-<input type="hidden" name="old_img" value="<?=$result_product_list['per_photo'];?>">
+<input type="hidden" name="tempid" value="<?=htmlspecialchars((string)($result_product_list['tempid']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="old_img" value="<?=htmlspecialchars((string)($result_product_list['per_photo']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
 											
 											<label class="form-label">User*</label>
                                <select required name="usertype" class="form-control">
-							   <option value="<?=$result_product_list['usertype'];?>" hidden><?=$result_product_list['usertype'];?></option>
+							   <option value="<?=htmlspecialchars((string)($result_product_list['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden><?=htmlspecialchars((string)($result_product_list['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <option value="super_stockiest">Super Stockist</option>
 							   <option value="stockiest">Stockist</option>
 							   <option value="distributor">Distributor</option>
@@ -148,13 +148,13 @@ else
 												<br/>
                                                 
 												<label class="form-label">Particulars (optional)</label>
-                               <input type="text" name="particulars" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=$result_product_list['particulars'];?>">
+                               <input type="text" name="particulars" onkeypress="restrictSpecialChars(event)" class="form-control" value="<?=htmlspecialchars((string)($result_product_list['particulars']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 												<br/>
 												
 												<label class="form-label">Photo</label>
             <input type="file" name="per_photo" class="form-control" id="fileLogo" accept=".jpg, .jpeg, .png">
 			<br/>
-			<img src="<?php echo $imgsrcname;?>" style="width:300px;border-radius:10px;" alt="<?=$result_product_list["title"];?>">
+			<img src="<?php echo $imgsrcname;?>" style="width:300px;border-radius:10px;" alt="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			<br/>
 			<br/>
 												

@@ -236,6 +236,45 @@ function requireAdminOnly(): void
     }
 }
 
+/**
+ * Passes if the user holds AT LEAST ONE of the given permissions. For shared
+ * handlers (one action file called from several permission-gated pages).
+ */
+function requireAnyPermission(array $perms): void
+{
+    foreach ($perms as $perm) {
+        if (hasPermission($perm)) { return; }
+    }
+    denyAccess();
+}
+
+/**
+ * For handlers no restricted "users" sub-account has any menu path to: lets
+ * the company owner, finance, neksomo and stock-viewer roles through (the same
+ * roles requirePermission() always passes) and refuses everyone else,
+ * including sub-users and Sales BDM bridge sessions.
+ */
+function requireStaffOnly(): void
+{
+    global $db_conn;
+
+    $username = $_SESSION['LOGIN_USER'] ?? '';
+    if ($username === '') {
+        header('Location: index.php?sessionexpiry');
+        exit;
+    }
+
+    $stmt = mysqli_prepare($db_conn, "SELECT usertype FROM admin_log WHERE username=? LIMIT 1");
+    mysqli_stmt_bind_param($stmt, 's', $username);
+    mysqli_stmt_execute($stmt);
+    $row = mysqli_stmt_get_result($stmt)->fetch_assoc();
+    mysqli_stmt_close($stmt);
+
+    if (!$row || !in_array($row['usertype'], ['admin', 'finance', 'neksomo', 'stockviewer'], true)) {
+        denyAccess();
+    }
+}
+
 function denyAccess(): void
 {
     http_response_code(403);

@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 // Load environment variables FIRST (before anything else)
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -20,22 +20,13 @@ $manage_title="Manage Users";
 
 $id=base64_decode($_REQUEST['prid']);
 //
-$select_count_users="select * from admin_log where id='$id'";
-	$fetch_count_users=mysqli_query($db_conn,$select_count_users);
+$select_count_users="select * from admin_log where id=?";
+	$fetch_count_users=db_q($db_conn,$select_count_users,[$id]);
 	$result_count_users=mysqli_fetch_array($fetch_count_users);
 	
-// Decrypt password for display
+// Passwords are stored as one-way hashes and can no longer be displayed;
+// the edit form leaves the field blank and keeps the current password unless a new one is typed.
 $displayPassword = '';
-try {
-    $displayPassword = $encryption->decrypt($result_count_users['password']);
-} catch (Exception $e) {
-    // If decryption fails, it might be plain text
-    if (strlen($result_count_users['password']) < 50) {
-        $displayPassword = $result_count_users['password']; // Plain text
-    } else {
-        $displayPassword = ''; // Error case
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -117,12 +108,18 @@ if(isset($_REQUEST['add-users']))
 	$password=$_REQUEST['password'];
 	$update_id=$_REQUEST['update_id'];
 	
-	// Encrypt password
-	$encryptedPassword = $encryption->encrypt($password);
+	// New password -> bcrypt hash; blank -> keep the stored one
+	require_once __DIR__ . '/../shared/PasswordService.php';
+	if (trim((string)$password) !== '') {
+		$encryptedPassword = femi_password_hash((string)$password);
+	} else {
+		$__cur = mysqli_fetch_assoc(db_q($db_conn,"select password from admin_log where id=?",[$update_id]));
+		$encryptedPassword = $__cur['password'] ?? '';
+	}
 	
 	//Truncate
-	$select_count_users12_truncate="delete from admin_log_ot where username='$username'";
-	mysqli_query($db_conn,$select_count_users12_truncate);
+	$select_count_users12_truncate="delete from admin_log_ot where username=?";
+	db_q($db_conn,$select_count_users12_truncate,[$username]);
 	
 	if($_REQUEST['dash']==1){$dash=$_REQUEST['dash'];}else{$dash="0";}
 	if($_REQUEST['report']==1){$report=$_REQUEST['report'];}else{$report="0";}
@@ -206,24 +203,24 @@ if(isset($_REQUEST['add-users']))
     if(isset($_REQUEST['internal_transfer']) && $_REQUEST['internal_transfer']==1){$internal_transfer="1";}else{$internal_transfer="0";}
 
 
-		$insert_users="update admin_log set password='$encryptedPassword',dash='$dash',report='$report',
-        company_profile='$company_profile',users_demo='$users_demo',reward_points='$reward_points',
-        demo_free='$demo_free',demo_free_edit='$demo_free_edit',demo_free_delete='$demo_free_delete',
-        manage_return='$manage_return',manage_return_edit='$manage_return_edit',manage_return_delete='$manage_return_delete',
-        debit_note='$debit_note',debit_note_edit='$debit_note_edit',debit_note_delete='$debit_note_delete',stock_request='$stock_request',
-        products='$products',products_edit='$products_edit',products_delete='$products_delete',ot_channels='$ot_channels',location='$location',
-        ss='$ss',ss_edit='$ss_edit',ss_delete='$ss_delete',st='$st',st_edit='$st_edit',st_delete='$st_delete',
-        dt='$dt',dt_edit='$dt_edit',dt_delete='$dt_delete',sdt='$sdt',sdt_edit='$sdt_edit',sdt_delete='$sdt_delete',
-        shop='$shop',shop_edit='$shop_edit',shop_delete='$shop_delete',cus='$cus',cus_edit='$cus_edit',cus_delete='$cus_delete',
-        ms='$ms',ms_edit='$ms_edit',ms_delete='$ms_delete',
-        salesbdm_manage='$salesbdm_manage',salesbdm_manage_edit='$salesbdm_manage_edit',salesbdm_manage_delete='$salesbdm_manage_delete',
-        unassigned='$unassigned',remap='$remap',
-        users_network='$users_network',payment_entry='$add_payment_entry',manage_payment_entry='$manage_payment_entry',manage_payment_entry_edit='$manage_payment_entry_edit',manage_payment_entry_delete='$manage_payment_entry_delete',
-        consolidated_payment_entry='$consolidated_payment_entry',consolidated_payment_entry_edit='$consolidated_payment_entry_edit',consolidated_payment_entry_delete='$consolidated_payment_entry_delete',
-        bonus_calculator='$bonus_calculator',manage_bonus_points='$manage_bonus_points',manage_bonus_points_edit='$manage_bonus_points_edit',manage_bonus_points_delete='$manage_bonus_points_delete',
-        add_input_stock='$add_input_stock',manage_input_stock='$manage_input_stock',manage_input_stock_edit='$manage_input_stock_edit',manage_input_stock_delete='$manage_input_stock_delete',add_input_stock_users='$add_input_stock_users',manage_input_stock_users='$manage_input_stock_users',manage_input_stock_users_edit='$manage_input_stock_users_edit',manage_input_stock_users_delete='$manage_input_stock_users_delete',
-        partner_location='$partner_location',channel_partner='$channel_partner',channel_partner_edit='$channel_partner_edit',channel_partner_delete='$channel_partner_delete',territory_partner='$territory_partner',territory_partner_edit='$territory_partner_edit',territory_partner_delete='$territory_partner_delete',stock_transfers='$stock_transfers',internal_transfer='$internal_transfer' where id='$update_id'";
-		mysqli_query($db_conn,$insert_users);
+		$insert_users="update admin_log set password=?,dash=?,report=?,
+        company_profile=?,users_demo=?,reward_points=?,
+        demo_free=?,demo_free_edit=?,demo_free_delete=?,
+        manage_return=?,manage_return_edit=?,manage_return_delete=?,
+        debit_note=?,debit_note_edit=?,debit_note_delete=?,stock_request=?,
+        products=?,products_edit=?,products_delete=?,ot_channels=?,location=?,
+        ss=?,ss_edit=?,ss_delete=?,st=?,st_edit=?,st_delete=?,
+        dt=?,dt_edit=?,dt_delete=?,sdt=?,sdt_edit=?,sdt_delete=?,
+        shop=?,shop_edit=?,shop_delete=?,cus=?,cus_edit=?,cus_delete=?,
+        ms=?,ms_edit=?,ms_delete=?,
+        salesbdm_manage=?,salesbdm_manage_edit=?,salesbdm_manage_delete=?,
+        unassigned=?,remap=?,
+        users_network=?,payment_entry=?,manage_payment_entry=?,manage_payment_entry_edit=?,manage_payment_entry_delete=?,
+        consolidated_payment_entry=?,consolidated_payment_entry_edit=?,consolidated_payment_entry_delete=?,
+        bonus_calculator=?,manage_bonus_points=?,manage_bonus_points_edit=?,manage_bonus_points_delete=?,
+        add_input_stock=?,manage_input_stock=?,manage_input_stock_edit=?,manage_input_stock_delete=?,add_input_stock_users=?,manage_input_stock_users=?,manage_input_stock_users_edit=?,manage_input_stock_users_delete=?,
+        partner_location=?,channel_partner=?,channel_partner_edit=?,channel_partner_delete=?,territory_partner=?,territory_partner_edit=?,territory_partner_delete=?,stock_transfers=?,internal_transfer=? where id=?";
+		db_q($db_conn,$insert_users,[$encryptedPassword,$dash,$report,$company_profile,$users_demo,$reward_points,$demo_free,$demo_free_edit,$demo_free_delete,$manage_return,$manage_return_edit,$manage_return_delete,$debit_note,$debit_note_edit,$debit_note_delete,$stock_request,$products,$products_edit,$products_delete,$ot_channels,$location,$ss,$ss_edit,$ss_delete,$st,$st_edit,$st_delete,$dt,$dt_edit,$dt_delete,$sdt,$sdt_edit,$sdt_delete,$shop,$shop_edit,$shop_delete,$cus,$cus_edit,$cus_delete,$ms,$ms_edit,$ms_delete,$salesbdm_manage,$salesbdm_manage_edit,$salesbdm_manage_delete,$unassigned,$remap,$users_network,$add_payment_entry,$manage_payment_entry,$manage_payment_entry_edit,$manage_payment_entry_delete,$consolidated_payment_entry,$consolidated_payment_entry_edit,$consolidated_payment_entry_delete,$bonus_calculator,$manage_bonus_points,$manage_bonus_points_edit,$manage_bonus_points_delete,$add_input_stock,$manage_input_stock,$manage_input_stock_edit,$manage_input_stock_delete,$add_input_stock_users,$manage_input_stock_users,$manage_input_stock_users_edit,$manage_input_stock_users_delete,$partner_location,$channel_partner,$channel_partner_edit,$channel_partner_delete,$territory_partner,$territory_partner_edit,$territory_partner_delete,$stock_transfers,$internal_transfer,$update_id]);
 		
 		
 		//Insert Ot sales category permission 
@@ -233,12 +230,12 @@ $ex_catid = array_filter(explode("#", $catid));
   foreach ($ex_catid as $key => $value)
    {   
     
-    $select_count_users12="select * from admin_log_ot where username='$username' and ot_cat='$value'";
-	$fetch_count_users12=mysqli_query($db_conn,$select_count_users12);
+    $select_count_users12="select * from admin_log_ot where username=? and ot_cat=?";
+	$fetch_count_users12=db_q($db_conn,$select_count_users12,[$username,$value]);
 	if(mysqli_num_rows($fetch_count_users12)==0)
 	{
-		$insert_ot="insert into admin_log_ot (username,ot_cat) values ('$username','$value')";
-		mysqli_query($db_conn,$insert_ot);
+		$insert_ot="insert into admin_log_ot (username,ot_cat) values (?,?)";
+		db_q($db_conn,$insert_ot,[$username,$value]);
 	} /// End validate duplicate
 	
    } /// End foreach
@@ -255,19 +252,19 @@ $ex_catid = array_filter(explode("#", $catid));
 	
 <form method="post" enctype="multipart/form-data" onSubmit="return confirm('Please make a confirm!')">
 
-<input type="hidden" name="update_id" value="<?=$id;?>">
-<input type="hidden" name="username" value="<?=$result_count_users['username'];?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($id), ENT_QUOTES, 'UTF-8', false);?>">
+<input type="hidden" name="username" value="<?=htmlspecialchars((string)($result_count_users['username']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			
                                         <div class="example-container">
                                             <div class="example-content">
                                    
 												
 <label class="form-label">Username*</label>
-<input type="text" required="" disabled value="<?=$result_count_users['username'];?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="text" required="" disabled value="<?=htmlspecialchars((string)($result_count_users['username']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 <br/>
 
 <label class="form-label">Password*</label>
-<input type="text" required="" name="password" value="<?=$displayPassword;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="text" name="password" value="" placeholder="Leave blank to keep the current password" autocomplete="new-password" class="form-control" onkeypress="restrictSpecialChars(event)">
 <br/>
 				
 				<div class="view-only-row">

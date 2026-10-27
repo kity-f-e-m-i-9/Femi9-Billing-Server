@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 /**
  * Expense Tracker — Date-Detecting Upload Handler (Neksomo)
  *
@@ -22,7 +22,7 @@
 session_name('femi9_company_sess');
 session_start();
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('report');
 include("config.php");
 require_once("include/GodownAccess.php");
 require '../../../vendor/autoload.php';
@@ -77,7 +77,7 @@ if (!is_dir($upload_dir)) {
 $stored_name = 'exp_dw_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
 $stored_path = $upload_dir . '/' . $stored_name;
 
-if (!move_uploaded_file($_FILES['expense_file']['tmp_name'], $stored_path)) {
+if (!safe_move_uploaded_file($_FILES['expense_file']['tmp_name'], $stored_path)) {
     redirect_back_dw(['err' => 'Could not save uploaded file']);
 }
 

@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php");
 ?>
@@ -105,8 +105,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from input_stock_users where usertype='$Login_user_TYPEvl' and userid='$Login_user_IDvl' order by input_date desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from input_stock_users where usertype=? and userid=? order by input_date desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -114,17 +114,17 @@ $i= $start_from;
 											
 											//
 											$product_id=$result_product_list['product_id'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 											?>
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
 							<td><?php echo date("d/M/Y",strtotime($result_product_list["input_date"]));?></td>
-                                                    <td><?php echo $Result_productDetils["productName"];?></td>
-													<td><?php echo $result_product_list["input_qty"];?></td>
-													<td><?php echo $result_product_list["remarks"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["input_qty"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["remarks"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
 													<a href="delete-input?Roowid=<?php echo $RowID;?>"onclick="return confirm('You want to delete confirm?');"><img src="../../assets/images/delete-32.png"/></a>
 													</td>

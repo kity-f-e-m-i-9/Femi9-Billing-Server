@@ -59,10 +59,10 @@ function generateSecurePassword($length = 10) {
     $maxIndex = strlen($chars) - 1;
     
     // Ensure password meets requirements
-    $password .= chr(rand(65, 90));  // One uppercase
-    $password .= chr(rand(97, 122)); // One lowercase
-    $password .= chr(rand(48, 57));  // One number
-    $password .= $chars[rand(62, $maxIndex)]; // One special char
+    $password .= chr(random_int(65, 90));  // One uppercase
+    $password .= chr(random_int(97, 122)); // One lowercase
+    $password .= chr(random_int(48, 57));  // One number
+    $password .= $chars[random_int(62, $maxIndex)]; // One special char
     
     // Fill remaining length with random chars
     for ($i = 4; $i < $length; $i++) {
@@ -70,7 +70,9 @@ function generateSecurePassword($length = 10) {
     }
     
     // Shuffle to make it random
-    return str_shuffle($password);
+    $a = str_split($password);
+    for ($i = count($a) - 1; $i > 0; $i--) { $j = random_int(0, $i); [$a[$i], $a[$j]] = [$a[$j], $a[$i]]; }
+    return implode('', $a);
 }
 
 $message = '';
@@ -123,30 +125,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subforgotbutton'])) {
             // Generate new secure password
             $newPassword = generateSecurePassword(10);
             
-            // Encrypt the password before storing
-            $encryptedPassword = $encryption->encrypt($newPassword);
-            
             // Begin transaction
             mysqli_begin_transaction($db_conn);
             
             try {
-                // Update password with encrypted version
-                $updateStmt = mysqli_prepare($db_conn, 
-                    "UPDATE {$userTable} SET password = ? WHERE ms_mobile = ?"
-                );
-                mysqli_stmt_bind_param($updateStmt, "ss", $encryptedPassword, $mobileNumber);
-                mysqli_stmt_execute($updateStmt);
-                mysqli_stmt_close($updateStmt);
+                // Store the temporary password as a PENDING credential (30 min). The real
+                // password is untouched and only replaced if the owner logs in with it.
+                require_once __DIR__ . '/../shared/PasswordService.php';
+                femi_reset_issue($db_conn, $userTable, 'id', $user['id'], (string)$userType, $mobileNumber, $newPassword);
                 
                 // Log password reset and set must_change_password flag
                 $logStmt = mysqli_prepare($db_conn, 
                     "INSERT INTO forgotpassword (usertype, mobilenumber, reset_at, ip_address, must_change_password) 
-                     VALUES (?, ?, NOW(), ?, 1)
-                     ON DUPLICATE KEY UPDATE 
-                        reset_at = NOW(), 
-                        attempts = attempts + 1,
-                        must_change_password = 1,
-                        password_changed_at = NULL"
+                     VALUES (?, ?, NOW(), ?, 0)
+                     ON DUPLICATE KEY UPDATE
+                        reset_at = NOW(),
+                        attempts = attempts + 1"
                 );
                 $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
                 mysqli_stmt_bind_param($logStmt, "sss", $userType, $mobileNumber, $ipAddress);

@@ -1,8 +1,8 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 $prid = (int)base64_decode($_REQUEST['prid'] ?? '');
-$res  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE id='$prid'"));
+$res  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE id='".db_esc($prid)."'"));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -38,7 +38,7 @@ $res  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE
                     <div class="row"><div class="col-md-12"><div class="card"><div class="card-body">
 
 <form action="customer-action.php" method="post" enctype="multipart/form-data">
-<input type="hidden" name="update_id" value="<?php echo $res['id']; ?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($res['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 <div class="example-container"><div class="example-content">
 
 <label class="form-label">Customer Name*</label>
@@ -52,7 +52,7 @@ $res  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE
         <select name="country_code" required class="form-control">
         <option value="<?php echo htmlspecialchars($res['country_code']); ?>" hidden><?php echo htmlspecialchars($res['country_code']); ?></option>
         <?php $fc = mysqli_query($db_conn, "SELECT * FROM country ORDER BY c_name ASC"); while ($rc = mysqli_fetch_array($fc)) { ?>
-        <option value="<?php echo $rc['c_code']; ?>"><?php echo $rc['c_name']; ?> (<?php echo $rc['c_code']; ?>)</option>
+        <option value="<?php echo htmlspecialchars((string)($rc['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rc['c_name']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($rc['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
         <?php } ?>
         </select>
     </div>
@@ -75,7 +75,7 @@ $res  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE
 <textarea name="address" onkeypress="restrictSpecialChars(event)" class="form-control" placeholder="optional"><?php echo htmlspecialchars($res['address']); ?></textarea>
 <br/>
 
-<input type="hidden" name="marketing_date" value="<?php echo $res['marketing_date']; ?>">
+<input type="hidden" name="marketing_date" value="<?php echo htmlspecialchars((string)($res['marketing_date']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 
 <button type="submit" name="update-customer" class="btn btn-primary">Update</button>
 

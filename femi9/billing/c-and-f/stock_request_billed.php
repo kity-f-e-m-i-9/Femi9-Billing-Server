@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 ?>
 <!DOCTYPE html>
@@ -98,8 +98,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from stock_request where touserid='$Login_user_IDvl' and tousertype='$Login_user_TYPEvl' and status='billed' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+					<?php $select_product_list="select * from stock_request where touserid=? and tousertype=? and status='billed' order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_IDvl,$Login_user_TYPEvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											$reqid=$result_product_list['reqid'];
@@ -123,26 +123,26 @@ $i= $start_from;
 				$result_distlist=mysqli_fetch_array($fetch_distlist);
 				
 				//get qty total
-				$select_qtytotal="select sum(qty) from stock_request_items where reqid='$reqid'";
-				$fetch_qtytotal=mysqli_query($db_conn,$select_qtytotal);
+				$select_qtytotal="select sum(qty) from stock_request_items where reqid=?";
+				$fetch_qtytotal=db_q($db_conn,$select_qtytotal,[$reqid]);
 				$result_qtytotal=mysqli_fetch_array($fetch_qtytotal);
 				$totalqty=$result_qtytotal[0];
 				
 				//invoice details
-				$select_invDetails="select * from user_invoice where inv_id='$reqid'";
-				$fetch_invDetails=mysqli_query($db_conn,$select_invDetails);
+				$select_invDetails="select * from user_invoice where inv_id=?";
+				$fetch_invDetails=db_q($db_conn,$select_invDetails,[$reqid]);
 				$result_invDetails=mysqli_fetch_array($fetch_invDetails);
 				?>
   <tr valign="top">
                                                     <td><?php echo ++$i; ?></td>
                                  <td><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
-								<td><b><?=strtoupper($result_distlist['name']);?></b>
+								<td><b><?=htmlspecialchars((string)(strtoupper($result_distlist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b>
 								<br/>
 								<span style="font-size:13px;color:#999;"><?=strtoupper($fromusertype);?></span>
 								</td>		
 <td><?=$totalqty;?></td>							
 
-<td><?=$result_invDetails['inv_number'];?></td>	
+<td><?=htmlspecialchars((string)($result_invDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>	
 <td><?=date("d/m/Y",strtotime($result_invDetails['date']));?></td>	
 													
 													<td>

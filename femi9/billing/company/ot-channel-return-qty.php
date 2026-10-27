@@ -82,7 +82,7 @@ foreach ($rows as $r) { $grand_total_qty += (int)$r['total_qty']; }
                                     </h1>
                                     <br/>
 
-                                    <form method="post" enctype="multipart/form-data" action="<?= $_SERVER['PHP_SELF']; ?>">
+                                    <form method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>">
                                     <div class="overviewcontainar">
                                     <div id="searchleftcont">
                                     <label class="form-label">From Date</label>

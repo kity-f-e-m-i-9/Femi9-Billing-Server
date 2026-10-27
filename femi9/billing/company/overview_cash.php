@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -82,7 +82,7 @@ $endDate=$_REQUEST['todate'];
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report_cash?frdate=<?=$start_date;?>&&todate=<?=$endDate;?>&&lable=<?=$_REQUEST['lable'];?>&&rptlable=<?=$_REQUEST['rptlable'];?>&&out1=<?=$_REQUEST['out1'];?>&&out2=<?=$_REQUEST['out2'];?>&&out3=<?=$_REQUEST['out3'];?>&&out4=<?=$_REQUEST['out4'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report_cash?frdate=<?=htmlspecialchars((string)($start_date), ENT_QUOTES, 'UTF-8', false);?>&&todate=<?=htmlspecialchars((string)($endDate), ENT_QUOTES, 'UTF-8', false);?>&&lable=<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>&&rptlable=<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>&&out2=<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>&&out3=<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>&&out4=<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -99,19 +99,19 @@ $endDate=$_REQUEST['todate'];
 												<table id="reportdash">
 												<tr>
 												<th>Today</th>
-												<td>:&nbsp;<b><?=$_REQUEST['out1'];?></b></td>
+												<td>:&nbsp;<b><?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?></b></td>
 												</tr>
 												<tr>
 												<th>Yesterday</th>
-												<td>:&nbsp;<?=$_REQUEST['out2'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>This&nbsp;Month</th>
-												<td>:&nbsp;<?=$_REQUEST['out3'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Last&nbsp;Month Till&nbsp;Date</th>
-												<td>:&nbsp;<?=$_REQUEST['out4'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												</table>
                                             </div>
@@ -120,22 +120,22 @@ $endDate=$_REQUEST['todate'];
                                 </div>
                             </div>---->
 							
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="lable" value="<?=$_REQUEST['lable'];?>"/>
-<input type="hidden" name="rptlable" value="<?=$_REQUEST['rptlable'];?>"/>
-<input type="hidden" name="out1" value="<?=$_REQUEST['out1'];?>"/>
-<input type="hidden" name="out2" value="<?=$_REQUEST['out2'];?>"/>
-<input type="hidden" name="out3" value="<?=$_REQUEST['out3'];?>"/>
-<input type="hidden" name="out4" value="<?=$_REQUEST['out4'];?>"/>
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="lable" value="<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="rptlable" value="<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out1" value="<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out2" value="<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out3" value="<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out4" value="<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?>"/>
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$start_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($start_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$endDate;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($endDate), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
@@ -186,15 +186,15 @@ $i= $start_from;
 											<tbody>
 										<?php									
 										
-$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type='$usertypevl' and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select distinct inv_id from receipt where from_user_type=? and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
 	$receipt_inv_id=$result_market_SSCASH_VLSS_THISMONTH['inv_id'];
 	//
-	$select_ReceiptDetails="select * from receipt where inv_id='$receipt_inv_id'";
-	$fetch_ReceiptDetails=mysqli_query($db_conn,$select_ReceiptDetails);
+	$select_ReceiptDetails="select * from receipt where inv_id=?";
+	$fetch_ReceiptDetails=db_q($db_conn,$select_ReceiptDetails,[$receipt_inv_id]);
 	$result_ReceiptDetails=mysqli_fetch_array($fetch_ReceiptDetails);
 	$to_user_type=$result_ReceiptDetails['to_user_type'];
 	$to_user_id=$result_ReceiptDetails['to_user_id'];
@@ -209,8 +209,8 @@ else{$tablename="shop";}
 	//get invoice Number
 	if($to_user_type=="stockiest" || $to_user_type=="distributor" || $to_user_type=="shop")
 	{
-	$select_inv_number="select * from user_invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from user_invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
@@ -226,22 +226,22 @@ else{$tablename="shop";}
 	$state_id_VLSS1=$resultRcd_VLSS1['state_id'];
 	$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 	
 	}else{
 		//CUSTOMER
-	$select_inv_number="select * from invoice where inv_id='$receipt_inv_id'";
-	$fetch_inv_number=mysqli_query($db_conn,$select_inv_number);
+	$select_inv_number="select * from invoice where inv_id=?";
+	$fetch_inv_number=db_q($db_conn,$select_inv_number,[$receipt_inv_id]);
 	$result_inv_number=mysqli_fetch_array($fetch_inv_number);
 	
 	$inv_number=$result_inv_number['inv_number'];
 	$inv_date=$result_inv_number['date'];
 	
-	$selectRcd_VLSS1="select * from customers where id='$to_user_id'";
-										$fetchRcd_VLSS1=mysqli_query($db_conn,$selectRcd_VLSS1);
+	$selectRcd_VLSS1="select * from customers where id=?";
+										$fetchRcd_VLSS1=db_q($db_conn,$selectRcd_VLSS1,[$to_user_id]);
 										$resultRcd_VLSS1=mysqli_fetch_array($fetchRcd_VLSS1);
 										
 	$useridtext="---";
@@ -250,8 +250,8 @@ else{$tablename="shop";}
 	$mobilenumber=$resultRcd_VLSS1["mobile"];
 	}
 										
-$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id='$receipt_inv_id'";
-$fetch_marketstock_VLDIST_VLSS1=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS1);
+$select_marketstock_VLDIST_VLSS1="select sum(received) from receipt where inv_id=?";
+$fetch_marketstock_VLDIST_VLSS1=db_q($db_conn,$select_marketstock_VLDIST_VLSS1,[$receipt_inv_id]);
 $result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS1);
 
 if($result_marketstock_VLDIST_VLSS1[0]!=NULL){

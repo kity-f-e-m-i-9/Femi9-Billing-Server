@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/safe-upload.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -92,7 +92,7 @@ if ($isUnconvertedHeic) {
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
     $screenshotName = 'po_' . $tp_id . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.heic';
 
-    if (!move_uploaded_file($file['tmp_name'], $uploadDir . $screenshotName)) {
+    if (!safe_move_uploaded_file($file['tmp_name'], $uploadDir . $screenshotName)) {
         respond(['success' => false, 'message' => 'Could not save the uploaded file. Please try again.'], 500);
     }
 

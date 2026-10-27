@@ -16,8 +16,8 @@ $tempid="".$randum_number."RTST/".$temp_date."/".$temp_time."";
 <input type="hidden" name="tempid" value="<?=$tempid?>">
 <input type="hidden" name="randumnumber" value="<?=$inv_randum_no?>">
 
-<input type="hidden" name="username" value="<?=$_SESSION['LOGIN_USER'];?>">
-<input type="hidden" name="usertype" value="<?=$Result_Log_users_Dtails134['usertype'];?>">
+<input type="hidden" name="username" value="<?=htmlspecialchars((string)($_SESSION['LOGIN_USER']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="usertype" value="<?=htmlspecialchars((string)($Result_Log_users_Dtails134['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
                                         <div class="example-container">
                                         <div class="example-content">

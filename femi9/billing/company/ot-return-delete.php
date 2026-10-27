@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
 include("config.php");
 require_once("include/StockService.php");
 error_reporting(0);
@@ -6,8 +6,8 @@ error_reporting(0);
 $Roowid=base64_decode($_REQUEST['id']);
 $tempid=$_REQUEST['tempid'];
 
-$select_count_product="select * from ot_sales_return where id='$Roowid'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+$select_count_product="select * from ot_sales_return where id=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$Roowid]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	
 	$product_id=$result_count_product['prid'];
@@ -50,13 +50,13 @@ $select_count_product="select * from ot_sales_return where id='$Roowid'";
 			);
 		} catch (StockException $e) {
 			$_SESSION['errorMessage'] = "Stock error: " . $e->getMessage();
-			echo "<script>window.location='ot-sale-return?stockerror&&tempid=$tempid';</script>";
+			echo "<script>window.location='ot-sale-return?stockerror&&tempid=".urlencode($tempid)."';</script>";
 			exit;
 		}
 	}
 	
-$del_product="delete from ot_sales_return where id='$Roowid'";
-mysqli_query($db_conn,$del_product);
+$del_product="delete from ot_sales_return where id=?";
+db_q($db_conn,$del_product,[$Roowid]);
 
-echo "<script>window.location='ot-sale-return?deletedDone&&tempid=$tempid';</script>";
+echo "<script>window.location='ot-sale-return?deletedDone&&tempid=".urlencode($tempid)."';</script>";
 ?>

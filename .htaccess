@@ -18,3 +18,24 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [L,R=301]
 # Serve the central login page at the bare domain root, without redirecting
 # the browser away from it (internal rewrite — URL bar stays on "/").
 RewriteRule ^$ femi9/billing/login/index.php [L]
+
+# ---------------------------------------------------------------------------
+# Security hardening (2026-10 audit)
+# ---------------------------------------------------------------------------
+Options -Indexes
+
+# Never serve source backups, dumps, logs, archives or dependency manifests.
+<FilesMatch "(\.(sql|log|bak|orig|old|swp|zip|tar|gz|tgz|md|ini|lock)$|^error_log$|^composer\.json$|^package\.json$|^rate_limit\.json$|login_rate_limit\.json$)">
+    Require all denied
+</FilesMatch>
+
+# Non-web directories that live inside the web root.
+RedirectMatch 403 ^/(sql|db_backups|docs|site_publisher|skills|bakup)(/|$)
+RedirectMatch 403 /(vendor|db_migrations|tests|bakup)(/|$)
+RedirectMatch 403 ^/n8n-api/.*\.bak$
+
+# Uploaded-file folders must never execute scripts: if anyone gets a .php /
+# .phtml / .phar into one of these, it is served as a 403 instead of run.
+<If "%{REQUEST_URI} =~ m#/(user_icon|cf_user_icon|outlet_icon|shop_icon|demo_photo|tp_photo|cp_photo|bussiness_logo|po_screenshots|company_signature|advance_payment_screenshots|kyc_documents|expense_uploads|district_note_photos|courier_payment_screenshots|payment_screenshots|screenshot|offers_img|bill_copy_photos|ot_sale_import_uploads|uploads?)/.*\.(php[0-9]?|phtml|phar|pht|shtml)(\.|$)#i">
+    Require all denied
+</If>

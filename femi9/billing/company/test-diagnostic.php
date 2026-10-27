@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 /**
  * DIAGNOSTIC: Check Company ID Issue in Multi-Company System
  */
@@ -55,7 +55,7 @@ while ($row = mysqli_fetch_assoc($result_companies)) {
     echo "<tr>";
     echo "<td><strong>" . htmlspecialchars($row['to_user_id']) . "</strong></td>";
     echo "<td>" . htmlspecialchars($row['to_user_type']) . "</td>";
-    echo "<td>" . $row['payment_count'] . "</td>";
+    echo "<td>" . htmlspecialchars((string)($row['payment_count']), ENT_QUOTES, 'ISO-8859-1', false) . "</td>";
     echo "<td>₹" . inr_format($row['total_balance'], 2) . "</td>";
     echo "</tr>";
 }
@@ -72,7 +72,7 @@ echo "<p><strong>Testing Super Stockist ID:</strong> $test_ss_id</p>";
 // Check which company this SS paid to
 $query_ss = "SELECT to_user_id, to_user_type, SUM(balance_amount) as balance
              FROM advance_payments
-             WHERE from_user_id = '$test_ss_id'
+             WHERE from_user_id = '".db_esc($test_ss_id)."'
              AND from_user_type = 'super_stockiest'
              AND deleted_at IS NULL
              GROUP BY to_user_id, to_user_type";
@@ -103,9 +103,9 @@ foreach (['1', '11'] as $company_id) {
     
     $query_test = "SELECT COALESCE(SUM(balance_amount), 0) as balance
                    FROM advance_payments
-                   WHERE from_user_id = '$test_ss_id'
+                   WHERE from_user_id = '".db_esc($test_ss_id)."'
                    AND from_user_type = 'super_stockiest'
-                   AND to_user_id = '$company_id'
+                   AND to_user_id = '".db_esc($company_id)."'
                    AND deleted_at IS NULL";
     
     $result_test = mysqli_query($db_conn, $query_test);

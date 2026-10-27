@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms');
 $canEditMs   = hasPermission('ms_edit');
 $canDeleteMs = hasPermission('ms_delete');
@@ -163,24 +163,24 @@ $select_product_list="select * from marketing_staff where deleted_at is null ord
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["ms_name"];?></td>
-													<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["ms_mobile"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["ms_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["ms_mobile"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td>
                                                         <?php
                                                         $storedPassword = $result_product_list['password'];
                                                         $decryptedPassword = '';
                                                         $passwordError = false;
                                                         try {
-                                                            $decryptedPassword = $encryption->decrypt($storedPassword);
+                                                            throw new Exception('hidden'); // passwords are hashed and can no longer be displayed
                                                         } catch (Exception $e) {
                                                             if (strlen($storedPassword) < 50) {
-                                                                $decryptedPassword = $storedPassword;
+                                                                $passwordError = true;
                                                             } else {
                                                                 $passwordError = true;
                                                             }
                                                         }
                                                         if ($passwordError) {
-                                                            echo '<span class="text-danger">Error</span>';
+                                                            femi_password_hidden_cell('marketing_staff', $result_product_list['id']);
                                                         } else {
                                                             $rowIdUnique = $result_product_list["id"];
                                                         ?>
@@ -196,8 +196,8 @@ $select_product_list="select * from marketing_staff where deleted_at is null ord
                                                         </div>
                                                         <?php } ?>
                                                         </td>
-													<td><?php echo $result_product_list["ms_email"];?></td>
-													<td><?php echo $result_product_list["ms_address"];?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["ms_email"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["ms_address"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 													<td>
 													<?php

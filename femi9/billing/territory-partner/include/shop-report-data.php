@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../../shared/db-helpers.php';
 // Shared data-fetch for the TP "Shop Report" — used by both the on-screen
 // report (shop-report.php) and its Excel export (shop-report-export.php) so
 // the two never drift apart on filter logic or numbers shown.
@@ -17,12 +17,12 @@ function tp_shop_report_fetch(mysqli $db_conn, int $uid, string $utype, string $
         LEFT JOIN shop_category sc ON sc.id = s.shop_cat
         LEFT JOIN user_invoice ui
                ON ui.to_user_id = s.temp_id AND ui.to_user_type = 'shop'
-              AND ui.from_user_id = '$uid' AND ui.from_user_type = '$utype'
-              AND ui.sub_total > 0 AND ui.date BETWEEN '$from' AND '$to'
+              AND ui.from_user_id = '".db_esc($uid)."' AND ui.from_user_type = '".db_esc($utype)."'
+              AND ui.sub_total > 0 AND ui.date BETWEEN '".db_esc($from)."' AND '".db_esc($to)."'
         LEFT JOIN (
             SELECT inv_id, SUM(received) received FROM receipt GROUP BY inv_id
         ) r ON r.inv_id = ui.inv_id
-        WHERE s.onboard_userID = '$uid' AND s.onboard_userTYPE = '$utype'
+        WHERE s.onboard_userID = '".db_esc($uid)."' AND s.onboard_userTYPE = '".db_esc($utype)."'
         GROUP BY s.id, s.temp_id, s.useridtext, s.name, s.mobile_number, s.country_code, s.gstin, s.address, sc.catlable
         ORDER BY total_billed DESC, s.name ASC
     ");

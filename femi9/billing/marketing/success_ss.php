@@ -1,4 +1,4 @@
-<?php include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("include/db-connect.php");
 
 $title="Payment Success";
 $message_title="Payment Success";
@@ -73,15 +73,15 @@ $transactionID = $data['transactionId'];
 $providerReferenceId = $data['providerReferenceId'];
 
 // Fetch details from the database
-$sql = "SELECT * FROM distributor WHERE merchantTransactionId = '$transactionID'";
-$result = $conn->query($sql);
+$sql = "SELECT * FROM distributor WHERE merchantTransactionId = ?";
+$result = db_q($conn,$sql,[$transactionID]);
 
 if ($result->num_rows > 0) {
     $row = $result->fetch_assoc();
 
     // Update paymentdetails table
-    $ins_success = "UPDATE distributor SET amount_status='paid',`account_status`='active' WHERE merchantTransactionId='$transactionID'";
-    $conn->query($ins_success);
+    $ins_success = "UPDATE distributor SET amount_status='paid',`account_status`='active' WHERE merchantTransactionId=?";
+    db_q($conn,$ins_success,[$transactionID]);
     
 	
 	} else {

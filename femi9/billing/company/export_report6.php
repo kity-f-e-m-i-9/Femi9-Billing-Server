@@ -1,10 +1,10 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 error_reporting(0);
 
 // Include session check
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('report');
 include("config.php");
 
 $Report_LABLE="Market Stock Report";
@@ -45,8 +45,8 @@ $selectRcd_VLSS1="select * from ".$tblenma." order by id asc";
 											$state_id_VLSS1=$resultRcd_VLSS1['state_id'];
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
@@ -54,15 +54,15 @@ $selectRcd_VLSS1="select * from ".$tblenma." order by id asc";
 $usrid_VLSS1=$resultRcd_VLSS1['temp_id'];
 // GROUP BY product_id, summing across any per-warehouse rows — a
 // product's stock can now be split across physical godowns (H1/G1/G2)
-$select_marketstock_VLDIST_VLSS1="select product_id, sum(closing_qty) as closing_qty from stock where user_type='$usertype_stock' and user_id='$usrid_VLSS1' group by product_id";
-$fetch_marketstock_VLDIST_VLSS1=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS1);
+$select_marketstock_VLDIST_VLSS1="select product_id, sum(closing_qty) as closing_qty from stock where user_type=? and user_id=? group by product_id";
+$fetch_marketstock_VLDIST_VLSS1=db_q($db_conn,$select_marketstock_VLDIST_VLSS1,[$usertype_stock,$usrid_VLSS1]);
 while($result_marketstock_VLDIST_VLSS1=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS1))
 {
 	
 	$productID_VLSS1=$result_marketstock_VLDIST_VLSS1['product_id'];
 	//
-	$select_productDetils_VLSS1="select * from products where id='$productID_VLSS1'";
-						$Fetch_productDetils_VLSS1=mysqli_query($db_conn,$select_productDetils_VLSS1);
+	$select_productDetils_VLSS1="select * from products where id=?";
+						$Fetch_productDetils_VLSS1=db_q($db_conn,$select_productDetils_VLSS1,[$productID_VLSS1]);
 						$Result_productDetils_VLSS1=mysqli_fetch_array($Fetch_productDetils_VLSS1);
 						
 						$closing_stock_VLSS1=$result_marketstock_VLDIST_VLSS1['closing_qty'];
@@ -101,8 +101,8 @@ $csv_content .= "User ID, Name, District, Taluk, Product Description, Available 
 //DISTRICT
 if(is_numeric($district_id_VLSS2))
 {
-										$selectrecords_VLSS2="select * from district where state_id='$state_id_VLSS2' and id='$district_id_VLSS2'";
-										$fetchrecords_VLSS2=mysqli_query($db_conn,$selectrecords_VLSS2);
+										$selectrecords_VLSS2="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS2=db_q($db_conn,$selectrecords_VLSS2,[$state_id_VLSS2,$district_id_VLSS2]);
 										$resultrecords_VLSS2=mysqli_fetch_array($fetchrecords_VLSS2);
 										$district_name_VLSS2=$resultrecords_VLSS2['dist_name'];
 }else{
@@ -112,8 +112,8 @@ if(is_numeric($district_id_VLSS2))
 //TALUK	
 if(is_numeric($taluk_id_VLSS2))
 {	
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS2' and dist_id='$district_id_VLSS2' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS2,$district_id_VLSS2,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 }else{
@@ -124,14 +124,14 @@ $taluk_name_VLSS2=$taluk_id_VLSS2;
 $usrid_VLSS2=$resultRcd_VLSS2['temp_id'];
 // GROUP BY product_id, summing across any per-warehouse rows — a
 // product's stock can now be split across physical godowns (H1/G1/G2)
-$select_marketstock_VLDIST_VLSS2="select product_id, sum(closing_qty) as closing_qty from stock where user_type='$usertype_stock' and user_id='$usrid_VLSS2' group by product_id";
-$fetch_marketstock_VLDIST_VLSS2=mysqli_query($db_conn,$select_marketstock_VLDIST_VLSS2);
+$select_marketstock_VLDIST_VLSS2="select product_id, sum(closing_qty) as closing_qty from stock where user_type=? and user_id=? group by product_id";
+$fetch_marketstock_VLDIST_VLSS2=db_q($db_conn,$select_marketstock_VLDIST_VLSS2,[$usertype_stock,$usrid_VLSS2]);
 while($result_marketstock_VLDIST_VLSS2=mysqli_fetch_array($fetch_marketstock_VLDIST_VLSS2))
 {
 	
 	$productID_VLSS2=$result_marketstock_VLDIST_VLSS2['product_id'];
-	$select_productDetils_VLSS2="select * from products where id='$productID_VLSS2'";
-						$Fetch_productDetils_VLSS2=mysqli_query($db_conn,$select_productDetils_VLSS2);
+	$select_productDetils_VLSS2="select * from products where id=?";
+						$Fetch_productDetils_VLSS2=db_q($db_conn,$select_productDetils_VLSS2,[$productID_VLSS2]);
 						$Result_productDetils_VLSS2=mysqli_fetch_array($Fetch_productDetils_VLSS2);
 						
 						$closing_stock_VLSS2=$result_marketstock_VLDIST_VLSS2['closing_qty'];

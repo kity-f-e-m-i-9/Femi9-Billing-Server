@@ -243,7 +243,7 @@ $qparam = urlencode($search ?? '');
                                                     <?php foreach($selected_tp_ids as $tid): ?>
                                                     <input type="hidden" name="tp_id[]" value="<?=(int)$tid;?>">
                                                     <?php endforeach; ?>
-                                                    <input type="hidden" name="amount_range" value="<?=$selected_amount_range;?>">
+                                                    <input type="hidden" name="amount_range" value="<?=htmlspecialchars((string)($selected_amount_range), ENT_QUOTES, 'UTF-8', false);?>">
                                                     <input type="hidden" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>">
                                                     <button type="submit" class="btn btn-success btn-sm">
                                                       Export
@@ -264,7 +264,7 @@ $qparam = urlencode($search ?? '');
                                         <h5 class="card-title">Advanced Filters</h5>
                                     </div>
                                     <div class="card-body">
-                                        <form method="post" action="<?=$_SERVER['PHP_SELF'];?>" id="filterForm">
+                                        <form method="post" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" id="filterForm">
                                             <div class="row mb-3">
                                                 <div class="col-md-3 col-sm-6 mb-2">
                                                     <label class="form-label">From Date <span class="text-danger">*</span></label>
@@ -286,7 +286,7 @@ $qparam = urlencode($search ?? '');
                                                         if($dist_result) {
                                                             while($dist = mysqli_fetch_assoc($dist_result)) {
                                                                 $selected_attr = in_array((int)$dist['id'], $selected_district_ids, true) ? 'selected' : '';
-                                                                echo '<option value="'.$dist['id'].'" '.$selected_attr.'>'.htmlspecialchars($dist['name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($dist['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($dist['name']).'</option>';
                                                             }
                                                         }
                                                         ?>
@@ -311,7 +311,7 @@ $qparam = urlencode($search ?? '');
                                                             $firka_result = $stmt_firka->get_result();
                                                             while($firka = $firka_result->fetch_assoc()) {
                                                                 $selected_attr = in_array((int)$firka['id'], $selected_firka_ids, true) ? 'selected' : '';
-                                                                echo '<option value="'.$firka['id'].'" '.$selected_attr.'>'.htmlspecialchars($firka['name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($firka['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($firka['name']).'</option>';
                                                             }
                                                             $stmt_firka->close();
                                                         }
@@ -351,7 +351,7 @@ $qparam = urlencode($search ?? '');
                                                             if($tpNameResult) {
                                                                 while($tpRow = mysqli_fetch_assoc($tpNameResult)) {
                                                                     $selected_attr = in_array((int)$tpRow['id'], $selected_tp_ids, true) ? 'selected' : '';
-                                                                    echo '<option value="'.$tpRow['id'].'" '.$selected_attr.'>'.htmlspecialchars($tpRow['name']).'</option>';
+                                                                    echo '<option value="'.htmlspecialchars((string)($tpRow['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($tpRow['name']).'</option>';
                                                                 }
                                                             }
                                                         }
@@ -454,7 +454,7 @@ $qparam = urlencode($search ?? '');
                                 <div class="card">
                                     <div class="card-header py-3 bg-white border-0">
                                         <div class="d-flex align-items-center justify-content-between">
-                                            <form method="post" action="<?=$_SERVER['PHP_SELF'];?>" class="d-flex align-items-center gap-2">
+                                            <form method="post" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" class="d-flex align-items-center gap-2">
                                                 <input type="hidden" name="frdate" value="<?=$from_date;?>">
                                                 <input type="hidden" name="todate" value="<?=$to_date;?>">
                                                 <?php foreach($selected_district_ids as $did): ?>
@@ -466,7 +466,7 @@ $qparam = urlencode($search ?? '');
                                                 <?php foreach($selected_tp_ids as $tid): ?>
                                                 <input type="hidden" name="tp_id[]" value="<?=(int)$tid;?>">
                                                 <?php endforeach; ?>
-                                                <input type="hidden" name="amount_range" value="<?=$selected_amount_range;?>">
+                                                <input type="hidden" name="amount_range" value="<?=htmlspecialchars((string)($selected_amount_range), ENT_QUOTES, 'UTF-8', false);?>">
                                                 <input type="hidden" name="page" value="1">
                                                 <input type="hidden" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>">
 
@@ -480,7 +480,7 @@ $qparam = urlencode($search ?? '');
                                             </form>
 
                                             <div class="d-flex align-items-center gap-3">
-                                              <form method="get" action="<?=$_SERVER['PHP_SELF'];?>" id="searchForm" class="d-flex align-items-center gap-2">
+                                              <form method="get" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" id="searchForm" class="d-flex align-items-center gap-2">
                                                 <input type="hidden" name="page" value="1">
                                                 <input type="text" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>"
                                                        class="form-control form-control-sm" placeholder="Search name, mobile, product..." style="min-width:280px">

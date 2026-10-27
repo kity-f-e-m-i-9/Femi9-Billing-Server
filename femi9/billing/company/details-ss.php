@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; 
 // Load environment variables FIRST
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -10,21 +10,21 @@ require_once __DIR__ . '/../shared/EncryptionService.php';
 $encryption = new EncryptionService();
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from super_stockiest where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from super_stockiest where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 				
 //state details
 $state_id=$result_product_list['state_id'];
-$select_state_dtails="select * from state where id='$state_id'";
-$fetch_state_dtails=mysqli_query($db_conn,$select_state_dtails);
+$select_state_dtails="select * from state where id=?";
+$fetch_state_dtails=db_q($db_conn,$select_state_dtails,[$state_id]);
 $result_state_dtails=mysqli_fetch_array($fetch_state_dtails);
 $state_name=$result_state_dtails['st_name'];
 
 //district details
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 ?>
@@ -38,7 +38,7 @@ $district_name=	$result_district['dist_name'];
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : Super Stockist</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : Super Stockist</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -81,9 +81,9 @@ $district_name=	$result_district['dist_name'];
         <tr>
             <th colspan="2">
                 <?php if($result_product_list["onboard_userTYPE"]=="candf"){ ?>
-                <img src="../c-and-f/<?php echo $result_product_list["user_icon"];?>" style="width:150px;border-radius:10px;">
+                <img src="../c-and-f/<?php echo htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;border-radius:10px;">
                 <?php }else{?>
-                <img src="<?php echo $result_product_list["user_icon"];?>" style="width:150px;border-radius:10px;">
+                <img src="<?php echo htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;border-radius:10px;">
                 <?php }?>
             </th>
         </tr>
@@ -109,7 +109,7 @@ $district_name=	$result_district['dist_name'];
         
         <tr>
             <th scope="col">Name</th>
-            <td><?php echo $result_product_list['name'];?></td>
+            <td><?php echo htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
         </tr>
         
         <tr>
@@ -124,22 +124,22 @@ $district_name=	$result_district['dist_name'];
         
         <tr>
             <th scope="col">Email ID</th>
-            <td><?php echo $result_product_list['email'];?></td>
+            <td><?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
         </tr>
         
         <tr>
             <th scope="col">Address</th>
-            <td><?php echo $result_product_list['address'];?></td>
+            <td><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
         </tr>
         
         <tr>
             <th scope="col">Mobile Number</th>
-            <td><?php echo $result_product_list['country_code'];?>&nbsp;<?php echo $result_product_list['mobile_number'];?></td>
+            <td><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
         </tr>
         
         <tr>
             <th scope="col">Username</th>
-            <td><span id="usernamebox"><?php echo $result_product_list['username'];?></span></td>
+            <td><span id="usernamebox"><?php echo htmlspecialchars((string)($result_product_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
         </tr>
         
         <tr>
@@ -152,18 +152,18 @@ $district_name=	$result_district['dist_name'];
                 $passwordError = false;
                 
                 try {
-                    $decryptedPassword = $encryption->decrypt($storedPassword);
+                    throw new Exception('hidden'); // passwords are hashed and can no longer be displayed
                 } catch (Exception $e) {
                     // If decryption fails, it might be plain text
                     if (strlen($storedPassword) < 50) {
-                        $decryptedPassword = $storedPassword; // Plain text
+                        $passwordError = true;
                     } else {
                         $passwordError = true;
                     }
                 }
                 
                 if ($passwordError) {
-                    echo '<span class="text-danger">Decryption Error</span>';
+                    femi_password_hidden_cell('super_stockiest', $result_product_list['id']);
                 } else {
                     ?>
                     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -200,7 +200,7 @@ $district_name=	$result_district['dist_name'];
         
         <tr>
             <th scope="col">GST Number</th>
-            <td><?php echo $result_product_list['gstin'];?></td>
+            <td><?php echo htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
         </tr>
         
         <?php if($result_product_list['account_status']=="pending"){?>
@@ -208,7 +208,7 @@ $district_name=	$result_district['dist_name'];
             <td colspan="2">
                 <form method="post" enctype="mutipart/form-data" action="active-users" onSubmit="return confirm('Please make a confirm!');">
                     <input type="hidden" name="usertype" value="super_stockiest">
-                    <input type="hidden" name="userrowid" value="<?=$get_id;?>">
+                    <input type="hidden" name="userrowid" value="<?=htmlspecialchars((string)($get_id), ENT_QUOTES, 'UTF-8', false);?>">
                     
                     <div class="d-grid gap-2">
                         <button class="btn btn-primary" type="submit">Click to Activate</button>

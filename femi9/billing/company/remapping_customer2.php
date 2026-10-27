@@ -266,7 +266,7 @@ $business_name = escape_html($business_name ?? 'Billing App');
                                         <?php if (count($customers) > 0): ?>
                                             <form action="remapping_action.php" method="post" id="remappingForm">
                                                 <!-- CSRF Token -->
-                                                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                                 <input type="hidden" name="from_usertype" value="<?php echo escape_html($get_from_user_type); ?>">
                                                 <input type="hidden" name="from_userid" value="<?php echo escape_html($get_from_user_id); ?>">
                                                 

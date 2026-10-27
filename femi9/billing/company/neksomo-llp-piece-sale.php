@@ -103,7 +103,7 @@ $products = $db_conn->query("SELECT id, productName, pieces_per_pack, unit_type,
                         <?php if (isset($_REQUEST['error'])): ?><div class="alert alert-danger">Something went wrong. Please try again.</div><?php endif; ?>
 
                         <form action="neksomo-llp-piece-sale-action.php" method="post" id="rateForm">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="add-record" value="1">
                         <div id="hiddenRateInputs"></div>
 

@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 ?>
 <!DOCTYPE html>
@@ -116,14 +116,14 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from invoice where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' order by id asc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from invoice where user_type=? and user_id=? order by id asc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											//customer details
 											$CuSTID=$result_product_list['customer_id'];
-										$select_Customers="select * from customers where id='$CuSTID'";
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+										$select_Customers="select * from customers where id=?";
+										$fetch_Customers=db_q($db_conn,$select_Customers,[$CuSTID]);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 										//
 										$Cust_Name=$result_Customers['name'];
@@ -135,7 +135,7 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $Cust_Name;?>, <?php echo $Cust_Mbile;?></td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
@@ -147,7 +147,7 @@ $i= $start_from;
 													
 													<td style="white-space:nowrap;">
 <div style="display:flex;align-items:center;gap:8px;">
-<a href="invoice-print?invoiceid=<?php echo $result_product_list["inv_id"];?>" title="Print">
+<a href="invoice-print?invoiceid=<?php echo htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" title="Print">
 <img src="../../assets/images/print32.png"/></a>
 </div>
 													</td>

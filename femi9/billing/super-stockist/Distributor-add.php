@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 header("Location: dashboard.php"); exit;
 include("config.php");
 
@@ -111,7 +111,7 @@ $tempID="".$randum_number."FDST".$temp_date."".$temp_time."";?>
 										
 			<label class="form-label">Type*</label>
             <select name="usertype" class="form-control">
-			<option value="<?=$_REQUEST['usertype'];?>"><?=$_REQUEST['usertype'];?></option>
+			<option value="<?=htmlspecialchars((string)($_REQUEST['usertype']), ENT_QUOTES, 'UTF-8', false);?>"><?=htmlspecialchars((string)($_REQUEST['usertype']), ENT_QUOTES, 'UTF-8', false);?></option>
 			</select>
 			<br/>
 			
@@ -126,7 +126,7 @@ $tempID="".$randum_number."FDST".$temp_date."".$temp_time."";?>
 							   $fetch_stcatlist=mysqli_query($db_conn,$select_stcatlist);
 							   while($result_stcatlist=mysqli_fetch_array($fetch_stcatlist))
 							   {?>
-	<option value="<?php echo $result_stcatlist['amount'];?>"><?php echo $result_stcatlist['amount'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($result_stcatlist['amount']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stcatlist['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 			<br/>
@@ -173,7 +173,7 @@ $tempID="".$randum_number."FDST".$temp_date."".$temp_time."";?>
 <?php $selectCountry="select * from country order by id asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>
@@ -269,11 +269,11 @@ xmlhttp.send();}
 					<label class="form-label">Choose Plan</label>
             <select required="" name="plan_id" class="form-control">
 												<option value="" hidden="">Select</option>
-												<?php $select_plans="select * from plans where cat='$Coupon_category' order by amount asc";
-												$fetch_plans=mysqli_query($db_conn,$select_plans);
+												<?php $select_plans="select * from plans where cat=? order by amount asc";
+												$fetch_plans=db_q($db_conn,$select_plans,[$Coupon_category]);
 												while($result_plans=mysqli_fetch_array($fetch_plans))
 												{?>
-											<option value="<?php echo $result_plans['id'];?>">&#8377; <?php echo $result_plans['amount'];?> / <?php echo $result_plans['valid_months'];?> Days</option>
+											<option value="<?php echo htmlspecialchars((string)($result_plans['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">&#8377; <?php echo htmlspecialchars((string)($result_plans['amount']), ENT_QUOTES, 'ISO-8859-1', false);?> / <?php echo htmlspecialchars((string)($result_plans['valid_months']), ENT_QUOTES, 'ISO-8859-1', false);?> Days</option>
 												<?php } ?>
 												</select>
 												<?php */?>

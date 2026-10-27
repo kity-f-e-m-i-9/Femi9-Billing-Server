@@ -126,7 +126,7 @@ if ($orders) {
 													<th>Total Amount</th>
 
 				<?php foreach ($products as $result_prdetails_header) { ?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 
 												</tr>
@@ -145,14 +145,14 @@ if ($orders) {
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?=$result_Customers["gname"] ?? '';?></td>
-													<td><?=$resultrecords['cat'];?></td>
+													<td><?=htmlspecialchars((string)($resultrecords['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?=date("d/M/Y",strtotime($resultrecords["date"]));?></td>
 
-													<td><?php echo $resultrecords["order_number"];?></td>
+													<td><?php echo htmlspecialchars((string)($resultrecords["order_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
-					<td><?php echo $resultrecords["customer_name"];?></td>
-					<td><?php echo $resultrecords["customer_mobile"];?></td>
-					<td><?php echo $resultrecords["customer_address"];?></td>
+					<td><?php echo htmlspecialchars((string)($resultrecords["customer_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php echo htmlspecialchars((string)($resultrecords["customer_mobile"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php echo htmlspecialchars((string)($resultrecords["customer_address"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
 				<?php
 				$TotalAmount = $totalsByTempid[$ot_tempid] ?? '0';

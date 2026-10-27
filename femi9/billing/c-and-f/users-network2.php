@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 $title="Users Network";
 ?>
@@ -101,14 +101,14 @@ $title="Users Network";
 </thead>
 
 <?php 
-$select_product_list="select * from super_stockiest where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID'";
+$select_product_list="select * from super_stockiest where onboard_userTYPE='".db_esc($onboard_userTYPE)."' and onboard_userID='".db_esc($onboard_userID)."'";
 				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 									$district_id=$result_product_list['district_id'];
 //
-$select_distict="select * from district where id='$district_id'";
+$select_distict="select * from district where id='".db_esc($district_id)."'";
 	$fetch_district=mysqli_query($db_conn,$select_distict);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
@@ -116,10 +116,10 @@ $district_name=	$result_district['dist_name'];
 
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list["name"]);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($district_name);?></td>
 </tr>
-<tr><td colspan="2"><a href="stockist-network?ssid=<?=$result_product_list['temp_id'];?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="2"><a href="stockist-network?ssid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" title="<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

@@ -139,7 +139,7 @@ if (empty($_SESSION['csrf_token'])) {
                                 <?php if (empty($requests)): ?>
                                     <tr><td colspan="7" class="text-center text-muted" style="padding:24px;">No requests found for this filter.</td></tr>
                                 <?php else: foreach ($requests as $r): ?>
-                                    <tr id="sirRow<?php echo $r['id']; ?>">
+                                    <tr id="sirRow<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <td><?php echo date('d M Y', strtotime($r['created_at'])); ?><br><span class="text-muted" style="font-size:11px;"><?php echo date('h:i A', strtotime($r['created_at'])); ?></span></td>
                                         <td><?php echo htmlspecialchars($r['tp_name']); ?><br><span class="text-muted" style="font-size:11px;"><?php echo htmlspecialchars($r['tp_code']); ?></span></td>
                                         <td><?php
@@ -148,8 +148,8 @@ if (empty($_SESSION['csrf_token'])) {
                                                 ? '<span class="sir-badge pending">Pending</span>'
                                                 : '<code style="font-size:12px;">' . htmlspecialchars($r['inv_number']) . '</code>';
                                         ?></td>
-                                        <td><span class="sir-badge <?php echo $r['action_type']; ?>"><?php echo ucfirst($r['action_type']); ?></span></td>
-                                        <td><span class="sir-badge <?php echo $r['status']; ?>"><?php echo ucfirst($r['status']); ?></span></td>
+                                        <td><span class="sir-badge <?php echo htmlspecialchars((string)($r['action_type']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucfirst($r['action_type'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span></td>
+                                        <td><span class="sir-badge <?php echo htmlspecialchars((string)($r['status']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucfirst($r['status'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span></td>
                                         <td style="font-size:11.5px;max-width:200px;">
                                             <?php if ($r['reviewed_by_name']): ?>
                                                 <?php echo htmlspecialchars($r['reviewed_by_name']); ?><br>
@@ -163,10 +163,10 @@ if (empty($_SESSION['csrf_token'])) {
                                         </td>
                                         <td style="white-space:nowrap;">
                                             <?php if ($r['status'] === 'pending'): ?>
-                                            <button type="button" class="btn btn-success btn-sm" onclick="sirReview(<?php echo $r['id']; ?>, 'approved')">Approve</button>
-                                            <button type="button" class="btn btn-danger btn-sm" onclick="sirReview(<?php echo $r['id']; ?>, 'rejected')">Reject</button>
+                                            <button type="button" class="btn btn-success btn-sm" onclick="sirReview(<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>, 'approved')">Approve</button>
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="sirReview(<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>, 'rejected')">Reject</button>
                                             <?php elseif ($r['status'] === 'approved'): ?>
-                                            <button type="button" class="btn btn-danger btn-sm" onclick="sirReview(<?php echo $r['id']; ?>, 'rejected')">Reject</button>
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="sirReview(<?php echo htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>, 'rejected')">Reject</button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -188,7 +188,7 @@ if (empty($_SESSION['csrf_token'])) {
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script>
-var CSRF_TOKEN = '<?php echo $_SESSION['csrf_token']; ?>';
+var CSRF_TOKEN = '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>';
 function sirReview(id, decision) {
     var reason = prompt('Reason for ' + (decision === 'approved' ? 'approving' : 'rejecting') + ' this request:');
     if (reason === null) return; // cancelled

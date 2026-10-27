@@ -105,7 +105,7 @@ if (!$layer) {
                                     <?php include("validate-scripts.php"); ?>
 
                                     <form action="partner-location-layer-action" method="post" enctype="multipart/form-data">
-                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                                         <input type="hidden" name="update_id" value="<?php echo (int)$layer['id']; ?>">
                                         <input type="hidden" name="prid" value="<?php echo htmlspecialchars($prid); ?>">
 

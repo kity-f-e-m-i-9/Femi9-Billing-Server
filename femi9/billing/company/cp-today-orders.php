@@ -381,7 +381,7 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
                                                         <select name="godown_id" class="form-control form-control-sm" required style="width:140px;">
                                                             <option value="">Company Profile…</option>
                                                             <?php foreach ($godowns as $g): ?>
-                                                            <option value="<?=$g['id']?>"><?=htmlspecialchars($g['gname'])?></option>
+                                                            <option value="<?=htmlspecialchars((string)($g['id']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars($g['gname'])?></option>
                                                             <?php endforeach; ?>
                                                         </select>
                                                         <select name="warehouse_id" class="form-control form-control-sm" required style="width:110px;">

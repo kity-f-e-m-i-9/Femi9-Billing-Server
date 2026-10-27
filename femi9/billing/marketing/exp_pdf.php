@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -38,9 +38,9 @@ $from_date=$_REQUEST['frd'];
 											
 											<tbody>
 <?php 
-	$select_product_list="select * from ms_exp where ms_id='$markeingSTFID' and date between '$from_date' and '$to_date' order by date asc";
+	$select_product_list="select * from ms_exp where ms_id=? and date between ? and ? order by date asc";
 
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$fetch_product_list=db_q($db_conn,$select_product_list,[$markeingSTFID,$from_date,$to_date]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {																
 
@@ -54,7 +54,7 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 					<td>
 					<b><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
 					<td><?=inr_format($exp_amount, 2);?></td>
-					<td><?=ucwords($result_product_list["remarks"]);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list["remarks"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 	
                                                 </tr>
                                            

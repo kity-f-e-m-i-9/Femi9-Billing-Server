@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -108,8 +108,8 @@ $current_to_date=date("Y-m-d",strtotime($_REQUEST['todate']));
                         </div>
 						
 							
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="femiusr" value="<?=$getinvuser;?>"/>
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="femiusr" value="<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>"/>
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -165,13 +165,13 @@ $pdo = new PDO("mysql:host=".$servername.";port=".$db_port.";dbname=".$dbname.""
 
 $query_RFR_PRE = "
     SELECT from_user_id, SUM(rwpoints_sls) AS total_points
-    FROM user_invoice_items where DATE between '$current_from_date' and '$current_to_date' and 
-	from_user_type='$getinvuser'
+    FROM user_invoice_items where DATE between ? and ? and 
+	from_user_type=?
     GROUP BY from_user_id
     ORDER BY total_points DESC
 ";
 
-$stmt_RFR_PRE = $pdo->query($query_RFR_PRE);
+$stmt_RFR_PRE = db_q($pdo,$query_RFR_PRE,[$current_from_date,$current_to_date,$getinvuser]);
 $results_RFR_PRE = $stmt_RFR_PRE->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($results_RFR_PRE as $row_RFR_PRE) {
@@ -180,14 +180,14 @@ foreach ($results_RFR_PRE as $row_RFR_PRE) {
     $total_points = $row_RFR_PRE['total_points'];
 	
 	//SUM return points
-	$SLCT_LM_POINTS_RTN="select sum(rwpoints_sls) from user_return_stock_items where to_usertype='$getinvuser' and to_userid='$from_user_id' and date between '$current_from_date' and '$current_to_date'";
-	$FETCH_LM_POINTS_RTN=mysqli_query($db_conn,$SLCT_LM_POINTS_RTN);
+	$SLCT_LM_POINTS_RTN="select sum(rwpoints_sls) from user_return_stock_items where to_usertype=? and to_userid=? and date between ? and ?";
+	$FETCH_LM_POINTS_RTN=db_q($db_conn,$SLCT_LM_POINTS_RTN,[$getinvuser,$from_user_id,$current_from_date,$current_to_date]);
 	$RESULT_LM_POINTS_RTN=mysqli_fetch_array($FETCH_LM_POINTS_RTN);
 	if($RESULT_LM_POINTS_RTN[0]>0){$TotalPoints_LM_RTN=$RESULT_LM_POINTS_RTN[0];}else{$TotalPoints_LM_RTN="0";}
 	
 	//Sum customers invoice points
-	$select_sum_cus_points="select sum(rwpoints) from invoice_items where user_type='$getinvuser' and user_id='$from_user_id' and date between '$current_from_date' and '$current_to_date'";
-	$fetch_sum_cus_points=mysqli_query($db_conn,$select_sum_cus_points);
+	$select_sum_cus_points="select sum(rwpoints) from invoice_items where user_type=? and user_id=? and date between ? and ?";
+	$fetch_sum_cus_points=db_q($db_conn,$select_sum_cus_points,[$getinvuser,$from_user_id,$current_from_date,$current_to_date]);
 	$result_sum_cus_points=mysqli_fetch_array($fetch_sum_cus_points);
 	$Total_cus_points=$result_sum_cus_points[0] ?? '0';
 	
@@ -205,8 +205,8 @@ foreach ($results_RFR_PRE as $row_RFR_PRE) {
 $usr_district_id=$result_Customers['district_id'] ?? 0;
 if(is_numeric($usr_district_id))
 {	
-$select_distict="select * from district where id='$usr_district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$usr_district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'] ?? 'Nil';
 }else{

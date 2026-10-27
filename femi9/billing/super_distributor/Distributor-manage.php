@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 include("config.php");
 //
 $Coupon_category="Distributor";
@@ -113,8 +113,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-<?php $select_product_list="select * from distributor where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' AND account_status = 'active' order by id desc";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+<?php $select_product_list="select * from distributor where onboard_userTYPE=? and onboard_userID=? AND account_status = 'active' order by id desc";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$onboard_userTYPE,$onboard_userID]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {											
 											
@@ -123,13 +123,13 @@ $rowid=base64_encode($result_product_list["id"]);
                                             
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_product_list["useridtext"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
-					D:&nbsp;<?=ucwords($result_product_list['district_id']);?><br/>T:&nbsp;<?=ucwords($result_product_list['taluk_id']);?>
-					<br/>P:&nbsp;<?=$result_product_list['pincode_id'];?>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+					D:&nbsp;<?=htmlspecialchars((string)(ucwords($result_product_list['district_id'])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>T:&nbsp;<?=htmlspecialchars((string)(ucwords($result_product_list['taluk_id'])), ENT_QUOTES, 'ISO-8859-1', false);?>
+					<br/>P:&nbsp;<?=htmlspecialchars((string)($result_product_list['pincode_id']), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</td>
-					<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 				
 					

@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
 include("config.php");
 require_once("include/StockService.php");
 
@@ -53,5 +53,5 @@ $stmt->execute();
 $stmt->close();
 
 $_SESSION['sucMessage'] = "One OT Sales record deleted successfully.";
-echo "<script>window.location='ot-sale-details?deletedDone&&tempid=$tempid';</script>";
+echo "<script>window.location='ot-sale-details?deletedDone&&tempid=".urlencode($tempid)."';</script>";
 ?>

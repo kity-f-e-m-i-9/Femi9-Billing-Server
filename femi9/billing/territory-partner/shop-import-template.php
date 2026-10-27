@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/csv-safe.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -9,7 +9,7 @@ header("Content-Type: text/csv; charset=UTF-8");
 header("Content-Disposition: attachment; filename=$file");
 
 $output = fopen("php://output", "w");
-fputcsv($output, ['Name', 'Category', 'State', 'District', 'Taluk', 'Pincode', 'Country Code', 'Mobile Number', 'Landline', 'Email ID', 'Address', 'GSTIN']);
+femi_fputcsv($output, ['Name', 'Category', 'State', 'District', 'Taluk', 'Pincode', 'Country Code', 'Mobile Number', 'Landline', 'Email ID', 'Address', 'GSTIN']);
 
 $exampleCategory = 'GROCERY STORES / GENERAL STORES';
 $catRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_category ORDER BY id ASC LIMIT 1"));
@@ -40,7 +40,7 @@ foreach ($geoNodes as $node) {
     }
 }
 
-fputcsv($output, [
+femi_fputcsv($output, [
     'Example Shop', $exampleCategory,
     $exampleState !== '' ? $exampleState : 'STATE NAME',
     $exampleDistrict !== '' ? $exampleDistrict : 'DISTRICT NAME',

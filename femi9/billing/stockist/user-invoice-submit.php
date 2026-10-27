@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); 
 include("config.php");
 error_reporting(1);
@@ -18,20 +18,20 @@ if($_REQUEST['update_invoice_date']!=NULL)
 $update_invoice_date=date("Y-m-d",strtotime($_REQUEST['update_invoice_date']));
 
 //1
-$update_invoice12="update user_invoice set date='$update_invoice_date' where inv_id='$invoice_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-mysqli_query($db_conn,$update_invoice12);
+$update_invoice12="update user_invoice set date=? where inv_id=? and from_user_type=? and from_user_id=?";
+db_q($db_conn,$update_invoice12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
 //2	
-$update_invoice_ITEMS12="update user_invoice_items set date='$update_invoice_date' where inv_id='$invoice_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-mysqli_query($db_conn,$update_invoice_ITEMS12);
+$update_invoice_ITEMS12="update user_invoice_items set date=? where inv_id=? and from_user_type=? and from_user_id=?";
+db_q($db_conn,$update_invoice_ITEMS12,[$update_invoice_date,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
 	}
 //--------------------------------------------
 
 
 	//
-	$selectdetails="select * from user_invoice where inv_id='$invoice_id'";
-	$fetchdetails=mysqli_query($db_conn,$selectdetails);
+	$selectdetails="select * from user_invoice where inv_id=?";
+	$fetchdetails=db_q($db_conn,$selectdetails,[$invoice_id]);
 	$resultdetails=mysqli_fetch_array($fetchdetails);
 	//
 	$usertype=$resultdetails['to_user_type'];
@@ -59,8 +59,8 @@ $receiptdate = !empty($result_invoicedetails['date'])
     $userid   = $result_invoicedetails['to_user_id'];
     
     // Check if receipt row already exists for this invoice
-    $checkReceipt      = "SELECT id, received FROM receipt WHERE inv_id='$invoice_id' LIMIT 1";
-    $fetchCheckReceipt = mysqli_query($db_conn, $checkReceipt);
+    $checkReceipt      = "SELECT id, received FROM receipt WHERE inv_id=? LIMIT 1";
+    $fetchCheckReceipt = db_q($db_conn,$checkReceipt,[$invoice_id]);
     $existingReceipt   = mysqli_fetch_array($fetchCheckReceipt);
     
     if ($existingReceipt) {
@@ -69,13 +69,13 @@ $receiptdate = !empty($result_invoicedetails['date'])
         $new_receivable      = round($total_amount - $new_total_received);
     
         $updateReceipt = "UPDATE receipt 
-                          SET received        = '$new_total_received',
-                              receivable      = '$new_receivable',
-                              invoice_amount  = '$total_amount',
-                              receipt_method  = '$receipt_method',
-                              receipt_remarks = '$receipt_remarks'
-                          WHERE inv_id='$invoice_id'";
-        mysqli_query($db_conn, $updateReceipt);
+                          SET received        = ?,
+                              receivable      = ?,
+                              invoice_amount  = ?,
+                              receipt_method  = ?,
+                              receipt_remarks = ?
+                          WHERE inv_id=?";
+        db_q($db_conn,$updateReceipt,[$new_total_received,$new_receivable,$total_amount,$receipt_method,$receipt_remarks,$invoice_id]);
     
     } else {
         // No receipt yet — insert fresh row
@@ -86,12 +86,12 @@ $receiptdate = !empty($result_invoicedetails['date'])
                    from_user_type, from_user_id, to_user_type, to_user_id,
                    receipt_method, receipt_remarks) 
                   VALUES 
-                  ('$invoice_id', '$invoice_id', '$total_amount', '$receivedamount',
+                  ('".db_esc($invoice_id)."', '".db_esc($invoice_id)."', '$total_amount', '$receivedamount',
                    '$receivableamount', '$receiptdate',
                    '".$result_invoicedetails['from_user_type']."',
                    '".$result_invoicedetails['from_user_id']."',
                    '$usertype', '$userid',
-                   '$receipt_method', '$receipt_remarks')";
+                   '".db_esc($receipt_method)."', '$receipt_remarks')";
         mysqli_query($db_conn, $insertreceipt);
     }
 	
@@ -104,21 +104,21 @@ $receiptdate = !empty($result_invoicedetails['date'])
 			if($_SESSION['ACTIONEDIT']==NULL)
 			{
 	//LESS CREDIT AMOUNT - IF NEW INVOICE ONLY
-	/*$selectcountcredit12="select * from return_credit where usertype='$usertype' and userid='$userid'";
-	$fetchcountcredit12=mysqli_query($db_conn,$selectcountcredit12);
+	/*$selectcountcredit12="select * from return_credit where usertype=? and userid=?";
+	$fetchcountcredit12=db_q($db_conn,$selectcountcredit12,[$usertype,$userid]);
 	$resultcountcredit12=mysqli_fetch_array($fetchcountcredit12);
 	$creditamount=$resultcountcredit12['credit_amount']-$credit;
 		
-	$updatecredit="update return_credit set credit_amount='$creditamount' where usertype='$usertype' and userid='$userid'";
-	mysqli_query($db_conn,$updatecredit);*/
+	$updatecredit="update return_credit set credit_amount=? where usertype=? and userid=?";
+	db_q($db_conn,$updatecredit,[$creditamount,$usertype,$userid]);*/
 			}
 		}
 		
 		unset($_SESSION['INVOICEFINISH']);
 	
 	//UPDATE USER-INVOICE TABLE
-	$update_invoice="update user_invoice set credit='$credit',sub_total='$SubTotal',discount='$discount',total='$total_amount',roundoff='$roundoff',courier_charges='$courier_charges' where inv_id='$invoice_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-	$invoice_update_result = mysqli_query($db_conn,$update_invoice);
+	$update_invoice="update user_invoice set credit=?,sub_total=?,discount=?,total=?,roundoff=?,courier_charges=? where inv_id=? and from_user_type=? and from_user_id=?";
+	$invoice_update_result = db_q($db_conn,$update_invoice,[$credit,$SubTotal,$discount,$total_amount,$roundoff,$courier_charges,$invoice_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 	
 	// ============================================================================
 	// ✨ DAILY REWARD INTEGRATION - Check and award daily reward

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -11,25 +11,46 @@ date_default_timezone_set("Asia/Kolkata");
 
 $Invoice_ID = base64_decode($_REQUEST['invoiceid'] ?? '');
 
-$totalgst = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id='$Invoice_ID'"))[0];
+$totalgst = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(gstamount_total) FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."'"))[0];
 $invoice_heading = $totalgst > 0 ? 'Tax Invoice' : 'Bill of Supply';
 
-$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='$Invoice_ID' LIMIT 1"));
+$inv = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='".db_esc($Invoice_ID)."' LIMIT 1"));
+
+// Ownership scoping (same rule as get-tp-shop-mobiles.php / view-tp-shops.php):
+// only invoices sold by a Territory Partner that covers part of THIS staff
+// member's own assigned territory may be viewed - never an arbitrary invoice id.
+require_once("include/AssignedLocations.php");
+$__tpIdChk = (int)($inv['from_user_id'] ?? 0);
+$__allowed = false;
+if ($inv && $__tpIdChk > 0 && ($inv['from_user_type'] ?? '') === 'territory_partner') {
+    $__taluks = [];
+    foreach (getMsAssignedDistricts($db_conn, (int)$markeingSTFID) as $__d) {
+        foreach ($__d['taluks'] as $__t) { $__taluks[] = (int)$__t['id']; }
+    }
+    if ($__taluks) {
+        $__list = implode(',', $__taluks);
+        $__chk = $db_conn->query("SELECT 1 FROM territory_partner_locations tpl
+            JOIN partner_location_nodes n ON n.id = tpl.location_id
+            WHERE tpl.territory_partner_id = $__tpIdChk AND n.parent_id IN ($__list) LIMIT 1");
+        $__allowed = $__chk && $__chk->num_rows > 0;
+    }
+}
+if (!$__allowed) { http_response_code(403); exit('Not allowed'); }
 
 // TP (seller) details
 $tp_id = (int)($inv['from_user_id'] ?? 0);
-$tpRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM territory_partners WHERE id='$tp_id' LIMIT 1"));
+$tpRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM territory_partners WHERE id='".db_esc($tp_id)."' LIMIT 1"));
 
 // Customer (shop) details
 $customer_id = $inv['to_user_id'] ?? '';
-$shop        = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='$customer_id' LIMIT 1"));
+$shop        = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='".db_esc($customer_id)."' LIMIT 1"));
 $state_row   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT st_name FROM state WHERE id='{$shop['state_id']}' LIMIT 1"));
 $state_name  = $state_row['st_name'] ?? '';
 
 $Currency_symbol = "&#8377;";
 
-$dlnote  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM delivery_note WHERE inv_id='$Invoice_ID' LIMIT 1"));
-$profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profile WHERE user_tempid='$tp_id' AND usertype='territory_partner' LIMIT 1"));
+$dlnote  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM delivery_note WHERE inv_id='".db_esc($Invoice_ID)."' LIMIT 1"));
+$profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profile WHERE user_tempid='".db_esc($tp_id)."' AND usertype='territory_partner' LIMIT 1"));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -98,7 +119,7 @@ $profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profil
 <tr valign="top">
 <td width="50%">
 <table id="noneborder"><tr valign="top">
-<td><?php if (!empty($profile['logo'])): ?><img src="<?php echo $profile['logo']; ?>" style="width:95px;border-radius:10px;"/><?php endif; ?></td>
+<td><?php if (!empty($profile['logo'])): ?><img src="<?php echo htmlspecialchars((string)($profile['logo']), ENT_QUOTES, 'ISO-8859-1', false); ?>" style="width:95px;border-radius:10px;"/><?php endif; ?></td>
 <td valign="top">
 <span id="cmpname"><?php echo htmlspecialchars($tpRow['company_name'] ?: $tpRow['name']); ?></span><br/>
 <?php echo htmlspecialchars($tpRow['branch_line1'] . ' ' . $tpRow['branch_city']); ?><br/>
@@ -112,15 +133,15 @@ $profile = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM users_profil
 Consignee (Ship to):<br/>
 <b><?php echo ucwords(htmlspecialchars($shop['name'])); ?></b><br/>
 <?php echo htmlspecialchars($shop['address']); ?><br/>
-<?php if (!empty($shop['gstin'])): ?>GSTIN: <?php echo $shop['gstin']; ?><br/><?php endif; ?>
-Mobile: <?php echo $shop['mobile_number']; ?><br/>
+<?php if (!empty($shop['gstin'])): ?>GSTIN: <?php echo htmlspecialchars((string)($shop['gstin']), ENT_QUOTES, 'ISO-8859-1', false); ?><br/><?php endif; ?>
+Mobile: <?php echo htmlspecialchars((string)($shop['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?><br/>
 State: <?php echo $state_name; ?>
 </p>
 </td>
 <td valign="top">
 <table id="second_topvl">
 <tr id="border_nbottom">
-<td>Invoice #<br/><b><?php echo $inv['inv_number']; ?></b></td>
+<td>Invoice #<br/><b><?php echo htmlspecialchars((string)($inv['inv_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></b></td>
 <td>Invoice Date:<br/><b><?php echo date("d M Y", strtotime($inv['date'])); ?></b></td>
 </tr>
 <tr id="border_nbottom" valign="top">
@@ -141,7 +162,7 @@ State: <?php echo $state_name; ?>
 </tr>
 <?php
 $invno = 0; $TotalAMount123 = 0; $Totalquantity123 = 0;
-$items = mysqli_query($db_conn, "SELECT * FROM user_invoice_items WHERE inv_id='$Invoice_ID' ORDER BY id DESC");
+$items = mysqli_query($db_conn, "SELECT * FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."' ORDER BY id DESC");
 while ($ri = mysqli_fetch_array($items)) {
     $pr = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='{$ri['pr_id']}' LIMIT 1"));
     $lineTotal = ($ri['qty'] * $ri['amount']) - $ri['discount_amount'];
@@ -150,13 +171,13 @@ while ($ri = mysqli_fetch_array($items)) {
 ?>
 <tr>
 <td><?php echo ++$invno; ?></td>
-<td><b><?php echo $pr['productName']; ?></b></td>
-<td id="rightlaign"><?php echo $pr['hsn']; ?></td>
-<td id="rightlaign"><?php echo $ri['qty']; ?> Packs</td>
+<td><b><?php echo htmlspecialchars((string)($pr['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></b></td>
+<td id="rightlaign"><?php echo htmlspecialchars((string)($pr['hsn']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+<td id="rightlaign"><?php echo htmlspecialchars((string)($ri['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($pr['mrp'], 2); ?></td>
 <td id="rightlaign"><?php echo inr_format($ri['amount'], 2); ?></td>
 <td id="rightlaign">Packs</td>
-<td id="rightlaign"><?php echo $ri['gst_percentage']; ?>%</td>
+<td id="rightlaign"><?php echo htmlspecialchars((string)($ri['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%</td>
 <td id="rightlaign"><?php echo inr_format($ri['discount_amount'], 2); ?> (<?php echo inr_format($ri['discount_percentage'], 0); ?>%)</td>
 <td id="rightlaign"><?php echo inr_format($lineTotal, 2); ?></td>
 </tr>

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 
 $get_row_id=$_REQUEST['prid'];
 $get_row_id_DECODE=base64_decode($get_row_id);
@@ -9,8 +9,8 @@ if($pageNme=="superstockist")
 	$Display_label="Super Stockist";
 	$updae_table_name="super_stockiest"; //table name
 	
-	$select_candidate_list="select * from super_stockiest where id='$get_row_id_DECODE'";
-	$fetch_candidate_list=mysqli_query($db_conn,$select_candidate_list);
+	$select_candidate_list="select * from super_stockiest where id=?";
+	$fetch_candidate_list=db_q($db_conn,$select_candidate_list,[$get_row_id_DECODE]);
 	$result_candidate_list=mysqli_fetch_array($fetch_candidate_list);
 				
 }
@@ -20,8 +20,8 @@ else if($pageNme=="stockist")
 	$Display_label="Stockist";
 	$updae_table_name="stockiest"; //table name
 	
-	$select_candidate_list="select * from stockiest where id='$get_row_id_DECODE'";
-	$fetch_candidate_list=mysqli_query($db_conn,$select_candidate_list);
+	$select_candidate_list="select * from stockiest where id=?";
+	$fetch_candidate_list=db_q($db_conn,$select_candidate_list,[$get_row_id_DECODE]);
 	$result_candidate_list=mysqli_fetch_array($fetch_candidate_list);
 	
 }
@@ -31,8 +31,8 @@ else
 	$Display_label="Distributor";
 	$updae_table_name="distributor"; //table name
 	
-	$select_candidate_list="select * from distributor where id='$get_row_id_DECODE'";
-	$fetch_candidate_list=mysqli_query($db_conn,$select_candidate_list);
+	$select_candidate_list="select * from distributor where id=?";
+	$fetch_candidate_list=db_q($db_conn,$select_candidate_list,[$get_row_id_DECODE]);
 	$result_candidate_list=mysqli_fetch_array($fetch_candidate_list);
 }
 
@@ -42,6 +42,7 @@ if(isset($_REQUEST['update-username-action']))
 	$update_id=$_REQUEST['update_id'];
 	$page_name=$_REQUEST['page_name'];
 	$update_table=$_REQUEST['update_table'];
+	if (!in_array($update_table, ['stockiest','super_stockiest','distributor','super_distributor','shop','c_and_f','marketing_staff','sales_bdm_staff','outlet'], true)) { http_response_code(400); exit('Invalid request'); } // table name goes into SQL: allowlist only
 	$usrname=str_replace("'","&#39;",$_REQUEST['usrname']);
 	
 	$select_count_Username="select count(*) as numUsrname from ".$update_table." where username='$usrname'";
@@ -59,7 +60,7 @@ if(isset($_REQUEST['update-username-action']))
 	{
 		$update_id_encode=base64_encode($update_id);
 		
-		echo "<script>window.location='update-username?pageNme=".$page_name."&&prid=".$update_id_encode."&&InvalidUsrname&&ActionUpdate';</script>";
+		echo "<script>window.location='update-username?pageNme=".urlencode($page_name)."&&prid=".$update_id_encode."&&InvalidUsrname&&ActionUpdate';</script>";
 	}
 	
 	
@@ -134,24 +135,24 @@ function closerefresh()
 			<?php }?>
 			</div>
 
-<form method="post" enctype="multipart/form-data" action="<?php echo $_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
-<input type="hidden" name="update_id" value="<?php echo $get_row_id_DECODE;?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($get_row_id_DECODE), ENT_QUOTES, 'UTF-8', false);?>">
 <input type="hidden" name="update_table" value="<?php echo $updae_table_name;?>">
-<input type="hidden" name="page_name" value="<?php echo $pageNme;?>">
+<input type="hidden" name="page_name" value="<?php echo htmlspecialchars((string)($pageNme), ENT_QUOTES, 'UTF-8', false);?>">
 
  <table class="table123">
                     <tr>
                     <th scope="col">Name</th>
-                    <td>:&nbsp;&nbsp; <b><?php echo $result_candidate_list['name'];?></b></td>
+                    <td>:&nbsp;&nbsp; <b><?php echo htmlspecialchars((string)($result_candidate_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
                     </tr>
 					<tr>
                     <th scope="col">Mobile Number</th>
-                    <td>:&nbsp;&nbsp; <b><?php echo $result_candidate_list['mobile_number'];?></b></td>
+                    <td>:&nbsp;&nbsp; <b><?php echo htmlspecialchars((string)($result_candidate_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
                     </tr>
 					<tr>
                     <th scope="col">Username</th>
-                    <td><span id="usernamebox"><?php echo $result_candidate_list['username'];?></span></td>
+                    <td><span id="usernamebox"><?php echo htmlspecialchars((string)($result_candidate_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                     </tr>
 					<tr>
                     <th scope="col">Update Username</th>

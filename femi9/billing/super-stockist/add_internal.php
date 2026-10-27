@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 // Add error reporting for debugging (remove in production)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -75,7 +75,7 @@ if (empty($to_usertype)) {
 									<table class="headertble">
 									<tr>
 									<td>Add Internal Stock Transfer<br/>
-									<h4>(to) <?=$_REQUEST['to_usertype'];?></h4>
+									<h4>(to) <?=htmlspecialchars((string)($_REQUEST['to_usertype']), ENT_QUOTES, 'UTF-8', false);?></h4>
 									</td>
 		<td><a href="manage_internal" title="Manage Internal Stock Transfer">&#9776;</a></td>
 									</tr>
@@ -94,8 +94,8 @@ if (empty($to_usertype)) {
 									
 <?php if(isset($_REQUEST['InvalidStock'])){?><div class="alert alert-danger">There is no stock for the quantity you entered!</div><?php }?>
 <?php 	 
-$slctcheckstock="select count(*) as numstockcheck from stock where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-$fetch_ProductsPrice=mysqli_query($db_conn,$slctcheckstock);
+$slctcheckstock="select count(*) as numstockcheck from stock where user_type=? and user_id=?";
+$fetch_ProductsPrice=db_q($db_conn,$slctcheckstock,[$Login_user_TYPEvl,$Login_user_IDvl]);
 
 if (!$fetch_ProductsPrice) {
     echo '<div class="alert alert-danger">Database Error: ' . mysqli_error($db_conn) . '</div>';
@@ -119,7 +119,7 @@ $tempid="".$randum_number."INTTRNS".$temp_date."".$temp_time."";?>
 <input type="hidden" name="tempid" value="<?=$tempid?>">
 <input type="hidden" name="from_usertype" value="<?=$Login_user_TYPEvl?>">
 <input type="hidden" name="from_userid" value="<?=$Login_user_IDvl?>">
-<input type="hidden" name="to_usertype" value="<?=$_REQUEST['to_usertype'];?>">
+<input type="hidden" name="to_usertype" value="<?=htmlspecialchars((string)($_REQUEST['to_usertype']), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                         <div class="example-content">
@@ -131,7 +131,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintstock").innerHTML=xmlhttp.responseText;}}
-var invuser="<?=$_REQUEST['to_usertype'];?>";
+var invuser="<?=htmlspecialchars((string)($_REQUEST['to_usertype']), ENT_QUOTES, 'UTF-8', false);?>";
 xmlhttp.open("GET","loadstockcheck.php?q="+str + '&invuser='+ invuser,true);
 xmlhttp.send();}
 </script>
@@ -144,8 +144,8 @@ xmlhttp.send();}
 							   if($_REQUEST['to_usertype']=="super_stockiest")
 							   {
 							       $loginuser_state_id=$result_LoGuserDtails['state_id'];
-							       $select_Godown="select * from super_stockiest where account_status='active' and state_id='$loginuser_state_id' and temp_id != '$Login_user_IDvl' order by name asc";
-							       $fetch_Godown=mysqli_query($db_conn,$select_Godown);
+							       $select_Godown="select * from super_stockiest where account_status='active' and state_id=? and temp_id != ? order by name asc";
+							       $fetch_Godown=db_q($db_conn,$select_Godown,[$loginuser_state_id,$Login_user_IDvl]);
 							       if (!$fetch_Godown) {
 							           echo '<option value="">Error loading data: ' . mysqli_error($db_conn) . '</option>';
 							       } else {
@@ -175,8 +175,8 @@ xmlhttp.send();}
 							   else
 							   {
 							       $loginuser_DistrictID=$result_LoGuserDtails['district_id'];
-							       $select_Godown="select * from stockiest where district_id='$loginuser_DistrictID' or ss_id='$Login_user_IDvl' or onboard_userID='$Login_user_IDvl'  order by name asc";
-							       $fetch_Godown=mysqli_query($db_conn,$select_Godown);
+							       $select_Godown="select * from stockiest where district_id=? or ss_id=? or onboard_userID=?  order by name asc";
+							       $fetch_Godown=db_q($db_conn,$select_Godown,[$loginuser_DistrictID,$Login_user_IDvl,$Login_user_IDvl]);
 							       if (!$fetch_Godown) {
 							           echo '<option value="">Error loading data: ' . mysqli_error($db_conn) . '</option>';
 							       } else {
@@ -212,11 +212,11 @@ flatpickr("#bookingDate", {
                                <select required="" name="prid" class="form-control">
 							   <option value="" hidden="">Select</option>
 							   <?php
-							   $select_product_list="SELECT p.id, p.productName, s.closing_qty FROM products p INNER JOIN stock s ON s.product_id=p.id WHERE s.user_type='$Login_user_TYPEvl' AND s.user_id='$Login_user_IDvl' AND s.closing_qty>0 ORDER BY p.productName ASC";
-							   $fetch_product_list=mysqli_query($db_conn,$select_product_list);
+							   $select_product_list="SELECT p.id, p.productName, s.closing_qty FROM products p INNER JOIN stock s ON s.product_id=p.id WHERE s.user_type=? AND s.user_id=? AND s.closing_qty>0 ORDER BY p.productName ASC";
+							   $fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$Login_user_IDvl]);
 							   while($result_product_list=mysqli_fetch_array($fetch_product_list)) {
 							   ?>
-<option value="<?=$result_product_list['id'];?>"><?=strtoupper($result_product_list['productName']);?> (Qty: <?=$result_product_list['closing_qty'];?>)</option>
+<option value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_product_list['productName'])), ENT_QUOTES, 'ISO-8859-1', false);?> (Qty: <?=htmlspecialchars((string)($result_product_list['closing_qty']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 							   <?php } ?>
 							   </select>
 							   <br/>

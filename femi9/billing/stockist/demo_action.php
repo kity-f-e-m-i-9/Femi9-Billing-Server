@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
@@ -17,8 +17,8 @@ if (isset($_REQUEST['ADDDEMOAWR'])) {
 	$stockist_id=$_REQUEST["stockist_id"];
 	$distributor_id=$_REQUEST["distributor_id"];
 	
-	$select_count_dist="select count(*) as numdist from demo_awareness where tempid='$tempid'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+	$select_count_dist="select count(*) as numdist from demo_awareness where tempid=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$tempid]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numdist']==0)
 	{
@@ -33,12 +33,12 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		
                  $uploaddir='demo_photo/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['photo']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['photo']['tmp_name'],$uploadfile);
 	}else{$uploadfile="Nil";}
 	
         $InsertRecords="insert into demo_awareness (tempid,date,photo,title,usertype,userid,ssid,stockist_id,distributor_id)
-		values ('$tempid','$date','$uploadfile','$title','$usertype','$userid','$ssid','$stockist_id','$distributor_id')";
-		mysqli_query($db_conn,$InsertRecords);
+		values (?,?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$InsertRecords,[$tempid,$date,$uploadfile,$title,$usertype,$userid,$ssid,$stockist_id,$distributor_id]);
 		
 	}
 
@@ -51,7 +51,7 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 if (isset($_REQUEST['UPDATEDEMO'])) {
 	
 	$update_id=$_REQUEST["update_id"];
-	$old_photo=$_REQUEST["old_photo"];
+	$old_photo=safe_old_file_param($_REQUEST["old_photo"]);
 	$title=RemoveSpecialChar($_REQUEST["title"]);
 	
 	//UPLOAD PHOTO
@@ -64,7 +64,7 @@ if (isset($_REQUEST['UPDATEDEMO'])) {
 		
                  $uploaddir='demo_photo/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['photo']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['photo']['tmp_name'],$uploadfile);
 	   
 	   //UNLINK photo
 	   unlink("".$old_photo."");
@@ -73,8 +73,8 @@ if (isset($_REQUEST['UPDATEDEMO'])) {
 	{ $uploadfile=$old_photo; }
 		
 		
-		$update_records="update demo_awareness set title='$title',photo='$uploadfile' where id='$update_id'";
-		mysqli_query($db_conn,$update_records);
+		$update_records="update demo_awareness set title=?,photo=? where id=?";
+		db_q($db_conn,$update_records,[$title,$uploadfile,$update_id]);
 		
 		echo "<script>window.location='manage_demo.php?updatedSuccess';</script>";
 	

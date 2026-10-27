@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -75,7 +75,7 @@ $i = $start_from;
                                                     $fetch_prdetails_header = mysqli_query($db_conn, $select_prdetails_header);
                                                     while ($result_prdetails_header = mysqli_fetch_array($fetch_prdetails_header)) {
                                                     ?>
-                                                    <th><?php echo $result_prdetails_header['productName']; ?></th>
+                                                    <th><?php echo htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></th>
                                                     <?php } ?>
                                                     <th>Details</th>
                                                     <th>Edit</th>
@@ -83,27 +83,27 @@ $i = $start_from;
                                             </thead>
                                             <tbody>
 <?php
-$select_tempids = "SELECT DISTINCT `tempid` FROM `demofreedamage` WHERE usertype='$Login_user_TYPEvl' AND userid='$Login_user_IDvl'";
-$fetch_tempids = mysqli_query($db_conn, $select_tempids);
+$select_tempids = "SELECT DISTINCT `tempid` FROM `demofreedamage` WHERE usertype=? AND userid=?";
+$fetch_tempids = db_q($db_conn,$select_tempids,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while ($rowTempid = mysqli_fetch_array($fetch_tempids)) {
     $tempid = $rowTempid["tempid"];
 
-    $select_rec = "SELECT * FROM demofreedamage WHERE tempid='$tempid'";
-    $fetch_rec = mysqli_query($db_conn, $select_rec);
+    $select_rec = "SELECT * FROM demofreedamage WHERE tempid=?";
+    $fetch_rec = db_q($db_conn,$select_rec,[$tempid]);
     $ResultRecords = mysqli_fetch_array($fetch_rec);
 ?>
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $ResultRecords["category"]; ?></td>
+                                                    <td><?php echo htmlspecialchars((string)($ResultRecords["category"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                     <td><?php echo date("d/M/Y", strtotime($ResultRecords["date"])); ?></td>
-                                                    <td><?php echo $ResultRecords["remarks"]; ?></td>
+                                                    <td><?php echo htmlspecialchars((string)($ResultRecords["remarks"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
 <?php
     $select_prdetails_header = "select * from `products` where (`temp_id` not like 'NKS-%' or `temp_id` is null) order by `id` asc";
     $fetch_prdetails_header = mysqli_query($db_conn, $select_prdetails_header);
     while ($result_prdetails_header = mysqli_fetch_array($fetch_prdetails_header)) {
         $prid_header = $result_prdetails_header['id'];
-        $select_SUM_QTY = "SELECT qty FROM demofreedamage WHERE tempid='$tempid' AND product_id='$prid_header'";
-        $fetch_SUM_QTY = mysqli_query($db_conn, $select_SUM_QTY);
+        $select_SUM_QTY = "SELECT qty FROM demofreedamage WHERE tempid=? AND product_id=?";
+        $fetch_SUM_QTY = db_q($db_conn,$select_SUM_QTY,[$tempid,$prid_header]);
         $result_SUM_QTY = mysqli_fetch_array($fetch_SUM_QTY);
         $slsqty = ($result_SUM_QTY['qty'] != NULL) ? $result_SUM_QTY['qty'] : "0";
 ?>

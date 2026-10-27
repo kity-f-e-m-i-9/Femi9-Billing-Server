@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php"); 
 error_reporting(0);
@@ -9,8 +9,8 @@ $to_date=$_REQUEST['todate'];
 if($from_date!=NULL)
 {
  
-							   $select_sum_total_intra_register="select sum(total) from user_invoice where to_user_type='$Login_user_TYPEvl' and to_user_id='$Login_user_IDvl' and gst_type='inner' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_intra_register=mysqli_query($db_conn,$select_sum_total_intra_register);
+							   $select_sum_total_intra_register="select sum(total) from user_invoice where to_user_type=? and to_user_id=? and gst_type='inner' and date between ? and ?";
+							   $fetch_sum_total_intra_register=db_q($db_conn,$select_sum_total_intra_register,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_intra_register=mysqli_fetch_array($fetch_sum_total_intra_register);
 							   
 							   if($result_sum_total_intra_register[0]!=NULL)
@@ -21,8 +21,8 @@ if($from_date!=NULL)
 							   
 							   
 							   //inter-state registered person (other state)
-							   $select_sum_total_inter_register="select sum(total) from user_invoice where to_user_type='$Login_user_TYPEvl' and to_user_id='$Login_user_IDvl' and gst_type='outer' and date between '$from_date' and '$to_date'";
-							   $fetch_sum_total_inter_register=mysqli_query($db_conn,$select_sum_total_inter_register);
+							   $select_sum_total_inter_register="select sum(total) from user_invoice where to_user_type=? and to_user_id=? and gst_type='outer' and date between ? and ?";
+							   $fetch_sum_total_inter_register=db_q($db_conn,$select_sum_total_inter_register,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]);
 							   $result_sum_total_inter_register=mysqli_fetch_array($fetch_sum_total_inter_register);
 							   
 							   if($result_sum_total_inter_register[0]!=NULL)
@@ -110,16 +110,16 @@ if($from_date!=NULL)
                             </div>
 							
 							
-							<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+							<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$from_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($from_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$to_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($to_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>

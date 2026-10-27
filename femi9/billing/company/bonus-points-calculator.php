@@ -1333,7 +1333,7 @@ $availableExecutions = getAvailableExecutions($dbConn);
                                     <div class="stat-card primary">
                                         <div class="stat-label">Total Users</div>
                                         <div class="stat-value"><?php echo (int)$summary['total_users_processed']; ?></div>
-                                        <small class="text-muted">Processed<?php echo $modeLabel; ?></small>
+                                        <small class="text-muted">Processed<?php echo htmlspecialchars((string)($modeLabel), ENT_QUOTES, 'UTF-8', false); ?></small>
                                     </div>
                                 </div>
                                 <div class="col-md-2 col-sm-6 mb-3">

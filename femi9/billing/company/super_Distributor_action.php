@@ -1,6 +1,5 @@
-<?php 
-session_name('femi9_company_sess');
-session_start();
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; 
+session_name('femi9_company_sess'); session_start(); include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('sdt');
 include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
@@ -43,12 +42,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 	$mobile_number = RemoveSpecialChar($mobile_number);
 	
 //Validate Mobile Number	
-$Select_CNTMoblenm="select count(*) as numMob from super_distributor where mobile_number='$mobile_number'";
-$Fetch_Count_MobilenUmber=mysqli_query($db_conn,$Select_CNTMoblenm);
+$Select_CNTMoblenm="select count(*) as numMob from super_distributor where mobile_number=?";
+$Fetch_Count_MobilenUmber=db_q($db_conn,$Select_CNTMoblenm,[$mobile_number]);
 $Result_Count_MobilenUmber=mysqli_fetch_array($Fetch_Count_MobilenUmber);
 if($Result_Count_MobilenUmber['numMob']==1)
 {
-	echo "<script>window.location='super_Distributor_add?InvalidMobileNumber&&usertype=$usertype';</script>";
+	echo "<script>window.location='super_Distributor_add?InvalidMobileNumber&&usertype=".urlencode($usertype)."';</script>";
 	exit;
 	
 }else{
@@ -60,8 +59,8 @@ if($Result_Count_MobilenUmber['numMob']==1)
 	$name=str_replace("'","&#39;",$_POST["name"]);
 	$name = RemoveSpecialChar($name);
 	
-$select_count_dist="select count(*) as numdist from super_distributor where temp_id='$temp_id'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+$select_count_dist="select count(*) as numdist from super_distributor where temp_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$temp_id]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numdist']==0)
 	{
@@ -76,8 +75,8 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		
 	//plans details
 	$plan_id=$_POST["plan_id"];
-	$select_plans="select * from plans where id='$plan_id'";
-	$fetch_plans=mysqli_query($db_conn,$select_plans);
+	$select_plans="select * from plans where id=?";
+	$fetch_plans=db_q($db_conn,$select_plans,[$plan_id]);
 	$result_plans=mysqli_fetch_array($fetch_plans);
 	$plan_amount="0";//$result_plans["amount"];
 	$valid_months="0";//$result_plans["valid_months"];
@@ -94,7 +93,7 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='../super_distributor/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 	}else{$insfilename="Nil";}
@@ -118,22 +117,22 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 		ref_number,account_status,merchantOrderId,merchantTransactionId,merchantUserId,gstin,
 		onboard_userTYPE,onboard_userID,address,userid,useridtext,usertype,country_code,shop_onboard)
 
-		values ('$DummyStockistID','$temp_id','$insfilename','$name','$state_id','$district_id',
-		'$taluk_id','$pincode_id','$user_email','$mobile_number',
-		'$username_generate','$user_password','$plan_amount','$valid_months',
-		'$valid_from','$valid_to','phonepe','pending','Nil','active',
-		'$merchantOrderId','$merchantTransactionId','$merchantUserId',
-		'$gstin','$onboard_userTYPE','$onboard_userID','$address','$userid','$useridtext',
-		'$usertype','$country_code','$shop_onboard')";
-		mysqli_query($db_conn,$sql);
+		values (?,?,?,?,?,?,
+		?,?,?,?,
+		?,?,?,?,
+		?,?,'phonepe','pending','Nil','active',
+		?,?,?,
+		?,?,?,?,?,?,
+		?,?,?)";
+		db_q($db_conn,$sql,[$DummyStockistID,$temp_id,$insfilename,$name,$state_id,$district_id,$taluk_id,$pincode_id,$user_email,$mobile_number,$username_generate,femi_password_hash((string)($user_password)),$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$gstin,$onboard_userTYPE,$onboard_userID,$address,$userid,$useridtext,$usertype,$country_code,$shop_onboard]);
 		
 		// Insert Referral & Target Amount Details:-
 		$target_amount=$_REQUEST['target_amount'];
 		$ref_by_user_type=$_REQUEST['st_ref_type'];
 		
 		$insert_referral="insert into super_distributor_referral (sd_id,target_amount,ref_by_user_type,ref_by_user_id,updated) values 
-		('$temp_id','$target_amount','$ref_by_user_type','','0')";
-		mysqli_query($db_conn,$insert_referral);
+		(?,?,?,'','0')";
+		db_q($db_conn,$insert_referral,[$temp_id,$target_amount,$ref_by_user_type]);
 		
 		
 		//-----------------------------------------------------------------------------
@@ -164,7 +163,7 @@ exit;
 
 }else{
 		//this super distributor already exists.
-		echo "<script>window.location='super_Distributor_add?distalready&&usertype=$usertype';</script>";
+		echo "<script>window.location='super_Distributor_add?distalready&&usertype=".urlencode($usertype)."';</script>";
 		exit;
 	}
 	

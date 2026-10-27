@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 include("RemoveSpecialChar.php");
@@ -13,7 +13,7 @@ $InvoiceID = base64_decode($_POST['InvoiceID'] ?? '');
 $action    = $_POST['action']    ?? '';
 $gid       = $_POST['gid']       ?? '';
 $tblenme   = $_POST['tblenme']   ?? '1';
-$redirurl  = $_POST['redirurl']  ?? 'shop-invoice-add';
+$redirurl  = preg_replace('/[^A-Za-z0-9_\-\/]/', '', (string)($_POST['redirurl']  ?? 'shop-invoice-add'));
 
 $invnumber = RemoveSpecialChar($_POST['invnumber'] ?? '');
 $invnumber = str_replace("'", '', $invnumber);
@@ -21,17 +21,17 @@ $invnumber = str_replace("'", '', $invnumber);
 if ($tblenme == '1') {
     $tablename = 'user_invoice';
     $chk = mysqli_fetch_array(mysqli_query($db_conn,
-        "SELECT COUNT(*) AS n FROM user_invoice WHERE inv_number='$invnumber' AND from_user_type='$Login_user_TYPEvl' AND from_user_id='$Login_user_IDvl'"));
+        "SELECT COUNT(*) AS n FROM user_invoice WHERE inv_number='".db_esc($invnumber)."' AND from_user_type='".db_esc($Login_user_TYPEvl)."' AND from_user_id='".db_esc($Login_user_IDvl)."'"));
 } else {
     $tablename = 'invoice';
     $chk = mysqli_fetch_array(mysqli_query($db_conn,
-        "SELECT COUNT(*) AS n FROM invoice WHERE inv_number='$invnumber' AND user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl'"));
+        "SELECT COUNT(*) AS n FROM invoice WHERE inv_number='".db_esc($invnumber)."' AND user_type='".db_esc($Login_user_TYPEvl)."' AND user_id='".db_esc($Login_user_IDvl)."'"));
 }
 
 $InvoiceID_enc = base64_encode($InvoiceID);
 if ((int)$chk['n'] === 0) {
-    mysqli_query($db_conn, "UPDATE $tablename SET inv_number='$invnumber' WHERE inv_id='$InvoiceID'");
-    echo "<script>window.location='{$redirurl}.php?invuser=$invuser&&InvoiceID={$InvoiceID_enc}&&action=$action&&gid=$gid&&InvoiceUpdatedSuccess';</script>";
+    mysqli_query($db_conn, "UPDATE $tablename SET inv_number='".db_esc($invnumber)."' WHERE inv_id='".db_esc($InvoiceID)."'");
+    echo "<script>window.location='".preg_replace('/[^A-Za-z0-9_\-\/]/','',$redirurl).".php?invuser=".urlencode($invuser)."&&InvoiceID={$InvoiceID_enc}&&action=".urlencode($action)."&&gid=".urlencode($gid)."&&InvoiceUpdatedSuccess';</script>";
 } else {
-    echo "<script>window.location='{$redirurl}.php?invuser=$invuser&&InvoiceID={$InvoiceID_enc}&&action=$action&&gid=$gid&&invoicealready';</script>";
+    echo "<script>window.location='".preg_replace('/[^A-Za-z0-9_\-\/]/','',$redirurl).".php?invuser=".urlencode($invuser)."&&InvoiceID={$InvoiceID_enc}&&action=".urlencode($action)."&&gid=".urlencode($gid)."&&invoicealready';</script>";
 }

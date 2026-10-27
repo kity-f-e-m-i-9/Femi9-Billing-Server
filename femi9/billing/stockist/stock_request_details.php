@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");
@@ -6,8 +6,8 @@ include("config.php");
 $get_req_id=$_REQUEST['reqid'];
 	$get_req_id_DECODE=base64_decode($get_req_id);
 	//
-	 $select_requestdetails="select * from stock_request where reqid='$get_req_id_DECODE'";
-	 $fetch_requestdetails=mysqli_query($db_conn,$select_requestdetails);
+	 $select_requestdetails="select * from stock_request where reqid=?";
+	 $fetch_requestdetails=db_q($db_conn,$select_requestdetails,[$get_req_id_DECODE]);
 	 $result_requestdetails=mysqli_fetch_array($fetch_requestdetails);
 	 
 	 $verified_accounts=$result_requestdetails['verified'];
@@ -67,8 +67,8 @@ else
 		$fetch_CUSTDetails=mysqli_query($db_conn,$select_CUSTDetails);
 		$result_CUSTDetails=mysqli_fetch_array($fetch_CUSTDetails);
 		
-	$select_invoice_details="select * from user_invoice where inv_id='$get_req_id_DECODE'";
-	$fetch_invoice_details=mysqli_query($db_conn,$select_invoice_details);
+	$select_invoice_details="select * from user_invoice where inv_id=?";
+	$fetch_invoice_details=db_q($db_conn,$select_invoice_details,[$get_req_id_DECODE]);
 	$result_invoice_details=mysqli_fetch_array($fetch_invoice_details);
 												
 ?>
@@ -162,7 +162,7 @@ if (window.XMLHttpRequest){xmlhttp=new XMLHttpRequest();}else{
 xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");}xmlhttp.onreadystatechange=function(){
 if (xmlhttp.readyState==4 && xmlhttp.status==200){
 document.getElementById("txtHintPrreq").innerHTML=xmlhttp.responseText;}}
-var reqid="<?=$get_req_id?>";
+var reqid="<?=htmlspecialchars((string)($get_req_id), ENT_QUOTES, 'UTF-8', false)?>";
 xmlhttp.open("GET","loadproductreq.php?q="+str + '&reqid='+ reqid,true);
 xmlhttp.send();}
 </script>
@@ -196,8 +196,8 @@ select:focus, input[type=number]:focus{background:#fffa8f;}
 </style>													
 
 <?php 
-$select_INVProductDetails="select * from user_invoice_items where inv_id='$get_req_id_DECODE' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+$select_INVProductDetails="select * from user_invoice_items where inv_id=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$get_req_id_DECODE]);
 	$numitemsCheck=mysqli_num_rows($fetch_INVProductDetails);
 	?>
 
@@ -215,7 +215,7 @@ $temp_time=date("gis");
 $inv_id="".$inv_randum_number."".$invidprefix."".$temp_date."".$temp_time."";?>
 
 <input type="hidden" name="randum_number" value="<?=$randum_number?>">
-<input type="hidden" name="inv_id" value="<?=$get_req_id_DECODE?>">
+<input type="hidden" name="inv_id" value="<?=htmlspecialchars((string)($get_req_id_DECODE), ENT_QUOTES, 'UTF-8', false)?>">
 <input type="hidden" name="invuser" value="<?=$getinvuser?>">
 <input type="hidden" name="godownid" value="<?=$Login_user_IDvl?>">
 
@@ -258,7 +258,7 @@ xmlhttp.send();}
 
 <label class="form-label"><?=$lablenamedisplay;?>*</label>
 <select name="customer_id" class="form-control">
-<option value="<?php echo $CustomerID;?>"><?php echo $result_CUSTDetails['name'];?>, <?php echo $result_CUSTDetails['mobile_number'];?></option>
+<option value="<?php echo $CustomerID;?>"><?php echo htmlspecialchars((string)($result_CUSTDetails['name']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php echo htmlspecialchars((string)($result_CUSTDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 </select>
 
 
@@ -269,7 +269,7 @@ xmlhttp.send();}
 <?php if($result_invoice_details['date']==NULL){?>
 <input type="date" name="date" id="bookingDate" value="<?php echo date("Y-m-d");?>" required="" class="form-control">
 <?php }else{?>
-<input type="date" name="date" value="<?php echo $result_invoice_details['date'];?>" readonly required="" class="form-control">
+<input type="date" name="date" value="<?php echo htmlspecialchars((string)($result_invoice_details['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" readonly required="" class="form-control">
 <?php }?>
 </br>
 
@@ -291,19 +291,19 @@ xmlhttp.send();}
 <?php }?>
 <option value="" hidden="">Select Product</option>
 <?php 
-$select_requestdetails12="select * from stock_request_items where reqid='$get_req_id_DECODE'and qty>0";
-	 $fetch_requestdetails12=mysqli_query($db_conn,$select_requestdetails12);
+$select_requestdetails12="select * from stock_request_items where reqid=?and qty>0";
+	 $fetch_requestdetails12=db_q($db_conn,$select_requestdetails12,[$get_req_id_DECODE]);
 	 while($result_requestdetails12=mysqli_fetch_array($fetch_requestdetails12))
 		 {
 			 
 			 $getprid=$result_requestdetails12['prid'];
 	 
-	    $select_Products_list="select * from products where id='$getprid'";
-		$fetch_Products_list=mysqli_query($db_conn,$select_Products_list);
+	    $select_Products_list="select * from products where id=?";
+		$fetch_Products_list=db_q($db_conn,$select_Products_list,[$getprid]);
 		$result_Products_list=mysqli_fetch_array($fetch_Products_list);
 										
 											?>
-<option value="<?php echo $result_Products_list['id'];?>"><?php echo $result_Products_list['productName'];?></option>
+<option value="<?php echo htmlspecialchars((string)($result_Products_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_Products_list['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 </select>
 
@@ -370,8 +370,8 @@ $select_requestdetails12="select * from stock_request_items where reqid='$get_re
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['pr_id'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		$TotalAMount=$result_INVProductDetails['total'];
@@ -381,16 +381,16 @@ $select_requestdetails12="select * from stock_request_items where reqid='$get_re
 	?>
                                                         <tr>
 <th scope="row"><?php echo $rd=$rd+1;?></th>
-<td><?=$result_ProductDetails123['productName'];?></td>
-<td><?=$result_ProductDetails123['hsn'];?></td>
-<td><?=$result_INVProductDetails['qty'];?></td>
-<td><?=$result_INVProductDetails['amount'];?></td>
-<td><?=$result_INVProductDetails['discount_amount'];?>(<?=$result_INVProductDetails['discount_percentage'];?>%)</td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_ProductDetails123['hsn']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['discount_amount']), ENT_QUOTES, 'ISO-8859-1', false);?>(<?=htmlspecialchars((string)($result_INVProductDetails['discount_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td>&#8377;<?php echo inr_format($result_INVProductDetails['subtotal'], 2);?></td>
-<td><?=$result_INVProductDetails['gstamount_total'];?>(<?=$result_INVProductDetails['gst_percentage'];?>%)</td>
+<td><?=htmlspecialchars((string)($result_INVProductDetails['gstamount_total']), ENT_QUOTES, 'ISO-8859-1', false);?>(<?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 <td align="right"><?php echo inr_format($TotalAMount, 2);?></td>
 <td>
-<a href="user-del-inv-product-req.php?inv_id=<?php echo $get_req_id;?>&&rowid=<?php echo $ItemRowid;?>&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+<a href="user-del-inv-product-req.php?inv_id=<?php echo htmlspecialchars((string)($get_req_id), ENT_QUOTES, 'UTF-8', false);?>&&rowid=<?php echo $ItemRowid;?>&&invuser=<?=$getinvuser;?>&&userid=<?=$CustomerID;?>&&actionremove"onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
 </td>
                                                         </tr>
                                                         
@@ -408,9 +408,9 @@ $select_requestdetails12="select * from stock_request_items where reqid='$get_re
 												
 												
                     <div>
-				   <b>Delivery Address:-</b> <br/><?=$result_requestdetails['delivery_address'];?>
+				   <b>Delivery Address:-</b> <br/><?=htmlspecialchars((string)($result_requestdetails['delivery_address']), ENT_QUOTES, 'ISO-8859-1', false);?>
 				   </div>
-                   <div style="margin-top:10px;"><b>Invoice Number:-</b> <br/><?=$result_invoice_details['inv_number'];?></div>
+                   <div style="margin-top:10px;"><b>Invoice Number:-</b> <br/><?=htmlspecialchars((string)($result_invoice_details['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></div>
                    <div style="margin-top:10px;">
 				   <b>Invoice Date:-</b> <br/><?php if($result_invoice_details['date']!=NULL){ echo date("d/M/Y",strtotime($result_invoice_details['date'])); }?>
 				   </div>
@@ -424,8 +424,8 @@ $usertype=$result_invoice_details['to_user_type'];
 		$userid=$result_invoice_details['to_user_id'];
 		
 		//get credit amount
-		$selectcredit_amount="select * from return_credit where usertype='$usertype' and userid='$userid'";
-		$fetchcredit_amount=mysqli_query($db_conn,$selectcredit_amount);
+		$selectcredit_amount="select * from return_credit where usertype=? and userid=?";
+		$fetchcredit_amount=db_q($db_conn,$selectcredit_amount,[$usertype,$userid]);
 		$resultcredit_amount=mysqli_fetch_array($fetchcredit_amount);
 		$creditamount=$resultcredit_amount['credit_amount'];
 		if($creditamount!=NULL)
@@ -479,7 +479,7 @@ $usertype=$result_invoice_details['to_user_type'];
 	
 <form action="invoice-submit-req.php" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
 
-<input type="hidden" name="invoice_id" value="<?=$get_req_id_DECODE;?>"/>
+<input type="hidden" name="invoice_id" value="<?=htmlspecialchars((string)($get_req_id_DECODE), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="SubTotal" value="<?=$TotalAMount123;?>"/>
 
 <?php $_SESSION['INVOICEFINISH']="1";?>
@@ -510,7 +510,7 @@ $usertype=$result_invoice_details['to_user_type'];
 		 </p><br/>
 		 
 		 <p class="bold">Courier Charges <span>
-		 <input type="number" value="<?=$result_InvoieDetails['courier_charges'];?>" name="courier_charges" min="0" required="" onKeyup="totalamount()" id="cucharge">
+		 <input type="number" value="<?=htmlspecialchars((string)($result_InvoieDetails['courier_charges']), ENT_QUOTES, 'ISO-8859-1', false);?>" name="courier_charges" min="0" required="" onKeyup="totalamount()" id="cucharge">
 		 </span>
 		 </p><br/>
 		 

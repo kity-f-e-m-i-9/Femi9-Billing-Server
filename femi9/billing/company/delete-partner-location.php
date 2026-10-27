@@ -5,7 +5,7 @@
  * Called via GET with prid (base64-encoded node id) and optional return_parent.
  */
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('partner_location');
 error_reporting(0);
 
 $prid         = isset($_GET['prid'])          ? trim($_GET['prid'])  : '';

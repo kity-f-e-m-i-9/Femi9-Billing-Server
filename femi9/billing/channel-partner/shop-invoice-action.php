@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -16,7 +16,7 @@ $tp_id       = (int)$Login_user_IDvl;
 // Check invoice number duplicate (set by AJAX in form)
 if (($_REQUEST['invoice_number_accept'] ?? '1') == '0') {
     $_SESSION['errorMessage'] = "Invoice Number already exists!";
-    echo "<script>window.location='shop-invoice-add.php?invoicealready&&invuser=$invuser';</script>";
+    echo "<script>window.location='shop-invoice-add.php?invoicealready&&invuser=".urlencode($invuser)."';</script>";
     exit;
 }
 
@@ -27,7 +27,7 @@ $amount = (float)($_REQUEST['amount'] ?? 0);
 $qty    = (int)($_REQUEST['qty']    ?? 0);
 
 // Product details
-$prod = mysqli_fetch_array(mysqli_query($db_conn, "SELECT gst,gst_type,hsn,rwpoints FROM products WHERE id='$pr_id'"));
+$prod = mysqli_fetch_array(mysqli_query($db_conn, "SELECT gst,gst_type,hsn,rwpoints FROM products WHERE id='".db_esc($pr_id)."'"));
 $gst_percentage  = $prod['gst']      ?? 0;
 $gst_type_item   = $prod['gst_type'] ?: 'exclusive';
 $hsn             = $prod['hsn']      ?? '';
@@ -60,26 +60,26 @@ if ($gst_type_item === 'inclusive' && $gst_percentage > 0) {
 $gstamount_singlepr = '0';
 
 // Customer/GST type
-$shopRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='$customer_id' LIMIT 1"));
+$shopRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE temp_id='".db_esc($customer_id)."' LIMIT 1"));
 $buyer_GSTIN   = $shopRow['gstin'] ?? '';
 $buyer_gsttype = strlen($buyer_GSTIN) === 15 ? 'register' : 'unregister';
 
 $shopStateRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT st_name FROM state WHERE id='{$shopRow['state_id']}' LIMIT 1"));
 $shop_state_name = $shopStateRow['st_name'] ?? '';
-$tpRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT branch_state FROM territory_partners WHERE id='$tp_id' LIMIT 1"));
+$tpRow = mysqli_fetch_array(mysqli_query($db_conn, "SELECT branch_state FROM territory_partners WHERE id='".db_esc($tp_id)."' LIMIT 1"));
 $tp_state = $tpRow['branch_state'] ?? '';
 $gst_type = (strtolower($shop_state_name) === strtolower($tp_state)) ? 'inner' : 'outer';
 
 // Create invoice if not exists
 $chk = mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COUNT(*) AS n FROM user_invoice WHERE inv_id='$inv_id' AND from_user_type='$Login_user_TYPEvl' AND from_user_id='$Login_user_IDvl' AND to_user_type='$invuser' AND to_user_id='$customer_id'"));
+    "SELECT COUNT(*) AS n FROM user_invoice WHERE inv_id='".db_esc($inv_id)."' AND from_user_type='".db_esc($Login_user_TYPEvl)."' AND from_user_id='".db_esc($Login_user_IDvl)."' AND to_user_type='".db_esc($invuser)."' AND to_user_id='".db_esc($customer_id)."'"));
 if ((int)$chk['n'] === 0) {
     mysqli_query($db_conn, "INSERT INTO user_invoice
         (inv_id,id_only,inv_number,date,inv_year,sub_total,discount,total,to_user_type,to_user_id,
          from_user_type,from_user_id,gst_type,credit,roundoff,courier_charges,rwpoints_enable,buyer_gsttype,username,usertype)
-        VALUES ('$inv_id','0','$inv_number','$date','$inv_year','0','0','0',
-        '$invuser','$customer_id','$Login_user_TYPEvl','$Login_user_IDvl',
-        '$gst_type','0','0','0','1','$buyer_gsttype','Nil','Nil')");
+        VALUES ('".db_esc($inv_id)."','0','".db_esc($inv_number)."','".db_esc($date)."','".db_esc($inv_year)."','0','0','0',
+        '".db_esc($invuser)."','".db_esc($customer_id)."','".db_esc($Login_user_TYPEvl)."','".db_esc($Login_user_IDvl)."',
+        '".db_esc($gst_type)."','0','0','0','1','".db_esc($buyer_gsttype)."','Nil','Nil')");
 }
 
 // Check TP stock
@@ -91,15 +91,15 @@ $stmtStk->close();
 $available = $stockRow ? (int)$stockRow['closing_qty'] : 0;
 
 if ($available < $qty) {
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=$invuser&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertStockError';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&InvalidStock&&invuser=".urlencode($invuser)."&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertStockError';</script>";
     exit;
 }
 
 // Check duplicate item
 $dupChk = mysqli_fetch_array(mysqli_query($db_conn,
-    "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id='$inv_id' AND pr_id='$pr_id' AND from_user_type='$Login_user_TYPEvl' AND from_user_id='$Login_user_IDvl' AND to_user_type='$invuser' AND to_user_id='$customer_id'"));
+    "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id='".db_esc($inv_id)."' AND pr_id='".db_esc($pr_id)."' AND from_user_type='".db_esc($Login_user_TYPEvl)."' AND from_user_id='".db_esc($Login_user_IDvl)."' AND to_user_type='".db_esc($invuser)."' AND to_user_id='".db_esc($customer_id)."'"));
 if ((int)$dupChk['n'] > 0) {
-    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&ItemAlreadyExists&&invuser=$invuser&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertMessage';</script>";
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&ItemAlreadyExists&&invuser=".urlencode($invuser)."&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertMessage';</script>";
     exit;
 }
 
@@ -108,9 +108,9 @@ mysqli_query($db_conn, "INSERT INTO user_invoice_items
     (inv_id,pr_id,amount,qty,total,to_user_type,to_user_id,from_user_type,from_user_id,
      gst_percentage,gstamount_singlepr,gstamount_total,subtotal,
      discount_percentage,discount_amount,gst_type,hsn,date,rwpoints,buyer_gsttype,rwpoints_sls)
-    VALUES ('$inv_id','$pr_id','$amount','$qty','$total',
-    '$invuser','$customer_id','$Login_user_TYPEvl','$Login_user_IDvl',
-    '$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal',
-    '$discount_percentage','$discount_amount','$gst_type','$hsn','$date','0','$buyer_gsttype','$rwpoints')");
+    VALUES ('".db_esc($inv_id)."','".db_esc($pr_id)."','".db_esc($amount)."','".db_esc($qty)."','".db_esc($total)."',
+    '".db_esc($invuser)."','".db_esc($customer_id)."','".db_esc($Login_user_TYPEvl)."','".db_esc($Login_user_IDvl)."',
+    '".db_esc($gst_percentage)."','".db_esc($gstamount_singlepr)."','".db_esc($gstamount_total)."','".db_esc($subtotal)."',
+    '".db_esc($discount_percentage)."','".db_esc($discount_amount)."','".db_esc($gst_type)."','".db_esc($hsn)."','".db_esc($date)."','0','".db_esc($buyer_gsttype)."','".db_esc($rwpoints)."')");
 
-echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&AddedSuccess&&invuser=$invuser&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&FemiAdded';</script>";
+echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&AddedSuccess&&invuser=".urlencode($invuser)."&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&FemiAdded';</script>";

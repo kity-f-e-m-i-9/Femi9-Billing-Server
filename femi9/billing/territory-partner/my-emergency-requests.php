@@ -83,7 +83,7 @@ $requests = $tpId > 0 ? getTpEmergencyStockRequestsForTp($db_conn, $tpId) : [];
                                     <td><?=htmlspecialchars($r['product_name'], ENT_QUOTES, 'UTF-8');?></td>
                                     <td style="text-align:right;font-weight:600;"><?=number_format($r['requested_qty']);?></td>
                                     <td style="text-align:right;color:#9ca3af;"><?=number_format($r['cp_available_qty']);?></td>
-                                    <td><span class="badge-<?=$r['status'];?>"><?=ucfirst($r['status']);?></span></td>
+                                    <td><span class="badge-<?=htmlspecialchars((string)($r['status']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(ucfirst($r['status'])), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                                     <td class="text-muted" style="font-size:12px;"><?=date('d M Y, h:i A', strtotime($r['created_at']));?></td>
                                 </tr>
                                 <?php endforeach; ?>

@@ -1,4 +1,4 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); require_once("include/PermissionCheck.php"); requirePermission('debit_note'); $canDeleteDebitNoteReturn = hasPermission('debit_note_delete');?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); require_once("include/PermissionCheck.php"); requirePermission('debit_note'); $canDeleteDebitNoteReturn = hasPermission('debit_note_delete');?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -118,8 +118,8 @@ $i= $start_from;
 											
 											//
 											$product_id=$result_product_list['prid'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						//get Godown Details
@@ -130,11 +130,11 @@ $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
                                             
                                                 <tr>
                         <td><?php echo ++$i; ?></td>
-						<td><?php echo $result_Godown["gname"];?></td>
+						<td><?php echo htmlspecialchars((string)($result_Godown["gname"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
-                        <td><?php echo $Result_productDetils["productName"];?></td>
-						<td><?php echo $result_product_list["returnqty"];?></td>
-						<td><?php echo $result_product_list["remarks"];?></td>
+                        <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+						<td><?php echo htmlspecialchars((string)($result_product_list["returnqty"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+						<td><?php echo htmlspecialchars((string)($result_product_list["remarks"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 								<td>
 				    <div class="actions-group">

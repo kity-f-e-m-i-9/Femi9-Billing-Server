@@ -1,16 +1,16 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 error_reporting(0);
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from shop where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from shop where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 				//
 				$shpid=$result_product_list['temp_id'];
 				
 				//last invoice dteails
-				$getlast_invoice="select * from user_invoice where to_user_id='$shpid' order by id desc";
-				$fetch_lstinvoice=mysqli_query($db_conn,$getlast_invoice);
+				$getlast_invoice="select * from user_invoice where to_user_id=? order by id desc";
+				$fetch_lstinvoice=db_q($db_conn,$getlast_invoice,[$shpid]);
 				$result_lastinvoicedetails=mysqli_fetch_array($fetch_lstinvoice);
 				//
 				$inv_number=$result_lastinvoicedetails['inv_number'];
@@ -26,7 +26,7 @@ $select_product_list="select * from shop where id='$get_id'";
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : Shop</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : Shop</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -102,7 +102,7 @@ $select_product_list="select * from shop where id='$get_id'";
 							 <tr>
 							 <td colspan="2">Shop Name</td>
 							 </tr>
-							 <tr><td colspan="2" style="font-size:18px;"><b><?=$result_product_list['name'];?></b><hr/></td></tr>
+							 <tr><td colspan="2" style="font-size:18px;"><b><?=htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></b><hr/></td></tr>
 							 
 							 <?php if($invid!=NULL){?>
 							 <tr>
@@ -132,22 +132,22 @@ $select_product_list="select * from shop where id='$get_id'";
 							 <th>Qty</th>
 							 </tr>
 							 <?php 
-					$select_productCurrentst="select * from shop_current_stock where inv_id='$invid' and shop_id='$shpid' order by id asc";
-					$fetch_productCurrentst=mysqli_query($db_conn,$select_productCurrentst);
+					$select_productCurrentst="select * from shop_current_stock where inv_id=? and shop_id=? order by id asc";
+					$fetch_productCurrentst=db_q($db_conn,$select_productCurrentst,[$invid,$shpid]);
 					while($result_productCurrentst=mysqli_fetch_array($fetch_productCurrentst))
 										{
 											//
 											$prid=$result_productCurrentst['prid'];
 											//
-											$selectprdetails="select * from products where id='$prid'";
-											$fetchprdetails=mysqli_query($db_conn,$selectprdetails);
+											$selectprdetails="select * from products where id=?";
+											$fetchprdetails=db_q($db_conn,$selectprdetails,[$prid]);
 											$resultprdetails=mysqli_fetch_array($fetchprdetails);
 											//
 											$crntstock=$result_productCurrentst['qty'];
 											$crntstock123+=$crntstock;
 										?>
 							  <tr>
-							 <td><?=$resultprdetails['productName'];?></td>
+							 <td><?=htmlspecialchars((string)($resultprdetails['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							 <td align="right"><?=$crntstock;?></td>
 							 </tr>
 										<?php }?>
@@ -169,24 +169,24 @@ $select_product_list="select * from shop where id='$get_id'";
 							 <th>Pantyliner</th>
 							 </tr>
 							 <?php 
-					$select_productCurrentst12="select * from shop_competitor_stock where inv_id='$invid' and shop_id='$shpid' order by id desc";
-					$fetch_productCurrentst12=mysqli_query($db_conn,$select_productCurrentst12);
+					$select_productCurrentst12="select * from shop_competitor_stock where inv_id=? and shop_id=? order by id desc";
+					$fetch_productCurrentst12=db_q($db_conn,$select_productCurrentst12,[$invid,$shpid]);
 					while($result_productCurrentst12=mysqli_fetch_array($fetch_productCurrentst12))
 										{
 											//
 											$prid=$result_productCurrentst12['brandid'];
 											//
-											$selectprdetails12="select * from competitor_brand where id='$prid'";
-											$fetchprdetails12=mysqli_query($db_conn,$selectprdetails12);
+											$selectprdetails12="select * from competitor_brand where id=?";
+											$fetchprdetails12=db_q($db_conn,$selectprdetails12,[$prid]);
 											$resultprdetails12=mysqli_fetch_array($fetchprdetails12);
 											//
 											$crntstock12=$result_productCurrentst12['qty'];
 											$crntstock123cst+=$crntstock12;
 										?>
 							  <tr>
-							 <td><?=$resultprdetails12['brand'];?></td>
+							 <td><?=htmlspecialchars((string)($resultprdetails12['brand']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							 <td align="right"><?=$crntstock12;?></td>
-							 <td><?=$result_productCurrentst12['cst_panty'];?></td>
+							 <td><?=htmlspecialchars((string)($result_productCurrentst12['cst_panty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							 </tr>
 										<?php }?>
 										<tr>

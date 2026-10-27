@@ -1,9 +1,9 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $update_id=$_REQUEST['update_id'];
-	$old_icon=$_REQUEST['old_icon'];
+	$old_icon=safe_old_file_param($_REQUEST['old_icon']);
 	
 	$name=str_replace("'","&#39;",$_REQUEST['name']);
 	
@@ -20,7 +20,7 @@ $update_id=$_REQUEST['update_id'];
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='outlet_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="outlet_icon/";
 	   $insfilename=$insfoldername.$filename;
 		   unlink("".$old_icon."");
@@ -32,8 +32,8 @@ $update_id=$_REQUEST['update_id'];
 	
 	
 	//update process
-	$update_ss="update outlet set user_icon='$insfilename',name='$name',email='$email',mobile_number='$mobile_number',password='$password',username='$mobile_number',address='$address' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update outlet set user_icon=?,name=?,email=?,mobile_number=?,password=?,username=?,address=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,femi_password_hash((string)$password),$mobile_number,$address,$update_id]);
 	
 	echo "<script>window.location='Outlet-manage?updatedSuccess';</script>";
 	

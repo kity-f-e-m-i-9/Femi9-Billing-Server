@@ -94,7 +94,7 @@ $stmt->close();
                         <?php if (empty($rows)): ?>
                         <div class="text-muted" style="font-size:13.5px;">No courier payments in this status.</div>
                         <?php else: foreach ($rows as $r): ?>
-                        <div class="mcp-card" data-id="<?=$r['id']?>">
+                        <div class="mcp-card" data-id="<?=htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false)?>">
                             <div style="flex-shrink:0;">
                                 <a href="../territory-partner/courier_payment_screenshots/<?=htmlspecialchars($r['file_path'])?>" target="_blank">
                                     <img src="../territory-partner/courier_payment_screenshots/<?=htmlspecialchars($r['file_path'])?>" alt="">
@@ -105,8 +105,8 @@ $stmt->close();
                             </div>
                             <div class="info">
                                 <b><?=htmlspecialchars($r['tp_name'])?></b> (<?=htmlspecialchars($r['tp_code'])?>)
-                                <span class="mcp-badge <?=$r['product_type']?>"><?=htmlspecialchars(tpProductTypeLabel($r['product_type']))?></span>
-                                <?php if ($r['po_id']): ?><span class="text-muted" style="font-size:11px;">· PO #<?=$r['po_id']?></span><?php else: ?><span class="text-muted" style="font-size:11px;">· not yet submitted</span><?php endif; ?>
+                                <span class="mcp-badge <?=htmlspecialchars((string)($r['product_type']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars(tpProductTypeLabel($r['product_type']))?></span>
+                                <?php if ($r['po_id']): ?><span class="text-muted" style="font-size:11px;">· PO #<?=htmlspecialchars((string)($r['po_id']), ENT_QUOTES, 'ISO-8859-1', false)?></span><?php else: ?><span class="text-muted" style="font-size:11px;">· not yet submitted</span><?php endif; ?>
                                 <br>
                                 <?=(int)$r['total_boxes']?> box<?=(int)$r['total_boxes']!==1?'es':''?><?php if ($r['total_covers'] > 0): ?> + <?=(int)$r['total_covers']?> cover<?=(int)$r['total_covers']!==1?'s':''?><?php endif; ?>
                                 — Required: ₹<?=number_format($r['required_amount'],2)?>
@@ -117,8 +117,8 @@ $stmt->close();
                             </div>
                             <?php if ($r['status'] === 'pending_review'): ?>
                             <div class="mcp-actions">
-                                <button type="button" class="mcp-approve" onclick="courierApprove(<?=$r['id']?>, <?=$r['detected_amount'] !== null ? $r['detected_amount'] : $r['required_amount']?>)">Approve</button>
-                                <button type="button" class="mcp-reject" onclick="courierReject(<?=$r['id']?>)">Reject</button>
+                                <button type="button" class="mcp-approve" onclick="courierApprove(<?=htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false)?>, <?=$r['detected_amount'] !== null ? $r['detected_amount'] : $r['required_amount']?>)">Approve</button>
+                                <button type="button" class="mcp-reject" onclick="courierReject(<?=htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false)?>)">Reject</button>
                             </div>
                             <?php endif; ?>
                         </div>

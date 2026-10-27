@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 /**
  * Reward Points (Sales) - Super Stockist Login
  * 
@@ -246,7 +246,7 @@ $query_user_sales = "
     FROM user_invoice_items 
     WHERE from_user_type = '$user_type' 
       AND from_user_id = '$user_id' 
-      AND date BETWEEN '$current_from_date' AND '$current_to_date'
+      AND date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."'
 ";
 
 $result_user_sales = mysqli_query($db_conn, $query_user_sales);
@@ -259,7 +259,7 @@ $query_customer_sales = "
     SELECT 
         COALESCE(SUM(subtotal) / 100, 0) AS customer_sales_points
     FROM invoice_items 
-    WHERE date BETWEEN '$current_from_date' AND '$current_to_date' 
+    WHERE date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."' 
       AND user_type = '$user_type' 
       AND user_id = '$user_id'
 ";
@@ -283,7 +283,7 @@ $query_user_returns = "
         FROM user_invoice_items
         WHERE from_user_type = '$user_type'
           AND from_user_id = '$user_id'
-          AND date BETWEEN '$current_from_date' AND '$current_to_date'
+          AND date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."'
     )
     AND r.to_usertype = '$user_type'
     AND r.to_userid = '$user_id'
@@ -308,7 +308,7 @@ if (mysqli_num_rows($table_exists) > 0) {
             FROM invoice_items
             WHERE user_type = '$user_type'
               AND user_id = '$user_id'
-              AND date BETWEEN '$current_from_date' AND '$current_to_date'
+              AND date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."'
         )
         AND r.user_type = '$user_type'
         AND r.user_id = '$user_id'

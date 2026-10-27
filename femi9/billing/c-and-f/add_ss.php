@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $title="Add Stockist";
 $manage_url="manage_ss.php";
@@ -133,7 +133,7 @@ $tempID="".$randum_number."FST".$temp_date."".$temp_time."";?>
 							   $fetch_stcatlist=mysqli_query($db_conn,$select_stcatlist);
 							   while($result_stcatlist=mysqli_fetch_array($fetch_stcatlist))
 							   {?>
-	<option value="<?php echo $result_stcatlist['id'];?>"><?php echo $result_stcatlist['catname'];?> (<?php echo $result_stcatlist['target_amount'];?>)</option>
+	<option value="<?php echo htmlspecialchars((string)($result_stcatlist['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stcatlist['catname']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($result_stcatlist['target_amount']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 							   <?php }?>
 							   </select>
 			<br/>	
@@ -264,11 +264,11 @@ function getXMLHTTP() { //fuction to return the xml http object
   foreach ($exstID as $keyss => $valuess)
    {  
    
-   $select_stateList="select st_name from state where id='$valuess' order by st_name asc";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+   $select_stateList="select st_name from state where id=? order by st_name asc";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$valuess]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   ?>
-	<option value="<?php echo $valuess;?>"><?php echo $result_stateList['st_name'];?></option>
+	<option value="<?php echo $valuess;?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 			<br/>
@@ -310,7 +310,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 <?php $selectCountry="select * from country order by id asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>
@@ -412,11 +412,11 @@ xmlhttp.send();}
 			<label class="form-label">Choose Plan</label>
             <select required="" name="plan_id" class="form-control">
 												<option value="" hidden="">Select</option>
-												<?php $select_plans="select * from plans where cat='$Coupon_category' order by amount asc";
-												$fetch_plans=mysqli_query($db_conn,$select_plans);
+												<?php $select_plans="select * from plans where cat=? order by amount asc";
+												$fetch_plans=db_q($db_conn,$select_plans,[$Coupon_category]);
 												while($result_plans=mysqli_fetch_array($fetch_plans))
 												{?>
-											<option value="<?php echo $result_plans['id'];?>">&#8377; <?php echo $result_plans['amount'];?> / <?php echo $result_plans['valid_months'];?> Days</option>
+											<option value="<?php echo htmlspecialchars((string)($result_plans['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">&#8377; <?php echo htmlspecialchars((string)($result_plans['amount']), ENT_QUOTES, 'ISO-8859-1', false);?> / <?php echo htmlspecialchars((string)($result_plans['valid_months']), ENT_QUOTES, 'ISO-8859-1', false);?> Days</option>
 												<?php } ?>
 												</select>
 												<?php */?>

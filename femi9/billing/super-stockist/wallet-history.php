@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -110,7 +110,7 @@ $tds_percentage=$result_admin_settings2233['tds_percentage'];
 												
 												<!----------------------------------------------------------------->
 												<!--------------------------Popup Open----------------------------->
-												<div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+												<div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
 													
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
@@ -138,8 +138,8 @@ $tempID="".$randum_number."".$temp_date."".$temp_time."";?>
 
                                                             <div class="example-content" style="padding:20px;">												
 <?php
-$selectcoutprofileDetaiils="select acname,acnumber,bankname,ifsc,upinumber, pannumber from users_profile where user_tempid='$Login_user_IDvl' and usertype='$Login_user_TYPEvl'";
-$fetchcountprofileDetails=mysqli_query($db_conn,$selectcoutprofileDetaiils);
+$selectcoutprofileDetaiils="select acname,acnumber,bankname,ifsc,upinumber, pannumber from users_profile where user_tempid=? and usertype=?";
+$fetchcountprofileDetails=db_q($db_conn,$selectcoutprofileDetaiils,[$Login_user_IDvl,$Login_user_TYPEvl]);
 $resultcountprofileDetails=mysqli_fetch_array($fetchcountprofileDetails);
 if(mysqli_num_rows($fetchcountprofileDetails)==1)
 {
@@ -259,8 +259,8 @@ if ($wh_from > $wh_to) { $t = $wh_from; $wh_from = $wh_to; $wh_to = $t; }
 							  <h5 class="todo-menu-title">Credit History</h5>
                                     <ul class="list-unstyled">		
 <?php 
-$select_wallet_History1234="select * from wallet_monthly_sls_report where refer_by_usertype='$Login_user_TYPEvl' and refer_by_userid='$Login_user_IDvl' and DATE(from_date) between '$wh_from' and '$wh_to' order by from_date desc";
-$fetch_wallet_History1234=mysqli_query($db_conn,$select_wallet_History1234);
+$select_wallet_History1234="select * from wallet_monthly_sls_report where refer_by_usertype=? and refer_by_userid=? and DATE(from_date) between ? and ? order by from_date desc";
+$fetch_wallet_History1234=db_q($db_conn,$select_wallet_History1234,[$Login_user_TYPEvl,$Login_user_IDvl,$wh_from,$wh_to]);
 while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 {
 
@@ -290,20 +290,20 @@ $commissionType=$result_wallet_History1234['commission_type'];
 
 <!----Whom did he refferred---->
 <?php if($commissionType=='Refferral'){?>
-<span><b><?php echo ucwords($result_onbaord_user_records_whom['name']);?> </b><span style="font-size:12px !important;">(<?=ucwords($whom_user_type);?>)</span><br/>
-<?php echo $result_onbaord_user_records_whom['mobile_number'];?></span>
+<span><b><?php echo htmlspecialchars((string)(ucwords($result_onbaord_user_records_whom['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> </b><span style="font-size:12px !important;">(<?=ucwords($whom_user_type);?>)</span><br/>
+<?php echo htmlspecialchars((string)($result_onbaord_user_records_whom['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 <?php }?>
 
 <!-------Cashback Remarks------->
 <?php if($commissionType=='Cashback'){?>
-Cashback : <?php echo $result_wallet_History1234['commission_percentage'];?>%<br/>
-<?php echo $result_wallet_History1234['remarks'];?>
+Cashback : <?php echo htmlspecialchars((string)($result_wallet_History1234['commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%<br/>
+<?php echo htmlspecialchars((string)($result_wallet_History1234['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?>
 <?php }?>
 															
 	<?php if($commissionType!='Website Order Commission'){?>
-	<span class="todo-item-subtitle"><?=$result_wallet_History1234['month'];?>, <?=$result_wallet_History1234['year'];?></span>
+	<span class="todo-item-subtitle"><?=htmlspecialchars((string)($result_wallet_History1234['month']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_wallet_History1234['year']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 	<?php }else{?>
-	<span class="todo-item-subtitle">Website Order Commission (OT Sales)<br/><?=$result_wallet_History1234['remarks'];?></span>
+	<span class="todo-item-subtitle">Website Order Commission (OT Sales)<br/><?=htmlspecialchars((string)($result_wallet_History1234['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
 	<?php }?>
 															
                                                         </div>
@@ -325,8 +325,8 @@ Cashback : <?php echo $result_wallet_History1234['commission_percentage'];?>%<br
                                                 <ul class="list-unstyled">
 												
 <?php 
-$select_wallet_History1234="select * from wallet_withdraw where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl' and DATE(date) between '$wh_from' and '$wh_to' order by date desc";
-$fetch_wallet_History1234=mysqli_query($db_conn,$select_wallet_History1234);
+$select_wallet_History1234="select * from wallet_withdraw where user_type=? and user_id=? and DATE(date) between ? and ? order by date desc";
+$fetch_wallet_History1234=db_q($db_conn,$select_wallet_History1234,[$Login_user_TYPEvl,$Login_user_IDvl,$wh_from,$wh_to]);
 while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 {
 ?>

@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('ss');
 include("config.php");
 require_once("include/StockService.php");
 
@@ -67,6 +67,6 @@ if (isset($_REQUEST['inv_id'])) {
     $stmt->execute();
     $stmt->close();
 
-    echo "<script>window.location='user-invoice-add?InvoiceID={$invoice_id_encode}&&DeleteSuccess&&invuser={$invuser}&&ActionRemove&&gid={$gid}&&action={$action}';</script>";
+    echo "<script>window.location='user-invoice-add?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&ActionRemove&&gid={$gid}&&action={$action}';</script>";
 }
 ?>

@@ -117,8 +117,8 @@ $tempid="".$randum_number."INTTRNS/".$temp_date."/".$temp_time."";?>
 <input type="hidden" name="tempid" value="<?=$tempid?>">
 <input type="hidden" name="randumnumber" value="<?=$randumnumber_inv;?>">
 
-<input type="hidden" name="username" value="<?=$_SESSION['LOGIN_USER'];?>">
-<input type="hidden" name="usertype" value="<?=$Result_Log_users_Dtails134['usertype'];?>">
+<input type="hidden" name="username" value="<?=htmlspecialchars((string)($_SESSION['LOGIN_USER']), ENT_QUOTES, 'ISO-8859-1', false);?>">
+<input type="hidden" name="usertype" value="<?=htmlspecialchars((string)($Result_Log_users_Dtails134['usertype']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
                                         <div class="example-container">
                                         <div class="example-content">
@@ -184,7 +184,7 @@ xmlhttp.send();}
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+						  <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>
@@ -197,7 +197,7 @@ xmlhttp.send();}
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+						  <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>
@@ -349,7 +349,7 @@ function deleteRow(tableID) {
 										while($result_product_list12=mysqli_fetch_array($fetch_product_list12))
 										{
 											?>
-<option value="<?=$result_product_list12['id'];?>" data-gst="<?=htmlspecialchars($result_product_list12['gst']);?>" data-gst-type="<?=htmlspecialchars($result_product_list12['gst_type'] ?: 'exclusive');?>"><?=$result_product_list12['productName'];?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list12['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" data-gst="<?=htmlspecialchars($result_product_list12['gst']);?>" data-gst-type="<?=htmlspecialchars($result_product_list12['gst_type'] ?: 'exclusive');?>"><?=htmlspecialchars((string)($result_product_list12['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 										<?php }?>
 </select>
 						 <div class="gst-hint" style="font-size:12px;color:#6c757d;margin-top:4px;"></div>

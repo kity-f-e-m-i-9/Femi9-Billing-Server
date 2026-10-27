@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 include("config.php");
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");

@@ -115,7 +115,7 @@ if(isset($_REQUEST['export_excel']))
 								<?php if(isset($_REQUEST['updatedSuccess'])){?><div class="alert alert-info">Changes saved success.</div><?php }?>
 								<?php if(isset($_REQUEST['deletedDone'])){?><div class="alert alert-warning">Deleted ! one input stock details deleted success.</div><?php }?>
 
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
     <div class="overviewcontainar">
         <div id="searchleftcont">
             <label class="form-label">From Date</label>

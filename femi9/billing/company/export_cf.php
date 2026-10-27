@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 
@@ -45,7 +45,7 @@ $ex=explode("#",$data);
   foreach ($ex as $key => $value)
    {  
     
-$select_distict="select st_name from state where id='$value'";
+$select_distict="select st_name from state where id='".db_esc($value)."'";
 	$fetch_district=mysqli_query($db_conn,$select_distict);
 $result_district=mysqli_fetch_array($fetch_district);
 		

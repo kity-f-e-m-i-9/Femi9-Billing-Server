@@ -264,7 +264,7 @@ $i = 0;
 <script src="../../assets/js/custom.js"></script>
 <script src="../../assets/js/pages/datatables.js"></script>
 <script>
-var CSRF_TOKEN = '<?php echo $_SESSION['csrf_token']; ?>';
+var CSRF_TOKEN = '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>';
 
 $(document).on('click', '.toggle-status-btn', function () {
     var $btn      = $(this);

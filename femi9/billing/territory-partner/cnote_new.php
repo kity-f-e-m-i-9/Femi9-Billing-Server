@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 include("return-validation-functions.php");
@@ -127,14 +127,14 @@ if ($getinvuser === 'customer') {
                 $items_r = mysqli_query($db_conn, $items_q);
                 while ($il = mysqli_fetch_array($items_r)) {
                     $pid = $il['pr_id'];
-                    $pr  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT productName FROM products WHERE id='$pid' LIMIT 1"));
+                    $pr  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT productName FROM products WHERE id='".db_esc($pid)."' LIMIT 1"));
                     $av  = getReturnAvailability($db_conn, $invid_decode, $pid, $fromusertype, $get_returnid);
                 ?>
                 <tr>
                     <td><?php echo htmlspecialchars($pr['productName']); ?></td>
-                    <td><span class="qty-badge qty-original"><?php echo $av['original_qty']; ?></span></td>
-                    <td><?php echo $av['returned_qty'] > 0 ? "<span class='qty-badge qty-returned'>{$av['returned_qty']}</span>" : '<span style="color:#999;">-</span>'; ?></td>
-                    <td><?php echo $av['available_qty'] > 0 ? "<span class='qty-badge qty-available'>{$av['available_qty']}</span>" : "<span class='qty-badge qty-none'>0</span>"; ?></td>
+                    <td><span class="qty-badge qty-original"><?php echo htmlspecialchars((string)($av['original_qty']), ENT_QUOTES, 'UTF-8', false); ?></span></td>
+                    <td><?php echo $av['returned_qty'] > 0 ? "<span class='qty-badge qty-returned'>".htmlspecialchars((string)($av['returned_qty']), ENT_QUOTES, 'ISO-8859-1', false)."</span>" : '<span style="color:#999;">-</span>'; ?></td>
+                    <td><?php echo $av['available_qty'] > 0 ? "<span class='qty-badge qty-available'>".htmlspecialchars((string)($av['available_qty']), ENT_QUOTES, 'ISO-8859-1', false)."</span>" : "<span class='qty-badge qty-none'>0</span>"; ?></td>
                 </tr>
                 <?php } ?>
                 </tbody>
@@ -171,16 +171,16 @@ if ($getinvuser === 'customer') {
         $drop_r = mysqli_query($db_conn, $drop_q);
         while ($dl = mysqli_fetch_array($drop_r)) {
             $dpid = $dl['pr_id'];
-            $dpr  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='$dpid' LIMIT 1"));
+            $dpr  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='".db_esc($dpid)."' LIMIT 1"));
             $dav  = getReturnAvailability($db_conn, $invid_decode, $dpid, $fromusertype, $get_returnid);
             $dis  = $dav['available_qty'] <= 0 ? 'disabled' : '';
             $lbl  = $dav['available_qty'] > 0 ? " (Available: {$dav['available_qty']})" : " (Fully Returned)";
         ?>
-        <option value="<?php echo $dpr['id']; ?>"
-                data-available="<?php echo $dav['available_qty']; ?>"
-                data-original="<?php echo $dav['original_qty']; ?>"
-                data-returned="<?php echo $dav['returned_qty']; ?>"
-                <?php echo $dis; ?>>
+        <option value="<?php echo htmlspecialchars((string)($dpr['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"
+                data-available="<?php echo htmlspecialchars((string)($dav['available_qty']), ENT_QUOTES, 'UTF-8', false); ?>"
+                data-original="<?php echo htmlspecialchars((string)($dav['original_qty']), ENT_QUOTES, 'UTF-8', false); ?>"
+                data-returned="<?php echo htmlspecialchars((string)($dav['returned_qty']), ENT_QUOTES, 'UTF-8', false); ?>"
+                <?php echo htmlspecialchars((string)($dis), ENT_QUOTES, 'UTF-8', false); ?>>
             <?php echo htmlspecialchars($dpr['productName']) . $lbl; ?>
         </option>
         <?php } ?>
@@ -237,8 +237,8 @@ function updateProductInfo() {
 
 <?php if (!empty($get_returnid)): ?>
 <?php
-$ret_master = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_return_stock WHERE returnid='$get_returnid' LIMIT 1"));
-$ret_items  = mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE returnid='$get_returnid' ORDER BY id DESC");
+$ret_master = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_return_stock WHERE returnid='".db_esc($get_returnid)."' LIMIT 1"));
+$ret_items  = mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE returnid='".db_esc($get_returnid)."' ORDER BY id DESC");
 $count_ri   = mysqli_num_rows($ret_items);
 $TotalAMount123 = 0; $rd = 0;
 ?>
@@ -255,14 +255,14 @@ $TotalAMount123 = 0; $rd = 0;
     ?>
     <tr>
         <th><?php echo ++$rd; ?></th>
-        <td><?php echo $pr2['productName']; ?></td>
-        <td><?php echo $ri['qty']; ?></td>
+        <td><?php echo htmlspecialchars((string)($pr2['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+        <td><?php echo htmlspecialchars((string)($ri['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
         <td>&#8377;<?php echo inr_format($ri['amount'], 2); ?></td>
         <td><?php echo inr_format($ri['subtotal'], 2); ?></td>
-        <td><?php echo inr_format($ri['gstamount_total'], 2); ?> (<?php echo $ri['gst_percentage']; ?>%)</td>
+        <td><?php echo inr_format($ri['gstamount_total'], 2); ?> (<?php echo htmlspecialchars((string)($ri['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
         <td><?php echo inr_format($ri['total'], 2); ?></td>
         <td>
-            <a href="cnote_delete.php?returnid=<?php echo $_REQUEST['returnid']; ?>&rowid=<?php echo $ItemRowid; ?>&InvoiceID=<?php echo $InvoiceID; ?>&redirurl=cnote_new"
+            <a href="cnote_delete.php?returnid=<?php echo htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false); ?>&rowid=<?php echo $ItemRowid; ?>&InvoiceID=<?php echo htmlspecialchars((string)($InvoiceID), ENT_QUOTES, 'UTF-8', false); ?>&redirurl=cnote_new"
                onclick="return confirm('Remove this item?');">
                 <span class="badge bg-danger">Remove</span>
             </a>
@@ -279,7 +279,7 @@ $TotalAMount123 = 0; $rd = 0;
 <script>function totalamount2(){var s=document.getElementById('subtotal2').value;var d=document.getElementById('discount2').value;document.getElementById('outputTotal2').value=(s*1)-(d*1);}</script>
 <div class="col-lg-3"><div class="invoice-info">
     <form action="cnote_finish.php" method="post" enctype="multipart/form-data" onsubmit="return confirm('Complete this return?');">
-        <input type="hidden" name="returnid" value="<?php echo $_REQUEST['returnid']; ?>">
+        <input type="hidden" name="returnid" value="<?php echo htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false); ?>">
         <input type="hidden" name="SubTotal" value="<?php echo $TotalAMount123; ?>">
         <p class="bold">Subtotal <span><input type="number" value="<?php echo $TotalAMount123; ?>" id="subtotal2" disabled></span></p><br/>
         <p class="bold">Discount <span>

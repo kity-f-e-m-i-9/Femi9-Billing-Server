@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 /**
  * Load Price - SUPER STOCKIST VERSION
  * Returns product price based on customer type
@@ -21,8 +21,8 @@ if (empty($prid)) {
 }
 
 // Get product details
-$select_ProductsPrice = "select * from products where id='$prid'";
-$fetch_ProductsPrice = mysqli_query($db_conn, $select_ProductsPrice);
+$select_ProductsPrice = "select * from products where id=?";
+$fetch_ProductsPrice = db_q($db_conn,$select_ProductsPrice,[$prid]);
 $Result_ProductsPrice = mysqli_fetch_array($fetch_ProductsPrice);
 
 if (!$Result_ProductsPrice) {

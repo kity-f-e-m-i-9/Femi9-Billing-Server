@@ -1,4 +1,4 @@
-<?php include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("include/db-connect.php");
 include("config.php");
 
 $title="Payment Success";
@@ -112,9 +112,9 @@ if ($responseData["status"] === "COMPLETED") {
 	if($utr!=NULL)
 	{
 	//UPDATE PAYMENT STATUS
-	//$update_records="update digit_jan20 set status='received',utr='$utr' where order_id='$get_order_id'";
-	$update_records = "UPDATE stockiest SET amount_status='paid',account_status='active',ref_number='$utr' WHERE temp_id='$orderId'";
-	mysqli_query($db_conn,$update_records);
+	//$update_records="update digit_jan20 set status='received',utr='".db_esc($utr)."' where order_id='".db_esc($get_order_id)."'";
+	$update_records = "UPDATE stockiest SET amount_status='paid',account_status='active',ref_number=? WHERE temp_id=?";
+	db_q($db_conn,$update_records,[$utr,$orderId]);
 	}
 	
 		

@@ -1,27 +1,28 @@
-<?php include("include/db-connect.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['cus','shop','ss']); include("include/db-connect.php");
 include("config.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
+$_REQUEST['redirurl']=preg_match('/^[A-Za-z0-9_\-\.\/]+$/',(string)($_REQUEST['redirurl']??'')) ? $_REQUEST['redirurl'] : 'dashboard';
 
 if (isset($_REQUEST['updateInvoiceNum'])) {
 	
-	$invuser=$_POST["invuser"];
-	$InvoiceID=base64_decode($_POST["InvoiceID"]);
-	$action=$_POST["action"];
-	$gid=$_POST["gid"];
+	$invuser=urlencode((string)$_POST["invuser"]);
+	$InvoiceID=mysqli_real_escape_string($db_conn,base64_decode($_POST["InvoiceID"]));
+	$action=urlencode((string)$_POST["action"]);
+	$gid=urlencode((string)$_POST["gid"]);
 	
 	$invnumber = RemoveSpecialChar($_POST["invnumber"]);
-	$invnumber=str_replace("'","",$invnumber);
+	$invnumber=mysqli_real_escape_string($db_conn,str_replace("'","",$invnumber));
 	
 	if($_REQUEST["tblenme"]==1)
 	{
 		$tablename="user_invoice";
-$Select_Count_Invoice="select * from user_invoice where inv_number='$invnumber' and from_user_type='$Login_user_TYPEvl'";
+$Select_Count_Invoice="select * from user_invoice where inv_number='$invnumber' and from_user_type='".db_esc($Login_user_TYPEvl)."'";
 		
 	}else{ 
 	$tablename="invoice";
-$Select_Count_Invoice="select * from invoice where inv_number='$invnumber' and user_type='$Login_user_TYPEvl'";
+$Select_Count_Invoice="select * from invoice where inv_number='$invnumber' and user_type='".db_esc($Login_user_TYPEvl)."'";
 	}
 	
 $Fetch_Count_Invoice=mysqli_query($db_conn,$Select_Count_Invoice);
@@ -31,12 +32,12 @@ if($Result_Count_Invoice==0){
 	$update_DLNote="update ".$tablename." set inv_number='$invnumber' where inv_id='$InvoiceID'";
 	mysqli_query($db_conn,$update_DLNote);
 	
-	echo "<script>window.location='".$_REQUEST['redirurl']."?invuser=$invuser&&InvoiceID=".$_POST["InvoiceID"]."&&action=$action&&gid=$gid&&InvoiceUpdatedSuccess';</script>";
+	echo "<script>window.location='".htmlspecialchars((string)($_REQUEST['redirurl']), ENT_QUOTES, 'ISO-8859-1', false)."?invuser=$invuser&&InvoiceID=".urlencode((string)$_POST["InvoiceID"])."&&action=$action&&gid=$gid&&InvoiceUpdatedSuccess';</script>";
 	
 }
 else{
 	
-	echo "<script>window.location='".$_REQUEST['redirurl']."?invuser=$invuser&&InvoiceID=".$_POST["InvoiceID"]."&&action=$action&&gid=$gid&&invoicealready';</script>";
+	echo "<script>window.location='".htmlspecialchars((string)($_REQUEST['redirurl']), ENT_QUOTES, 'ISO-8859-1', false)."?invuser=$invuser&&InvoiceID=".urlencode((string)$_POST["InvoiceID"])."&&action=$action&&gid=$gid&&invoicealready';</script>";
 }
 	
 }

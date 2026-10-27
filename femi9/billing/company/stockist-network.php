@@ -1,10 +1,10 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $title="Users Network";
 $superstockistid=$_REQUEST['ssid'];
 $get_state_id=$_REQUEST['stataeid'];
 //
-$select_stateList="select * from `state` where id='$get_state_id'";
-							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
+$select_stateList="select * from `state` where id=?";
+							   $fetch_staeList=db_q($db_conn,$select_stateList,[$get_state_id]);
 							   $result_stateList=mysqli_fetch_array($fetch_staeList);
 							   $state_name=$result_stateList['st_name'];
 ?>
@@ -86,7 +86,7 @@ $select_stateList="select * from `state` where id='$get_state_id'";
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
-								<a href="users-network2?state_id=<?=$get_state_id;?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
+								<a href="users-network2?state_id=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>" id="linkbackvl">&#8630;&nbsp;Go Back</a>
                                     <h1>
 									<table class="headertble">
 									<tr>
@@ -109,20 +109,20 @@ $select_stateList="select * from `state` where id='$get_state_id'";
 <th>District</th>
 </thead>
 <?php 
-$select_product_list12="select * from super_stockiest where temp_id='$superstockistid'";
-$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
+$select_product_list12="select * from super_stockiest where temp_id=?";
+$fetch_product_list12=db_q($db_conn,$select_product_list12,[$superstockistid]);
 while($result_product_list12=mysqli_fetch_array($fetch_product_list12))
 {
 //
 $district_id12=$result_product_list12['district_id'];
-$select_distict12="select * from district where id='$district_id12'";
-$fetch_district12=mysqli_query($db_conn,$select_distict12);
+$select_distict12="select * from district where id=?";
+$fetch_district12=db_q($db_conn,$select_distict12,[$district_id12]);
 $result_district12=mysqli_fetch_array($fetch_district12);
 ?>
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list12["name"]);?></td>
-<td><?php echo strtoupper($result_district12['dist_name']);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list12["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_district12['dist_name'])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 </tr>
 </tbody>
 <?php }?>		
@@ -139,33 +139,33 @@ $result_district12=mysqli_fetch_array($fetch_district12);
 </thead>
 
 <?php 
-$select_product_list="select * from stockiest where ss_id='$superstockistid'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from stockiest where ss_id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$superstockistid]);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
 									
 //
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 //
 $taluk_id=$result_product_list['taluk_id'];
-$select_Taluks12="select * from taluk where id='$taluk_id'";
-	$fetch_Taluks12=mysqli_query($db_conn,$select_Taluks12);
+$select_Taluks12="select * from taluk where id=?";
+	$fetch_Taluks12=db_q($db_conn,$select_Taluks12,[$taluk_id]);
 	$result_Taluks12=mysqli_fetch_array($fetch_Taluks12);
 $taluk_name=$result_Taluks12['taluk'];
 ?>
 
 <tbody>
 <tr>
-<td><?php echo strtoupper($result_product_list["name"]);?></td>
+<td><?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td><?php echo strtoupper($district_name);?></td>
 <td><?php echo strtoupper($taluk_name);?></td>
 </tr>
-<tr><td colspan="3"><a href="distributor-network?superid=<?=$superstockistid;?>&&stockistid=<?=$result_product_list['temp_id'];?>&&stataeid=<?=$get_state_id;?>" title="<?php echo strtoupper($result_product_list["name"]);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
+<tr><td colspan="3"><a href="distributor-network?superid=<?=htmlspecialchars((string)($superstockistid), ENT_QUOTES, 'UTF-8', false);?>&&stockistid=<?=htmlspecialchars((string)($result_product_list['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>&&stataeid=<?=htmlspecialchars((string)($get_state_id), ENT_QUOTES, 'UTF-8', false);?>" title="<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>"><div class="bottom-arrow"></div></a><br/></td></tr>
 </tbody>
 
 

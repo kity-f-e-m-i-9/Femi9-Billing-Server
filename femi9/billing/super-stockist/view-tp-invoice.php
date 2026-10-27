@@ -181,7 +181,7 @@ $stmt2->close();
                     <div class="row mb-3">
                         <div class="col">
                             <a href="manage-tp-invoices" class="btn btn-secondary"><i class="material-icons" style="font-size:16px;vertical-align:middle;">arrow_back</i> Back to List</a>
-                            <a href="tp-invoice-print?id=<?php echo $enc_id; ?>" class="btn btn-outline-primary ms-2" target="_blank"><i class="material-icons" style="font-size:16px;vertical-align:middle;">print</i> Print</a>
+                            <a href="tp-invoice-print?id=<?php echo htmlspecialchars((string)($enc_id), ENT_QUOTES, 'UTF-8', false); ?>" class="btn btn-outline-primary ms-2" target="_blank"><i class="material-icons" style="font-size:16px;vertical-align:middle;">print</i> Print</a>
                         </div>
                     </div>
 

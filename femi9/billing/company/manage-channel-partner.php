@@ -8,8 +8,7 @@ require_once __DIR__ . '/../shared/EncryptionService.php';
 $_enc = new EncryptionService();
 function decryptPassword($enc, $hash) {
     if (!$hash) return '';
-    if (password_get_info($hash)['algo']) return null; // bcrypt — cannot reverse
-    try { return $enc->decrypt($hash); } catch (Exception $e) { return $hash; }
+    return null; // passwords are one-way hashed / never displayed (use Reset password)
 }
 
 if (empty($_SESSION['csrf_token'])) {
@@ -327,7 +326,7 @@ $i = 0;
 <script src="../../assets/js/pages/datatables.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-var CSRF_TOKEN = '<?php echo $_SESSION['csrf_token']; ?>';
+var CSRF_TOKEN = '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>';
 
 $(document).on('click', '.toggle-status-btn', function () {
     var $btn      = $(this);

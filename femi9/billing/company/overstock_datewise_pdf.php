@@ -238,14 +238,14 @@ $renderPdfMovementTable = function($thisDate, $idsSqlForLeaf, $warehouseCondForB
 	);
 ?>
                        <tr>
-                        <td><?php echo $Result_productDetils["productName"];?></td>
+                        <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 						<td align="right"><?php echo $filterByGodown ? $openingStock : '—'; ?></td>
-						<td align="right"><?php echo $m['input_qty'];?></td>
-						<td align="right"><?php echo $m['total_sales'];?></td>
-						<td align="right"><?php echo $m['dfd_qty'];?></td>
-						<td align="right"><?php echo $m['total_sales_return'];?></td>
-						<td align="right"><?php echo $m['internal_transfer'];?><?php if (!empty($internalTransferLines)): ?><br><span style="font-size:9px;color:#666;font-weight:normal;"><?php echo nl2br(htmlspecialchars(implode("\n", $internalTransferLines), ENT_QUOTES, 'UTF-8')); ?></span><?php endif; ?></td>
-						<td align="right"><?php echo $m['movement_to_cp'];?><?php if (!empty($cpMovementLines)): ?><br><span style="font-size:9px;color:#666;font-weight:normal;"><?php echo nl2br(htmlspecialchars(implode("\n", $cpMovementLines), ENT_QUOTES, 'UTF-8')); ?></span><?php endif; ?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($m['input_qty']), ENT_QUOTES, 'UTF-8', false);?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($m['total_sales']), ENT_QUOTES, 'UTF-8', false);?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($m['dfd_qty']), ENT_QUOTES, 'UTF-8', false);?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($m['total_sales_return']), ENT_QUOTES, 'UTF-8', false);?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($m['internal_transfer']), ENT_QUOTES, 'UTF-8', false);?><?php if (!empty($internalTransferLines)): ?><br><span style="font-size:9px;color:#666;font-weight:normal;"><?php echo nl2br(htmlspecialchars(implode("\n", $internalTransferLines), ENT_QUOTES, 'UTF-8')); ?></span><?php endif; ?></td>
+						<td align="right"><?php echo htmlspecialchars((string)($m['movement_to_cp']), ENT_QUOTES, 'UTF-8', false);?><?php if (!empty($cpMovementLines)): ?><br><span style="font-size:9px;color:#666;font-weight:normal;"><?php echo nl2br(htmlspecialchars(implode("\n", $cpMovementLines), ENT_QUOTES, 'UTF-8')); ?></span><?php endif; ?></td>
 						<td align="right"><b><?php echo $filterByGodown ? $closingStock : '—'; ?></b></td>
                         </tr>
 						<?php endforeach; ?>

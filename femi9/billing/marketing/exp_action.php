@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -18,8 +18,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	$remarks=RemoveSpecialChar($remarks);
 	
 	
-	$select_count_dist="select count(*) as numShop from ms_exp where tempid='$tempid'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+	$select_count_dist="select count(*) as numShop from ms_exp where tempid=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$tempid]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numShop']==0)
 	{
@@ -34,15 +34,15 @@ $rand_isd_AADHAR=bin2hex(random_bytes(32));
 $filename_bill="".$DATETIME_AADHAR."".$rand_isd_AADHAR.".".$file_extension_AADHAR."";
 $uploaddir_AADHAR='bill_copy_photos/';
 $uploadfile_AADHAR=$uploaddir_AADHAR.$filename_bill;
-move_uploaded_file($_FILES['photos']['tmp_name'],$uploadfile_AADHAR);
+safe_move_uploaded_file($_FILES['photos']['tmp_name'],$uploadfile_AADHAR);
 }else{
 	$filename_bill="";
 }
 	
 	
         $sql="insert into ms_exp (tempid,ms_id,date,amount,remarks,photos) values 
-		('$tempid','$ms_id','$date','$amount','$remarks','$filename_bill')";
-		mysqli_query($db_conn,$sql);
+		(?,?,?,?,?,?)";
+		db_q($db_conn,$sql,[$tempid,$ms_id,$date,$amount,$remarks,$filename_bill]);
 		
 		echo "<script>window.location='".$viewurl."';</script>";
 

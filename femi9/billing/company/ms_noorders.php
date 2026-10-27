@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0); require_once("include/PermissionCheck.php"); requirePermission('ms');?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0); require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -70,8 +70,8 @@
 						
 						$se_msid=$_REQUEST['se_msid'];
 						//
-						$select_msDetails12="select * from marketing_staff where id='$se_msid'";
-$fetch_msDetails12=mysqli_query($db_conn,$select_msDetails12);
+						$select_msDetails12="select * from marketing_staff where id=?";
+$fetch_msDetails12=db_q($db_conn,$select_msDetails12,[$se_msid]);
 $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 						?>
 						
@@ -80,7 +80,7 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 									<tr>
 									<td>Marketing Staff > No Orders</td>
 									<td>
-									<a href="ms_orders_pdf2?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=$se_msid;?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
+									<a href="ms_orders_pdf2?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
 									</td>
 									</tr>
 									</table>
@@ -90,7 +90,7 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
                         </div>
 						
 						
-						<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+						<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -107,14 +107,14 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 <?php if($se_msid==NULL){?>
 <option value="" hidden="">Select</option>
 <?php }else{?>
-<option value="<?=$se_msid;?>" hidden=""><?=strtoupper($result_msDetails12['ms_name']);?>, <?=$result_msDetails12['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=htmlspecialchars((string)(strtoupper($result_msDetails12['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetails12['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 <?php $select_msDetailsOPT="select * from marketing_staff order by ms_name asc";
 $fetch_msDetailsOPT=mysqli_query($db_conn,$select_msDetailsOPT);
 while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 {
 ?>
-<option value="<?=$result_msDetailsOPT['id'];?>"><?=strtoupper($result_msDetailsOPT['ms_name']);?>, <?=$result_msDetailsOPT['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($result_msDetailsOPT['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_msDetailsOPT['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetailsOPT['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 </div>
@@ -168,42 +168,42 @@ $select_product_list="select * from ms_orders where new_order='no' order by id d
 }
 if($from_date!=NULL && $se_msid==NULL)
 {
-$select_product_list="select * from ms_orders where new_order='no' and order_date between '$from_date' and '$to_date' order by id desc";
+$select_product_list="select * from ms_orders where new_order='no' and order_date between '".db_esc($from_date)."' and '".db_esc($to_date)."' order by id desc";
 }
 if($from_date!=NULL && $se_msid!=NULL)
 {
-$select_product_list="select * from ms_orders where new_order='no' and order_date between '$from_date' and '$to_date' and ms_id='$se_msid' order by id desc";
+$select_product_list="select * from ms_orders where new_order='no' and order_date between ? and ? and ms_id=? order by id desc";
 }
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date,$se_msid]);
 while($result_product_list12=mysqli_fetch_array($fetch_product_list))
 {						
 
 
 //shop category
 $shop_id=$result_product_list12['shop_id'];
-$select_shopcatt="select * from ms_shop where id='$shop_id'";
-$fetch_shopcatt=mysqli_query($db_conn,$select_shopcatt);
+$select_shopcatt="select * from ms_shop where id=?";
+$fetch_shopcatt=db_q($db_conn,$select_shopcatt,[$shop_id]);
 $result_shopcatt=mysqli_fetch_array($fetch_shopcatt);
 
 //marketing staff details
 $ms_id=$result_product_list12['ms_id'];
-$select_msDetails="select * from marketing_staff where id='$ms_id'";
-$fetch_msDetails=mysqli_query($db_conn,$select_msDetails);
+$select_msDetails="select * from marketing_staff where id=?";
+$fetch_msDetails=db_q($db_conn,$select_msDetails,[$ms_id]);
 $result_msDetails=mysqli_fetch_array($fetch_msDetails);
 ?>
                                             
                                                <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_msDetails['ms_name'];?><br/>
-					<?=$result_msDetails['ms_mobile'];?>
+					<td><?=htmlspecialchars((string)($result_msDetails['ms_name']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?=htmlspecialchars((string)($result_msDetails['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</td>
-					<td><?=$result_shopcatt['name'];?></td>
-					<td><?=$result_shopcatt['mobile_number'];?></td>
-					<td><?=ucwords($result_shopcatt["address"]);?></td>
+					<td><?=htmlspecialchars((string)($result_shopcatt['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_shopcatt['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_shopcatt["address"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td><?=date("d/m/Y",strtotime($result_product_list12["order_date"]));?></td>
-					<td><?=$result_product_list12["noorder_reason"];?></td>
-					<td><?=$result_product_list12["marketing_tool"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list12["noorder_reason"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_product_list12["marketing_tool"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 	
                                                 </tr>

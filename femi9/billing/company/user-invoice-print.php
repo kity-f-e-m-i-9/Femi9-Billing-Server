@@ -1,11 +1,11 @@
-<?php include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/GodownAccess.php"); date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
 $Invoice_ID=$_REQUEST['invoiceid'];
 $Invoice_ID=base64_decode($Invoice_ID);
 
-$select_Invoice_Details="select * from user_invoice where inv_id='$Invoice_ID'";
-$fetch_Invoice_Details=mysqli_query($db_conn,$select_Invoice_Details);
+$select_Invoice_Details="select * from user_invoice where inv_id=?";
+$fetch_Invoice_Details=db_q($db_conn,$select_Invoice_Details,[$Invoice_ID]);
 $result_Invoice_Details=mysqli_fetch_array($fetch_Invoice_Details);
 // Needed early (before the item table) as well as in the GST summary
 // section further down, so it's pulled up here rather than declared once
@@ -14,8 +14,8 @@ $gsttype=$result_Invoice_Details['gst_type'];
 
 // Also needed early for the Tax Invoice / Bill of Supply heading below —
 // same query the GST summary section further down reuses via $totalgstamount.
-$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id='$Invoice_ID'";
-$fetch_sum_gstamount=mysqli_query($db_conn,$select_sum_gstamount);
+$select_sum_gstamount="select sum(gstamount_total) from user_invoice_items where inv_id=?";
+$fetch_sum_gstamount=db_q($db_conn,$select_sum_gstamount,[$Invoice_ID]);
 $result_sum_gstamount=mysqli_fetch_array($fetch_sum_gstamount);
 $totalgstamount=$result_sum_gstamount[0];
 $invoice_heading = $totalgstamount > 0 ? 'Tax Invoice' : 'Bill of Supply';
@@ -71,22 +71,22 @@ $result_Customer_Details=mysqli_fetch_array($fetch_Customer_Details);
 
 //state details
 $state_id=$result_Customer_Details['state_id'];
-$select_state_dtails="select * from state where id='$state_id'";
-$fetch_state_dtails=mysqli_query($db_conn,$select_state_dtails);
+$select_state_dtails="select * from state where id=?";
+$fetch_state_dtails=db_q($db_conn,$select_state_dtails,[$state_id]);
 $result_state_dtails=mysqli_fetch_array($fetch_state_dtails);
 $state_name=$result_state_dtails['st_name'];
 
 //district details
 $district_id=$result_Customer_Details['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 //Taluk details
 $taluk_id=$result_Customer_Details['taluk_id'];
-$select_taluk="select * from taluk where id='$taluk_id'";
-$fetch_taluk=mysqli_query($db_conn,$select_taluk);
+$select_taluk="select * from taluk where id=?";
+$fetch_taluk=db_q($db_conn,$select_taluk,[$taluk_id]);
 $result_taluk=mysqli_fetch_array($fetch_taluk);
 $taluk_name =	$result_taluk['taluk'];
 
@@ -181,8 +181,8 @@ $Currency_Name="INR";
 else{
 $get_ccode=base64_decode($_REQUEST['crcode']);
 //
-$select_currency223="select * from country where id='$get_ccode'";
-$fetch_currency223=mysqli_query($db_conn,$select_currency223);
+$select_currency223="select * from country where id=?";
+$fetch_currency223=db_q($db_conn,$select_currency223,[$get_ccode]);
 $result_currency223=mysqli_fetch_array($fetch_currency223);
 //
 $Currency_symbol="&#".$result_currency223['currency_ascii_code'].";";
@@ -196,7 +196,7 @@ $Currency_Name=$result_currency223['currency_name'];
 			<?php if($get_ccode==NULL){?>
 			<option value="" hidden>Currency</option>
 <?php }else{?>
-<option hidden><?=ucwords($result_currency223['c_name']);?> - <?=ucwords($result_currency223['currency_name']);?></option>
+<option hidden><?=htmlspecialchars((string)(ucwords($result_currency223['c_name'])), ENT_QUOTES, 'ISO-8859-1', false);?> - <?=htmlspecialchars((string)(ucwords($result_currency223['currency_name'])), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 			<option value="Default">Default</option>
 			<?php $select_currency="select * from country where currency_name!='' order by c_name asc";
@@ -204,7 +204,7 @@ $fetch_currency=mysqli_query($db_conn,$select_currency);
 while($result_currency=mysqli_fetch_array($fetch_currency))
 {
 			?>
-			<option value="<?=base64_encode($result_currency['id']);?>"><?=ucwords($result_currency['c_name']);?> - <?=ucwords($result_currency['currency_name']);?></option>
+			<option value="<?=base64_encode($result_currency['id']);?>"><?=htmlspecialchars((string)(ucwords($result_currency['c_name'])), ENT_QUOTES, 'ISO-8859-1', false);?> - <?=htmlspecialchars((string)(ucwords($result_currency['currency_name'])), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 			</select>
 			</div>
@@ -213,7 +213,7 @@ while($result_currency=mysqli_fetch_array($fetch_currency))
     document.getElementById("currencySelect").addEventListener("change", function() {
         let selectedValue = this.value;
         if (selectedValue) {
-            window.location.href = "user-invoice-print?invoiceid=<?=$_REQUEST['invoiceid'] ?>&crcode=" + selectedValue;
+            window.location.href = "user-invoice-print?invoiceid=<?=htmlspecialchars((string)($_REQUEST['invoiceid']), ENT_QUOTES, 'UTF-8', false) ?>&crcode=" + selectedValue;
         }
     });
 </script>
@@ -301,18 +301,18 @@ $result_Godown=mysqli_fetch_array($fetch_Godown);
 <tr valign="top">
 <td>
 <?php if($result_Godown['logo']!=NULL){?>
-<img src="<?=$result_Godown['logo'];?>" style="width:150px;margin-right:5px;"/>
+<img src="<?=htmlspecialchars((string)($result_Godown['logo']), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;margin-right:5px;"/>
 <?php }?>
 </td>
 
 <td valign="top">
-<span id="cmpname"><?=$result_Godown['gname'];?></span><br/>
-<?=$result_Godown['address_line1'];?><br/>
-<?=$result_Godown['address_line2'];?><br/>
-<b>GSTIN/UIN :</b> <?=$result_Godown['gstin'];?><br/>
-<b>State Name</b> : <?=$result_Godown['state'];?> <b>Code</b> : <?=$result_Godown['state_code'];?><br/>
-<b>Contact</b> : <?=$result_Godown['contact'];?><br/>
-<b>Email</b> : <?=$result_Godown['email'];?>
+<span id="cmpname"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></span><br/>
+<?=htmlspecialchars((string)($result_Godown['address_line1']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<?=htmlspecialchars((string)($result_Godown['address_line2']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<b>GSTIN/UIN :</b> <?=htmlspecialchars((string)($result_Godown['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<b>State Name</b> : <?=htmlspecialchars((string)($result_Godown['state']), ENT_QUOTES, 'ISO-8859-1', false);?> <b>Code</b> : <?=htmlspecialchars((string)($result_Godown['state_code']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<b>Contact</b> : <?=htmlspecialchars((string)($result_Godown['contact']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+<b>Email</b> : <?=htmlspecialchars((string)($result_Godown['email']), ENT_QUOTES, 'ISO-8859-1', false);?>
 </td>
 </tr>
 </table>
@@ -320,12 +320,12 @@ $result_Godown=mysqli_fetch_array($fetch_Godown);
 
 <?php 
 //fetch user profile
-$select_userprofile="select * from users_profile where user_tempid='$customer_id' and usertype='$getinvuser'";
-$fetch_userprofile=mysqli_query($db_conn,$select_userprofile);
+$select_userprofile="select * from users_profile where user_tempid=? and usertype=?";
+$fetch_userprofile=db_q($db_conn,$select_userprofile,[$customer_id,$getinvuser]);
 $result_userprofile=mysqli_fetch_array($fetch_userprofile);
 
-$selectstockreq="select * from stock_request where reqid='$Invoice_ID'";
-$fetchstockreq=mysqli_query($db_conn,$selectstockreq);
+$selectstockreq="select * from stock_request where reqid=?";
+$fetchstockreq=db_q($db_conn,$selectstockreq,[$Invoice_ID]);
 $resultstockreq=mysqli_fetch_array($fetchstockreq);
 
 if($resultstockreq['delivery_address']!=NULL){$deliveryaddress=$resultstockreq['delivery_address'];}
@@ -333,9 +333,9 @@ else{$deliveryaddress=$result_userprofile['deliveryaddress'];}
 ?>
 <p class="cusdetaiis">
 Consignee (Ship to):<br/>
-<b><?=$result_userprofile['companyname'];?></b><br/>
-GSTIN: <?=$result_Customer_Details['gstin'];?><br/>
-Mobile:&nbsp;<?=$result_Customer_Details['mobile_number'];?><br/>
+<b><?=htmlspecialchars((string)($result_userprofile['companyname']), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+GSTIN: <?=htmlspecialchars((string)($result_Customer_Details['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+Mobile:&nbsp;<?=htmlspecialchars((string)($result_Customer_Details['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 <?=$deliveryaddress;?>
 </p>
 
@@ -343,53 +343,53 @@ Mobile:&nbsp;<?=$result_Customer_Details['mobile_number'];?><br/>
 <hr/>
 <p class="cusdetaiis">
 Buyer (Bill to):<br/>
-<b><?=$result_userprofile['companyname'];?></b><br/>
-GSTIN: <?=$result_Customer_Details['gstin'];?><br/>
-Mobile:&nbsp;<?=$result_Customer_Details['mobile_number'];?><br/>
+<b><?=htmlspecialchars((string)($result_userprofile['companyname']), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+GSTIN: <?=htmlspecialchars((string)($result_Customer_Details['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+Mobile:&nbsp;<?=htmlspecialchars((string)($result_Customer_Details['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 State : <?=$state_name;?>, District: <?=$district_name?>, Taluk : <?=$taluk_name?>
 </p>
 </td>
 <td valign="top">
 <table id="second_topvl">
 <tr id="border_nbottom">
-<td>Invoice #<br/><b><?php echo $result_Invoice_Details['inv_number'];?></b></td>
+<td>Invoice #<br/><b><?php echo htmlspecialchars((string)($result_Invoice_Details['inv_number']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 <td>Invoice Date:<br/><b><?php if($result_Invoice_Details['date']!=NULL){ echo date("d M Y",strtotime($result_Invoice_Details['date'])); }?></b></td>
 </tr>
 
 <?php 
-$Select_DLDetails="select * from delivery_note where inv_id='$Invoice_ID'";
-$Fetch_DLDetails=mysqli_query($db_conn,$Select_DLDetails);
+$Select_DLDetails="select * from delivery_note where inv_id=?";
+$Fetch_DLDetails=db_q($db_conn,$Select_DLDetails,[$Invoice_ID]);
 $Result_DLDetails=mysqli_fetch_array($Fetch_DLDetails);
 ?>
 
 <tr id="border_nbottom" valign="top">
-<td height="50">Delivery Note<br/><?=$Result_DLDetails['dl_note'];?></td>
-<td>Mode/Terms of Payment<br/><?=$Result_DLDetails['mode_pmnt'];?></td>
+<td height="50">Delivery Note<br/><?=htmlspecialchars((string)($Result_DLDetails['dl_note']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td>Mode/Terms of Payment<br/><?=htmlspecialchars((string)($Result_DLDetails['mode_pmnt']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 </tr>
 <tr id="border_nbottom" valign="top">
-<td height="50">Reference No. & Date<br/><?php if($Result_DLDetails['ref_no']!=NULL){ echo $Result_DLDetails['ref_no'];?>, <?php } if($Result_DLDetails['ref_date']!=NULL){ echo date("d/m/Y",strtotime($Result_DLDetails['ref_date'])); }?></td>
-<td>Other References<br/><?=$Result_DLDetails['ot_ref'];?></td>
+<td height="50">Reference No. & Date<br/><?php if($Result_DLDetails['ref_no']!=NULL){ echo htmlspecialchars((string)($Result_DLDetails['ref_no']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?php } if($Result_DLDetails['ref_date']!=NULL){ echo date("d/m/Y",strtotime($Result_DLDetails['ref_date'])); }?></td>
+<td>Other References<br/><?=htmlspecialchars((string)($Result_DLDetails['ot_ref']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 </tr>
 <tr id="border_nbottom" valign="top">
-<td height="50">Buyer's Order No.<br/><?=$Result_DLDetails['order_no'];?></td>
+<td height="50">Buyer's Order No.<br/><?=htmlspecialchars((string)($Result_DLDetails['order_no']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>Dated<br/>
 <?php if($Result_DLDetails['dated']!=NULL){ echo date("d/m/Y",strtotime($Result_DLDetails['dated'])); }?>
 </td>
 </tr>
 <tr id="border_nbottom" valign="top">
-<td height="50">Dispatch Doc No.<br/><?=$Result_DLDetails['dispatch_doc_no'];?></td>
+<td height="50">Dispatch Doc No.<br/><?=htmlspecialchars((string)($Result_DLDetails['dispatch_doc_no']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td>Delivery Note Date<br/>
 <?php if($Result_DLDetails['dlnote_date']!=NULL){ echo date("d/m/Y",strtotime($Result_DLDetails['dlnote_date'])); }?>
 </td>
 </tr>
 <tr id="border_nbottom" valign="top">
-<td height="50">Dispatched through<br/><?=$Result_DLDetails['dispatch_through'];?></td>
-<td>Destination<br/><?=$Result_DLDetails['destination'];?></td>
+<td height="50">Dispatched through<br/><?=htmlspecialchars((string)($Result_DLDetails['dispatch_through']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+<td>Destination<br/><?=htmlspecialchars((string)($Result_DLDetails['destination']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 </tr>
 </table>
 <p id="shiippingaddress">
 Terms of Delivery<br/>
-<?=$Result_DLDetails['terms'];?>
+<?=htmlspecialchars((string)($Result_DLDetails['terms']), ENT_QUOTES, 'ISO-8859-1', false);?>
 </p>
 </td>
 </tr>
@@ -412,15 +412,15 @@ Terms of Delivery<br/>
 </tr>
 
 <?php
-	$select_INVProductDetails="select * from user_invoice_items where inv_id='$Invoice_ID' order by id desc";
-	$fetch_INVProductDetails=mysqli_query($db_conn,$select_INVProductDetails);
+	$select_INVProductDetails="select * from user_invoice_items where inv_id=? order by id desc";
+	$fetch_INVProductDetails=db_q($db_conn,$select_INVProductDetails,[$Invoice_ID]);
 	while($result_INVProductDetails=mysqli_fetch_array($fetch_INVProductDetails))
 	{
 	
 	//product dteails
 		$InV_Product_ID=$result_INVProductDetails['pr_id'];
-		$select_ProductDetails123="select * from products where id='$InV_Product_ID'";
-		$fetch_ProductDetails123=mysqli_query($db_conn,$select_ProductDetails123);
+		$select_ProductDetails123="select * from products where id=?";
+		$fetch_ProductDetails123=db_q($db_conn,$select_ProductDetails123,[$InV_Product_ID]);
 		$result_ProductDetails123=mysqli_fetch_array($fetch_ProductDetails123);
 		
 		// Taxable (excl.-of-tax) line value, derived from the stored total/
@@ -445,14 +445,14 @@ Terms of Delivery<br/>
 	?>
 <tr>
 <td><?=$invno=$invno+1;?></td>
-<td><b><?=$result_ProductDetails123['productName'];?></b></td>
-<td id="rightlaign"><?=$result_ProductDetails123['hsn'];?></td>
+<td><b><?=htmlspecialchars((string)($result_ProductDetails123['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
+<td id="rightlaign"><?=htmlspecialchars((string)($result_ProductDetails123['hsn']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 <td id="rightlaign"><?=$Totalquantity?> Packs</td>
 <td id="rightlaign"><?php echo inr_format($result_ProductDetails123['mrp'], 2);?></td>
 <td id="rightlaign"><?php echo inr_format($taxable_rate, 2);?></td>
 <td id="rightlaign"><?php echo inr_format($taxable_rate_incl, 2);?></td>
 <td id="rightlaign">Packs</td>
-<td id="rightlaign"><?=$result_INVProductDetails['gst_percentage'];?>%</td>
+<td id="rightlaign"><?=htmlspecialchars((string)($result_INVProductDetails['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
 <td id="rightlaign"><?=$discountamount_show;?> (<?=$discountpercentage_show;?>%)</td>
 <td id="rightlaign"><?php echo inr_format($TotalAMount23, 2);?></td>
 </tr>
@@ -489,7 +489,7 @@ if($totalgstamount>0)
 // an average, since a mixed-rate invoice has no single correct "the" rate;
 // MAX at least reflects a real line on the invoice rather than a blended
 // number that matches nothing on it.
-$__gst_pct_row = mysqli_fetch_assoc(mysqli_query($db_conn, "SELECT MAX(gst_percentage) AS pct FROM user_invoice_items WHERE inv_id='$Invoice_ID'"));
+$__gst_pct_row = mysqli_fetch_assoc(mysqli_query($db_conn, "SELECT MAX(gst_percentage) AS pct FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."'"));
 $__inv_gst_pct = (float)($__gst_pct_row['pct'] ?? 0);
 
 if($gsttype=="inner"){
@@ -694,15 +694,15 @@ $number = $result_Invoice_Details['total'];
 </tr>
 <?php } ?>
 <?php
-$selecthsn="select distinct hsn from user_invoice_items where inv_id='$Invoice_ID'";
-$fetchhsn=mysqli_query($db_conn,$selecthsn);
+$selecthsn="select distinct hsn from user_invoice_items where inv_id=?";
+$fetchhsn=db_q($db_conn,$selecthsn,[$Invoice_ID]);
 $hsn_grand_taxable=0; $hsn_grand_gst=0;
 while($resulthsn=mysqli_fetch_array($fetchhsn)){
 
 	$hsncode=$resulthsn['hsn'];
 	// total-gstamount_total = taxable value regardless of whether GST was added on top or carved out (see the GST fix in user-invoice-action2.php etc.)
-	$selecthsnTaxamount="select sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst, max(gst_percentage) as pct from user_invoice_items where inv_id='$Invoice_ID' and hsn='$hsncode'";
-	$fetchhsnTaxamount=mysqli_query($db_conn,$selecthsnTaxamount);
+	$selecthsnTaxamount="select sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst, max(gst_percentage) as pct from user_invoice_items where inv_id=? and hsn=?";
+	$fetchhsnTaxamount=db_q($db_conn,$selecthsnTaxamount,[$Invoice_ID,$hsncode]);
 	$resulthsnTaxamount=mysqli_fetch_array($fetchhsnTaxamount);
 	$hsn_taxable = (float)$resulthsnTaxamount['taxable'];
 	$hsn_gst     = (float)$resulthsnTaxamount['gst'];
@@ -833,27 +833,27 @@ $TAXnumber = $totalgstamount;
  <table align="right">
  <tr>
  <td>A/c Name</td>
- <td>&nbsp;:&nbsp;<?=$result_Godown['acname'];?></td>
+ <td>&nbsp;:&nbsp;<?=htmlspecialchars((string)($result_Godown['acname']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
  </tr>
  <tr>
  <td>A/c Number</td>
- <td>&nbsp;:&nbsp;<?=$result_Godown['acnumber'];?></td>
+ <td>&nbsp;:&nbsp;<?=htmlspecialchars((string)($result_Godown['acnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
  </tr>
  <tr>
  <td>Bank Name</td>
- <td>&nbsp;:&nbsp;<?=$result_Godown['bankname'];?></td>
+ <td>&nbsp;:&nbsp;<?=htmlspecialchars((string)($result_Godown['bankname']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
  </tr>
  <tr>
  <td>Branch Name</td>
- <td>&nbsp;:&nbsp;<?=$result_Godown['branchname'];?></td>
+ <td>&nbsp;:&nbsp;<?=htmlspecialchars((string)($result_Godown['branchname']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
  </tr>
  <tr>
  <td>IFS Code</td>
- <td>&nbsp;:&nbsp;<?=$result_Godown['ifsc'];?></td>
+ <td>&nbsp;:&nbsp;<?=htmlspecialchars((string)($result_Godown['ifsc']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
  </tr>
  <tr>
  <td>UPI Number</td>
- <td>&nbsp;:&nbsp;<?=$result_Godown['upinumber'];?></td>
+ <td>&nbsp;:&nbsp;<?=htmlspecialchars((string)($result_Godown['upinumber']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
  </tr>
  </table>
  </td>
@@ -865,7 +865,7 @@ $TAXnumber = $totalgstamount;
 <table width="100%" id="sealsign">
 <tr>
 <td width="50%" align="left">Customer's Seal and Signature</td>
-<td align="right">for <b><?=$result_Godown['gname'];?></b></td>
+<td align="right">for <b><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 </tr>
 <tr>
 <td>&nbsp;</td>

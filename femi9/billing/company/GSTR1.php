@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); require_once("include/GodownAccess.php");
 include("config.php"); 
 error_reporting(0);
@@ -15,8 +15,8 @@ if (!empty($get_godown_id) && !is_godown_allowed($db_conn, (int)$get_godown_id))
     header("Location: overall-stock?unauthorized"); exit;
 }
 //
-$select_Godown_details="select * from company_godown where id='$get_godown_id'";
-$fetch_Godown_details=mysqli_query($db_conn,$select_Godown_details);
+$select_Godown_details="select * from company_godown where id=?";
+$fetch_Godown_details=db_q($db_conn,$select_Godown_details,[$get_godown_id]);
 $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);							   
 ?>
 <!DOCTYPE html>
@@ -96,16 +96,16 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
                             </div>
 							
 							
-							<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+							<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
 <label class="form-label">From Month</label>
-<input type="month" required="" name="frdate" value="<?=$from_month;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="month" required="" name="frdate" value="<?=htmlspecialchars((string)($from_month), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Month</label>
-<input type="month" required="" name="todate" value="<?=$to_month;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="month" required="" name="todate" value="<?=htmlspecialchars((string)($to_month), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 
 <div id="searchleftcont">
@@ -118,7 +118,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['id'];?>" <?=($get_godown_id==$result_Godown['id'])?'selected':'';?>><?=$result_Godown['gname'];?></option>
+						  <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" <?=($get_godown_id==$result_Godown['id'])?'selected':'';?>><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   </div>
@@ -171,17 +171,17 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 						   <tr>
 						   <th>Total Sales (SS,ST, DT, SHP, CUS, TP)</th>
-						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_register_intra, 2);?></a></td>
-						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_unregister_intra, 2);?></a></td>
+						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($Total_sls_register_intra, 2);?></a></td>
+						   <td><a href="gst_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($Total_sls_unregister_intra, 2);?></a></td>
 						   </tr>
 						   <tr>
 						   <th>Total OT Sales</th>
-						   <td><a href="gst_otsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLS_intra, 2);?></a></td>
-						   <td><a href="gst_otsls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLSUN_intra, 2);?></a></td>
+						   <td><a href="gst_otsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_OTSLS_intra, 2);?></a></td>
+						   <td><a href="gst_otsls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_OTSLSUN_intra, 2);?></a></td>
 						   </tr>
 						    <tr>
 						   <th>Total Internal Transfer Sales</th>
-						    <td><a href="gst_intrsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_INTR, 2);?></a></td>
+						    <td><a href="gst_intrsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_INTR, 2);?></a></td>
 							 <td>0.00</td>
 						   </tr>
 						   <?php
@@ -213,21 +213,21 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   ?>
 						   <tr>
 						   <th>Sales Return<br/>(SS,ST, DT, SHP, CUS, TP)</th>
-						   <td><a href="gst_credit_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						   <td><a href="gst_credit_sls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						   <?=inr_format($Total_sls_register_intra_credit, 2);?></a>
 						   </td>
 						   <td>
-						   <a href="gst_credit_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						   <a href="gst_credit_sls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						   <?=inr_format($Total_sls_unregister_intra_credit, 2);?></a>
 						   </td>
 						   </tr>
 						   <tr>
 						   <th>OT Sales Return</th>
 						  <td>
-						  <a href="gst_credit_otsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						  <a href="gst_credit_otsls_detailed_report?data1=inner&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						  <?=inr_format($total_intra_register_creditOT, 2);?></a>
 						  </td>
-						  <td><a href="gst_credit_otsls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						  <td><a href="gst_credit_otsls_detailed_report?data1=inner&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						  <?=inr_format($total_intra_unregister_creditOT, 2);?></a>
 						  </td>
 						   </tr>
@@ -272,14 +272,14 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 						   <tr>
 						   <th>Total Sales (SS,ST, DT, SHP, CUS, TP)</th>
-						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_register_inter, 2);?></a></td>
-						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($Total_sls_unregister_inter, 2);?></a></td>
+						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($Total_sls_register_inter, 2);?></a></td>
+						   <td><a href="gst_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($Total_sls_unregister_inter, 2);?></a></td>
 						   </tr>
 
 						   <tr>
 						   <th>Total OT Sales</th>
-						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLS_inter, 2);?></a></td>
-						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_reg_OTSLSUN_inter, 2);?></a></td>
+						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_OTSLS_inter, 2);?></a></td>
+						   <td><a href="gst_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_reg_OTSLSUN_inter, 2);?></a></td>
 						   </tr>
 
 						   <?php
@@ -311,10 +311,10 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   <tr>
 						   <th>Sales Return<br/>(SS,ST, DT, SHP, CUS, TP)</th>
 						   <td>
-						   <a href="gst_credit_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						   <a href="gst_credit_sls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						   <?=inr_format($Total_sls_register_inter_credit, 2);?></a>
 						   </td>
-						   <td><a href="gst_credit_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank">
+						   <td><a href="gst_credit_sls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank">
 						   <?=inr_format($Total_sls_unregister_inter_credit, 2);?></a>
 						   </td>
 						   </tr>
@@ -322,10 +322,10 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   <tr>
 						   <th>OT Sales Return</th>
 						   <td>
-						   <a href="gst_credit_otsls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_inter_register_creditOT, 2);?></a>
+						   <a href="gst_credit_otsls_detailed_report?data1=outer&&data2=register&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_inter_register_creditOT, 2);?></a>
 						   </td>
 						   <td>
-						   <a href="gst_credit_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><?=inr_format($total_inter_unregister_creditOT, 2);?></a>
+						   <a href="gst_credit_otsls_detailed_report?data1=outer&&data2=unregister&&frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><?=inr_format($total_inter_unregister_creditOT, 2);?></a>
 						   </td>
 						   </tr>
 
@@ -467,22 +467,22 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 								//Total sls qty + taxable value (total - gstamount_total strips embedded
 								//GST from 'inclusive'-priced products; see gst_details.php for the same fix)
-								$Total_HSN_sls="select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn='$hsn_code' and gst_percentage$rate_filter and date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id'";
-								$fetch_HSN_sls=mysqli_query($db_conn,$Total_HSN_sls);
+								$Total_HSN_sls="select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn=? and gst_percentage$rate_filter and date between ? and ? and from_user_type=? and from_user_id=?";
+								$fetch_HSN_sls=db_q($db_conn,$Total_HSN_sls,[$hsn_code,$from_date,$to_date,$Login_user_TYPEvl,$get_godown_id]);
 								$result_HSN_sls=mysqli_fetch_array($fetch_HSN_sls);
 								$show_HSN_sls_qty = $result_HSN_sls[0]!=NULL ? $result_HSN_sls[0] : 0;
 								$show_HSN_sls_val = $result_HSN_sls[1]!=NULL ? $result_HSN_sls[1] : 0;
 
 								//Total customer sls qty + taxable value
-								$Total_HSN_cust="select sum(qty), sum(total-gstamount_total) from invoice_items where hsn='$hsn_code' and gst_percentage$rate_filter and date between '$from_date' and '$to_date' and user_type='$Login_user_TYPEvl' and user_id='$get_godown_id'";
-								$fetch_HSN_cust=mysqli_query($db_conn,$Total_HSN_cust);
+								$Total_HSN_cust="select sum(qty), sum(total-gstamount_total) from invoice_items where hsn=? and gst_percentage$rate_filter and date between ? and ? and user_type=? and user_id=?";
+								$fetch_HSN_cust=db_q($db_conn,$Total_HSN_cust,[$hsn_code,$from_date,$to_date,$Login_user_TYPEvl,$get_godown_id]);
 								$result_HSN_cust=mysqli_fetch_array($fetch_HSN_cust);
 								$show_HSN_cust_qty = $result_HSN_cust[0]!=NULL ? $result_HSN_cust[0] : 0;
 								$show_HSN_cust_val = $result_HSN_cust[1]!=NULL ? $result_HSN_cust[1] : 0;
 
 								//Total sls return qty + taxable value
-								$Total_HSN_sls_rtn="select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn='$hsn_code' and gst_percentage$rate_filter and date between '$from_date' and '$to_date' and to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id'";
-								$fetch_HSN_sls_rtn=mysqli_query($db_conn,$Total_HSN_sls_rtn);
+								$Total_HSN_sls_rtn="select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn=? and gst_percentage$rate_filter and date between ? and ? and to_usertype=? and to_userid=?";
+								$fetch_HSN_sls_rtn=db_q($db_conn,$Total_HSN_sls_rtn,[$hsn_code,$from_date,$to_date,$Login_user_TYPEvl,$get_godown_id]);
 								$result_HSN_sls_rtn=mysqli_fetch_array($fetch_HSN_sls_rtn);
 								$show_HSN_sls_rtn_qty = $result_HSN_sls_rtn[0]!=NULL ? $result_HSN_sls_rtn[0] : 0;
 								$show_HSN_sls_rtn_val = $result_HSN_sls_rtn[1]!=NULL ? $result_HSN_sls_rtn[1] : 0;
@@ -492,15 +492,15 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 
 								//Total OT sls qty + taxable value
-								$Total_HSN_slsOT="select sum(qty), sum(total-gst_amount) from ot_sales where hsn='$hsn_code' and gst$rate_filter and date between '$from_date' and '$to_date' and godownid='$get_godown_id'";
-								$fetch_HSN_slsOT=mysqli_query($db_conn,$Total_HSN_slsOT);
+								$Total_HSN_slsOT="select sum(qty), sum(total-gst_amount) from ot_sales where hsn=? and gst$rate_filter and date between ? and ? and godownid=?";
+								$fetch_HSN_slsOT=db_q($db_conn,$Total_HSN_slsOT,[$hsn_code,$from_date,$to_date,$get_godown_id]);
 								$result_HSN_slsOT=mysqli_fetch_array($fetch_HSN_slsOT);
 								$show_HSN_sls_qty_OT = $result_HSN_slsOT[0]!=NULL ? $result_HSN_slsOT[0] : 0;
 								$show_HSN_sls_val_OT = $result_HSN_slsOT[1]!=NULL ? $result_HSN_slsOT[1] : 0;
 
 								//Total OT sls return qty (ot_sales_return has no rate column, joins products via prid)
-								$Total_HSN_slsOT_rtn="select sum(osr.qty), sum(osr.total) from ot_sales_return osr join products p on p.id=osr.prid where osr.return_date between '$from_date' and '$to_date' and osr.godownid='$get_godown_id' and osr.hsn='$hsn_code' and p.gst$rate_filter";
-								$fetch_HSN_slsOT_rtn=mysqli_query($db_conn,$Total_HSN_slsOT_rtn);
+								$Total_HSN_slsOT_rtn="select sum(osr.qty), sum(osr.total) from ot_sales_return osr join products p on p.id=osr.prid where osr.return_date between ? and ? and osr.godownid=? and osr.hsn=? and p.gst$rate_filter";
+								$fetch_HSN_slsOT_rtn=db_q($db_conn,$Total_HSN_slsOT_rtn,[$from_date,$to_date,$get_godown_id,$hsn_code]);
 								$result_HSN_slsOT_rtn=mysqli_fetch_array($fetch_HSN_slsOT_rtn);
 								$show_HSN_sls_qty_OT_rtn = $result_HSN_slsOT_rtn[0]!=NULL ? $result_HSN_slsOT_rtn[0] : 0;
 								$show_HSN_sls_val_OT_rtn = $result_HSN_slsOT_rtn[1]!=NULL ? $result_HSN_slsOT_rtn[1] : 0;
@@ -510,8 +510,8 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 
 								//Total Internal Transfer sls qty + taxable value (stored taxable_value
 								//column is unreliable/unpopulated, so total-gst_amount is used instead)
-								$Total_HSN_sls_inter="select sum(qty), sum(total-gst_amount) from internal_transfer where hsn='$hsn_code' and gst$rate_filter and date between '$from_date' and '$to_date' and send_from='$get_godown_id'";
-								$fetch_HSN_sls_inter=mysqli_query($db_conn,$Total_HSN_sls_inter);
+								$Total_HSN_sls_inter="select sum(qty), sum(total-gst_amount) from internal_transfer where hsn=? and gst$rate_filter and date between ? and ? and send_from=?";
+								$fetch_HSN_sls_inter=db_q($db_conn,$Total_HSN_sls_inter,[$hsn_code,$from_date,$to_date,$get_godown_id]);
 								$result_HSN_sls_inter=mysqli_fetch_array($fetch_HSN_sls_inter);
 								$show_HSN_sls_qty_inter = $result_HSN_sls_inter[0]!=NULL ? $result_HSN_sls_inter[0] : 0;
 								$show_HSN_sls_val_inter = $result_HSN_sls_inter[1]!=NULL ? $result_HSN_sls_inter[1] : 0;
@@ -520,8 +520,8 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								//transfers, godown-sourced only) — tpii.amount is the gross line total,
 								//so the same inclusive/exclusive-aware helper used elsewhere is reused.
 								require_once __DIR__ . '/include/TpGstHelper.php';
-								$Total_HSN_sls_TP="select tpii.quantity, tpii.amount, p.gst as gst_percentage, p.gst_type as product_gst_type from tp_invoices tpi join tp_invoice_items tpii on tpii.tp_invoice_id=tpi.id join products p on p.id=tpii.product_id where p.hsn='$hsn_code' and p.gst$rate_filter and tpi.invoice_date between '$from_date' and '$to_date' and tpi.source_godown_id='$get_godown_id'";
-								$fetch_HSN_sls_TP=mysqli_query($db_conn,$Total_HSN_sls_TP);
+								$Total_HSN_sls_TP="select tpii.quantity, tpii.amount, p.gst as gst_percentage, p.gst_type as product_gst_type from tp_invoices tpi join tp_invoice_items tpii on tpii.tp_invoice_id=tpi.id join products p on p.id=tpii.product_id where p.hsn=? and p.gst$rate_filter and tpi.invoice_date between ? and ? and tpi.source_godown_id=?";
+								$fetch_HSN_sls_TP=db_q($db_conn,$Total_HSN_sls_TP,[$hsn_code,$from_date,$to_date,$get_godown_id]);
 								$show_HSN_sls_qty_TP=0; $show_HSN_sls_val_TP=0;
 								while($row_HSN_sls_TP=mysqli_fetch_array($fetch_HSN_sls_TP)){
 									$show_HSN_sls_qty_TP += (int)$row_HSN_sls_TP['quantity'];
@@ -587,15 +587,15 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<tr>
 							<td style="text-align:left;"><?=htmlspecialchars($hr['hsn']);?></td>
 							<td style="text-align:left;"><?=$hr['rate'] > 0 ? $hr['rate'].'%' : 'Nil';?></td>
-							<td style="text-align:left;"><?=$hr['uqc'];?></td>
-							<td><?=$hr['b2b']['qty'];?></td><td><?=inr_format($hr['b2b']['taxable'], 2);?></td><td><?=inr_format($hr['b2b']['cgst'], 2);?></td><td><?=inr_format($hr['b2b']['sgst'], 2);?></td><td><?=inr_format($hr['b2b']['igst'], 2);?></td>
-							<td><?=$hr['b2c']['qty'];?></td><td><?=inr_format($hr['b2c']['taxable'], 2);?></td><td><?=inr_format($hr['b2c']['cgst'], 2);?></td><td><?=inr_format($hr['b2c']['sgst'], 2);?></td><td><?=inr_format($hr['b2c']['igst'], 2);?></td>
+							<td style="text-align:left;"><?=htmlspecialchars((string)($hr['uqc']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($hr['b2b']['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td><td><?=inr_format($hr['b2b']['taxable'], 2);?></td><td><?=inr_format($hr['b2b']['cgst'], 2);?></td><td><?=inr_format($hr['b2b']['sgst'], 2);?></td><td><?=inr_format($hr['b2b']['igst'], 2);?></td>
+							<td><?=htmlspecialchars((string)($hr['b2c']['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td><td><?=inr_format($hr['b2c']['taxable'], 2);?></td><td><?=inr_format($hr['b2c']['cgst'], 2);?></td><td><?=inr_format($hr['b2c']['sgst'], 2);?></td><td><?=inr_format($hr['b2c']['igst'], 2);?></td>
 							</tr>
 							<?php }?>
 							<tr>
 							<td colspan="3" style="text-align:right;"><b>Total</b></td>
-							<td><b><?=$hsn_split_tot['b2b']['qty'];?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['igst'], 2);?></b></td>
-							<td><b><?=$hsn_split_tot['b2c']['qty'];?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['igst'], 2);?></b></td>
+							<td><b><?=htmlspecialchars((string)($hsn_split_tot['b2b']['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2b']['igst'], 2);?></b></td>
+							<td><b><?=htmlspecialchars((string)($hsn_split_tot['b2c']['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['taxable'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['cgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['sgst'], 2);?></b></td><td><b><?=inr_format($hsn_split_tot['b2c']['igst'], 2);?></b></td>
 							</tr>
 							</table>
 
@@ -622,7 +622,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<th>IGST</th>
 							</tr>
 							<tr>
-							<td style="text-align:left;"><a href="gst_b2b_buyer_report?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><b>Total B2B Supplies (view buyer-wise detail)</b></a></td>
+							<td style="text-align:left;"><a href="gst_b2b_buyer_report?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><b>Total B2B Supplies (view buyer-wise detail)</b></a></td>
 							<td style="text-align:left;"><?=$b2b_buyer_count;?></td>
 							<td style="text-align:left;"><b><?=inr_format($b2b_grand_taxable, 2);?></b></td>
 							<td style="text-align:left;"><b><?=inr_format($b2b_grand_cgst, 2);?></b></td>
@@ -648,7 +648,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<th>IGST</th>
 							</tr>
 							<tr>
-							<td style="text-align:left;"><a href="gst_b2c_invoice_report?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=$get_godown_id;?>" target="_blank"><b>Total B2C (Others) Supplies (view invoice-wise detail)</b></a></td>
+							<td style="text-align:left;"><a href="gst_b2c_invoice_report?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&gid=<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" target="_blank"><b>Total B2C (Others) Supplies (view invoice-wise detail)</b></a></td>
 							<td style="text-align:left;"><b><?=inr_format($b2c_totals['taxable'], 2);?></b></td>
 							<td style="text-align:left;"><b><?=inr_format($b2c_totals['cgst'], 2);?></b></td>
 							<td style="text-align:left;"><b><?=inr_format($b2c_totals['sgst'], 2);?></b></td>
@@ -682,10 +682,10 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								return 'OTHER';
 							}
 							$doc_channels = [
-								['label' => 'Network Sale (SS/ST/DT/Shop)', 'sql' => "select ui.inv_number as num, ui.date as d, (select max(x.buyer_gsttype='register') from user_invoice_items x where x.inv_id=ui.inv_id) as reg from user_invoice ui where ui.from_user_type='$Login_user_TYPEvl' and ui.from_user_id='$get_godown_id' and ui.date between '$from_date' and '$to_date' order by ui.date asc, ui.inv_number asc"],
-								['label' => 'Customer Sale', 'sql' => "select i.inv_number as num, i.date as d, (select max(x.buyer_gsttype='register') from invoice_items x where x.inv_id=i.inv_id) as reg from invoice i where i.user_type='$Login_user_TYPEvl' and i.user_id='$get_godown_id' and i.date between '$from_date' and '$to_date' order by i.date asc, i.inv_number asc"],
-								['label' => 'OT Sale', 'sql' => "select i.inv_number as num, min(s.date) as d, max(s.buyer_gsttype='register') as reg from ot_sales_invoice i join ot_sales s on s.tempid=i.tempid where s.godownid='$get_godown_id' and s.date between '$from_date' and '$to_date' group by i.inv_number order by d asc, i.inv_number asc"],
-								['label' => 'Territory Partner', 'sql' => "select tpi.invoice_number as num, tpi.invoice_date as d, tp.gstin as tp_gstin from tp_invoices tpi left join territory_partners tp on tp.id=tpi.territory_partner_id where tpi.source_godown_id='$get_godown_id' and tpi.invoice_date between '$from_date' and '$to_date' order by tpi.invoice_date asc, tpi.invoice_number asc", 'tp' => true],
+								['label' => 'Network Sale (SS/ST/DT/Shop)', 'sql' => "select ui.inv_number as num, ui.date as d, (select max(x.buyer_gsttype='register') from user_invoice_items x where x.inv_id=ui.inv_id) as reg from user_invoice ui where ui.from_user_type='$Login_user_TYPEvl' and ui.from_user_id='".db_esc($get_godown_id)."' and ui.date between '$from_date' and '$to_date' order by ui.date asc, ui.inv_number asc"],
+								['label' => 'Customer Sale', 'sql' => "select i.inv_number as num, i.date as d, (select max(x.buyer_gsttype='register') from invoice_items x where x.inv_id=i.inv_id) as reg from invoice i where i.user_type='$Login_user_TYPEvl' and i.user_id='".db_esc($get_godown_id)."' and i.date between '$from_date' and '$to_date' order by i.date asc, i.inv_number asc"],
+								['label' => 'OT Sale', 'sql' => "select i.inv_number as num, min(s.date) as d, max(s.buyer_gsttype='register') as reg from ot_sales_invoice i join ot_sales s on s.tempid=i.tempid where s.godownid='".db_esc($get_godown_id)."' and s.date between '$from_date' and '$to_date' group by i.inv_number order by d asc, i.inv_number asc"],
+								['label' => 'Territory Partner', 'sql' => "select tpi.invoice_number as num, tpi.invoice_date as d, tp.gstin as tp_gstin from tp_invoices tpi left join territory_partners tp on tp.id=tpi.territory_partner_id where tpi.source_godown_id='".db_esc($get_godown_id)."' and tpi.invoice_date between '$from_date' and '$to_date' order by tpi.invoice_date asc, tpi.invoice_number asc", 'tp' => true],
 							];
 							$doc_grand_total = 0;
 							foreach ($doc_channels as $dc) {

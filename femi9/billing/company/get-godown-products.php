@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('stock_transfers');
 require_once("include/GodownAccess.php");
 header('Content-Type: application/json');
 error_reporting(0);

@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php"); require_once("include/GodownAccess.php");
 include("config.php"); 
 error_reporting(0);
@@ -15,8 +15,8 @@ if (!empty($get_godown_id) && !is_godown_allowed($db_conn, (int)$get_godown_id))
     header("Location: overall-stock?unauthorized"); exit;
 }
 //
-$select_Godown_details="select * from company_godown where id='$get_godown_id'";
-$fetch_Godown_details=mysqli_query($db_conn,$select_Godown_details);
+$select_Godown_details="select * from company_godown where id=?";
+$fetch_Godown_details=db_q($db_conn,$select_Godown_details,[$get_godown_id]);
 $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);	   
 ?>
 <!DOCTYPE html>
@@ -158,16 +158,16 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
                                 </div>
                             </div>
 							
-							<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+							<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
 <label class="form-label">From Month</label>
-<input type="month" required="" name="frdate" value="<?=$from_month;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="month" required="" name="frdate" value="<?=htmlspecialchars((string)($from_month), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Month</label>
-<input type="month" required="" name="todate" value="<?=$to_month;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="month" required="" name="todate" value="<?=htmlspecialchars((string)($to_month), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 
 <div id="searchleftcont">
@@ -176,13 +176,13 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							   <?php if($get_godown_id==NULL){?>
 							   <option value="" hidden="">Select</option>
 							   <?php }else{?>
-							   <option value="<?=$get_godown_id;?>" hidden=""><?=$result_Godown_details['gname'];?></option>
+							   <option value="<?=htmlspecialchars((string)($get_godown_id), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=htmlspecialchars((string)($result_Godown_details['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   <?php $select_Godown="select * from company_godown where " . godown_finance_filter_sql($db_conn) . " order by id asc";
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['id'];?>"><?=$result_Godown['gname'];?></option>
+						  <option value="<?=htmlspecialchars((string)($result_Godown['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   </div>

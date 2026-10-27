@@ -113,9 +113,9 @@ $loc_stmt->close();
                     <?php endif; ?>
 
                     <form action="territory-partner-action" method="post" enctype="multipart/form-data">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="action" value="update-territory-partner">
-                        <input type="hidden" name="tp_db_id" value="<?php echo $enc_id; ?>">
+                        <input type="hidden" name="tp_db_id" value="<?php echo htmlspecialchars((string)($enc_id), ENT_QUOTES, 'UTF-8', false); ?>">
 
                     <div class="row">
 

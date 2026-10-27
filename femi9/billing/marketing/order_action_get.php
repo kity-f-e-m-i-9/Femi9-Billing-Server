@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
@@ -59,7 +59,7 @@ if (isset($_REQUEST['add_order_get'])) {
 		header("Location: add_order.php");
 		exit;
 	}
-	$shopLocRes = mysqli_query($db_conn, "SELECT address, state_name, district_name, taluk_name, pincode, latitude, longitude FROM ms_shop WHERE id='$shop_id_esc' LIMIT 1");
+	$shopLocRes = mysqli_query($db_conn, "SELECT address, state_name, district_name, taluk_name, pincode, latitude, longitude FROM ms_shop WHERE id='".db_esc($shop_id_esc)."' LIMIT 1");
 	$shopLocRow = $shopLocRes ? mysqli_fetch_assoc($shopLocRes) : null;
 	if (!$shopLocRow || $shopLocRow['latitude'] === null || $shopLocRow['latitude'] === '' || $shopLocRow['longitude'] === null || $shopLocRow['longitude'] === '') {
 		$addressParts = array_filter([
@@ -97,7 +97,7 @@ if (isset($_REQUEST['add_order_get'])) {
 	$tp_id = (int)($_POST["tp_id"] ?? 0);
 	if ($tp_id > 0) {
 		$tp_id_esc = (int)$tp_id;
-		$tpCheck = mysqli_query($db_conn, "select id from territory_partners where id='$tp_id_esc' and is_active=1 limit 1");
+		$tpCheck = mysqli_query($db_conn, "select id from territory_partners where id='".db_esc($tp_id_esc)."' and is_active=1 limit 1");
 		if (!$tpCheck || mysqli_num_rows($tpCheck) === 0) { $tp_id = 0; }
 	}
 	$tp_id_sql = $tp_id > 0 ? "'".$tp_id."'" : "NULL";
@@ -124,15 +124,15 @@ for ($i=0; $i<=$number; $i++)
 	 if($product_id_value!=NULL)
 	 {
 
-$select_count_dist="select count(*) as numShop from ms_orders where order_id='$order_id' and pr_id='$product_id_value'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+$select_count_dist="select count(*) as numShop from ms_orders where order_id=? and pr_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$order_id,$product_id_value]);
 $result_count_dist=mysqli_fetch_array($fetc_count_dist);
 if($result_count_dist['numShop']==0)
 	{
 
-        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,discount_percentage,latitude,longitude) values ('$order_id','$shop_id','$ms_id',$tp_id_sql,'$order_date','yes','nil','$marketing_tool',
-		'$product_id_value','$qty_value','$discount_value',$latitude_sql,$longitude_sql)";
-		mysqli_query($db_conn,$sql);
+        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,discount_percentage,latitude,longitude) values (?,?,?,$tp_id_sql,?,'yes','nil',?,
+		?,?,?,$latitude_sql,$longitude_sql)";
+		db_q($db_conn,$sql,[$order_id,$shop_id,$ms_id,$order_date,$marketing_tool,$product_id_value,$qty_value,$discount_value]);
 		$insertedLines[] = ['pr_id' => (int)$product_id_value, 'qty' => (int)$qty_value, 'discount_percentage' => $discount_value];
 
 	}

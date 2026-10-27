@@ -1,8 +1,8 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from super_distributor where id='$get_id'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from super_distributor where id=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -15,7 +15,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
     <!-- The above 6 meta tags *must* come first in the head; any other head content must come *after* these tags -->
 
     <!-- Title -->
-    <title><?php echo ucwords($result_product_list['name']);?> : Super-Distributor</title>
+    <title><?php echo htmlspecialchars((string)(ucwords($result_product_list['name'])), ENT_QUOTES, 'ISO-8859-1', false);?> : Super-Distributor</title>
 
     <!-- Styles -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -60,7 +60,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
  
  <?php if($result_product_list["user_icon"]!="Nil"){ ?>
  <tr>
-                    <th colspan="2"><img src="../super_distributor/<?php echo $result_product_list["user_icon"];?>" style="width:150px;border-radius:10px;"></th>
+                    <th colspan="2"><img src="../super_distributor/<?php echo htmlspecialchars((string)($result_product_list["user_icon"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="width:150px;border-radius:10px;"></th>
                     </tr>
  <?php } ?>
  
@@ -84,25 +84,25 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
   
                     <tr>
                     <th scope="col">Name</th>
-                    <td><?php echo $result_product_list['name'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					
 					<tr>
                     <th scope="col">State</th>
-                    <td><?php echo $result_product_list['state_id'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['state_id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">District</th>
-                    <td><?php echo $result_product_list['district_id'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['district_id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Taluk</th>
-                    <td><?php echo $result_product_list['taluk_id'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['taluk_id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Pincode</th>
-                    <td><?php echo $result_product_list['pincode_id'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['pincode_id']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
@@ -122,30 +122,30 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
 					
 					<tr>
                     <th scope="col">Email ID</th>
-                    <td><?php echo $result_product_list['email'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['email']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Address</th>
-                    <td><?php echo $result_product_list['address'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['address']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Mobile Number</th>
-                    <td><?php echo $result_product_list['country_code'];?>&nbsp;<?php echo $result_product_list['mobile_number'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['country_code']), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Username</th>
-                    <td><span id="usernamebox"><?php echo $result_product_list['username'];?></span></td>
+                    <td><span id="usernamebox"><?php echo htmlspecialchars((string)($result_product_list['username']), ENT_QUOTES, 'ISO-8859-1', false);?></span></td>
                     </tr>
 					
 					<tr>
                     <th scope="col">Password</th>
-                    <td><?php echo $result_product_list['password'];?></td>
+                    <td><?php echo '••••••••';?></td>
                     </tr>
 					<tr>
                     <th scope="col">GST Number</th>
-                    <td><?php echo $result_product_list['gstin'];?></td>
+                    <td><?php echo htmlspecialchars((string)($result_product_list['gstin']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					
 					
@@ -156,16 +156,16 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
 					<?php
 $sd_id=$result_product_list['temp_id'];
 					
-				$Select_ReferralDetails="select * from super_distributor_referral where sd_id='$sd_id'";
-				$Fetch_ReferralDetails=mysqli_query($db_conn,$Select_ReferralDetails);
+				$Select_ReferralDetails="select * from super_distributor_referral where sd_id=?";
+				$Fetch_ReferralDetails=db_q($db_conn,$Select_ReferralDetails,[$sd_id]);
 				$Result_ReferralDetails=mysqli_fetch_array($Fetch_ReferralDetails);
 				
 				$target_amount=$Result_ReferralDetails['target_amount'];
 				$referred_user_type=$Result_ReferralDetails['ref_by_user_type'];
 				$referred_user_id=$Result_ReferralDetails['ref_by_user_id'];
 				
-				$Select_STcatdetails="select * from super_distributor_category where amount='$target_amount'";
-				$Felect_STcatdetails=mysqli_query($db_conn,$Select_STcatdetails);
+				$Select_STcatdetails="select * from super_distributor_category where amount=?";
+				$Felect_STcatdetails=db_q($db_conn,$Select_STcatdetails,[$target_amount]);
 				$Relect_STcatdetails=mysqli_fetch_array($Felect_STcatdetails);
 				?>
 				<tr>
@@ -177,15 +177,15 @@ $sd_id=$result_product_list['temp_id'];
 					
 				<tr>
                     <th scope="col">Target Purchase Values(Rs.)</th>
-                    <td><?php echo $Relect_STcatdetails['amount'];?></td>
+                    <td><?php echo htmlspecialchars((string)($Relect_STcatdetails['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                     </tr>
 					<tr>
                     <th scope="col">Referral (%)</th>
-                    <td><?php echo $Relect_STcatdetails['ref_commission_percentage'];?>%</td>
+                    <td><?php echo htmlspecialchars((string)($Relect_STcatdetails['ref_commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
                     </tr>
 					<tr>
                     <th scope="col">Cashback (%)</th>
-                    <td><?php echo $Relect_STcatdetails['cash_back_percentage'];?>%</td>
+                    <td><?php echo htmlspecialchars((string)($Relect_STcatdetails['cash_back_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
                     </tr>
 					
 					<?php
@@ -257,7 +257,7 @@ $sd_id=$result_product_list['temp_id'];
 <td colspan="2">
 <form method="post" enctype="mutipart/form-data" action="active-users.php" onSubmit="return confirm('Please make a confirm!');">
 <input type="hidden" name="usertype" value="distributor">
-<input type="hidden" name="userrowid" value="<?=$get_id;?>">
+<input type="hidden" name="userrowid" value="<?=htmlspecialchars((string)($get_id), ENT_QUOTES, 'UTF-8', false);?>">
 
 <div class="d-grid gap-2">
     <button class="btn btn-primary" type="submit">Click to Activate</button>

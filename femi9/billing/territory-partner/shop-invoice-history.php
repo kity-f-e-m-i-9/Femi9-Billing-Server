@@ -103,7 +103,7 @@ $changeTypeLabels = [
                                         ?>
                                             <tr>
                                                 <td><?=htmlspecialchars(date("d-m-Y h:i A", strtotime($row['created_at'])))?></td>
-                                                <td><span class="<?=$ct['class']?>"><?=htmlspecialchars($ct['label'])?></span></td>
+                                                <td><span class="<?=htmlspecialchars((string)($ct['class']), ENT_QUOTES, 'ISO-8859-1', false)?>"><?=htmlspecialchars($ct['label'])?></span></td>
                                                 <td><?=htmlspecialchars($row['productName'] ?? '-')?></td>
                                                 <td><?=$row['qty_before'] !== null ? (int)$row['qty_before'] : '-'?></td>
                                                 <td><?=$row['qty_after'] !== null ? (int)$row['qty_after'] : '-'?></td>

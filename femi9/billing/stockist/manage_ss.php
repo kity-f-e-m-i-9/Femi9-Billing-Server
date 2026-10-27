@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 include("config.php");
 ?>
 <!DOCTYPE html>
@@ -111,29 +111,29 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-<?php $select_product_list="select * from distributor where stockiest_id='$loguser_tempid' order by id desc";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+<?php $select_product_list="select * from distributor where stockiest_id=? order by id desc";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$loguser_tempid]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {											
 									
 //
 $district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
 //
 $taluk_id=$result_product_list['taluk_id'];
-$select_taluklist="select * from taluk where id='$taluk_id'";
-	$fetch_taluklist=mysqli_query($db_conn,$select_taluklist);
+$select_taluklist="select * from taluk where id=?";
+	$fetch_taluklist=db_q($db_conn,$select_taluklist,[$taluk_id]);
 	$result_taluklist=mysqli_fetch_array($fetch_taluklist);
 $taluk_name=$result_taluklist['taluk'];
 
 //
 $pincode_id=$result_product_list['pincode_id'];
-$select_pincodelist="select * from pincode where id='$pincode_id'";
-	$fetch_pincodelist=mysqli_query($db_conn,$select_pincodelist);
+$select_pincodelist="select * from pincode where id=?";
+	$fetch_pincodelist=db_q($db_conn,$select_pincodelist,[$pincode_id]);
 	$result_pincodelist=mysqli_fetch_array($fetch_pincodelist);
 $pincodeshow=$result_pincodelist['pincode'];
 											
@@ -143,25 +143,25 @@ $pincodeshow=$result_pincodelist['pincode'];
                                             
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_product_list["useridtext"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
-					D:&nbsp;<?=ucwords($result_product_list["district_id"]);?><br/>
-					T:&nbsp;<?=ucwords($result_product_list["taluk_id"]);?>
-					<br/>P:&nbsp;<?=$result_product_list["pincode_id"];?>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
+					D:&nbsp;<?=htmlspecialchars((string)(ucwords($result_product_list["district_id"])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					T:&nbsp;<?=htmlspecialchars((string)(ucwords($result_product_list["taluk_id"])), ENT_QUOTES, 'ISO-8859-1', false);?>
+					<br/>P:&nbsp;<?=htmlspecialchars((string)($result_product_list["pincode_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</td>
-					<td><?php echo $result_product_list["country_code"];?>&nbsp;<?php echo $result_product_list["mobile_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?php echo htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					
 					<?php /*?>
-					<td><b><?php echo $result_product_list["username"];?></b></td>
-					<td>&#8377; <?php echo $result_product_list["plan_amount"];?><br/>
-					<?php echo $result_product_list["valid_months"];?> Days<br/>
+					<td><b><?php echo htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
+					<td>&#8377; <?php echo htmlspecialchars((string)($result_product_list["plan_amount"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?php echo htmlspecialchars((string)($result_product_list["valid_months"]), ENT_QUOTES, 'ISO-8859-1', false);?> Days<br/>
 					<?php echo date("d/m/Y",strtotime($result_product_list["valid_from"]));?>
 					(to) <?php echo date("d/m/Y",strtotime($result_product_list["valid_to"]));?>
 					</td>
 					
-					<td><?php echo $result_product_list["ref_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["ref_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<?php */?>
 					
 					<td>

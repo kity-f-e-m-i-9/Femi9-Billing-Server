@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php");
 $__perm_map = array (
   'super_stockiest' => 'ss',
@@ -180,8 +180,8 @@ $to_date=date("Y-m-d");
 $from_date = date ("Y-m-d", strtotime("-2 days", strtotime($to_date)));
 						}
 ?>
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="invuser" value="<?=$_REQUEST['invuser'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="invuser" value="<?=htmlspecialchars((string)($_REQUEST['invuser']), ENT_QUOTES, 'UTF-8', false);?>">
 
 <div class="overviewcontainar">
 <div id="searchleftcont">
@@ -206,7 +206,7 @@ $from_date = date ("Y-m-d", strtotime("-2 days", strtotime($to_date)));
 									<table class="headertble">
 									<tr>
 									<td><?=$displaytitle;?></td>
-									<td><a href="user-invoice-add?invuser=<?=$getinvuser;?>" title="Add Invoice">&#10011;</a></td>
+									<td><a href="user-invoice-add?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>" title="Add Invoice">&#10011;</a></td>
 									</tr>
 									</table>
 									</h1>
@@ -252,8 +252,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $select_product_list="select * from user_invoice where from_user_type='$Login_user_TYPEvl' and to_user_type='$getinvuser' and date between '$from_date' and '$to_date' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+										<?php $select_product_list="select * from user_invoice where from_user_type=? and to_user_type=? and date between ? and ? order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$getinvuser,$from_date,$to_date]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											//customer details
@@ -273,7 +273,7 @@ $select_Customers="select * from ".$tablename." where temp_id='$CuSTID'";
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td><?php echo $result_product_list["inv_number"];?></td>
+                                                    <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													
 													<td><?php echo $Cust_Name;?><br/>M:&nbsp;<?php echo $Cust_Mbile;?>
 			
@@ -286,7 +286,7 @@ $select_Customers="select * from ".$tablename." where temp_id='$CuSTID'";
 			if($result_count_return==0){
 			?>
 													
-													<a href="update_customer.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$result_product_list["inv_id"];?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
+													<a href="update_customer.php?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
 													</a>
 			<?php } else{ echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";}?>
 			<!----------END CUSTOMER UPDATE***--------->
@@ -322,16 +322,16 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 }
 ?>
 				<td><?php echo inr_format($result_product_list["total"], 2);?>
-				<br/><a href="add-receipt?invid=<?=$result_product_list["inv_id"];?>&&invuser=<?=$getinvuser;?>"><?=$msgpayment;?></a>
+				<br/><a href="add-receipt?invid=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>"><?=$msgpayment;?></a>
 				</td>
 				
-				<td><?=$result_product_list["username"];?><br/><?=ucwords($result_product_list["usertype"]);?></td>
+				<td><?=htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/><?=htmlspecialchars((string)(ucwords($result_product_list["usertype"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 				
 				<td>
 				<?php if($result_product_list['rwpoints_enable']==1){?>
-				<a href="update_rwpermission?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>&&rwst=<?=$result_product_list['rwpoints_enable'];?>&&invuser=<?=$getinvuser?>&&invnumber=<?=base64_encode($result_product_list["inv_number"]);?>" onclick="return confirm('You want to confirm update to Disabled Reward Points?');"><span class='badge badge-style-bordered badge-success'>Enable</span></a>
+				<a href="update_rwpermission?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>&&rwst=<?=htmlspecialchars((string)($result_product_list['rwpoints_enable']), ENT_QUOTES, 'ISO-8859-1', false);?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>&&invnumber=<?=base64_encode($result_product_list["inv_number"]);?>" onclick="return confirm('You want to confirm update to Disabled Reward Points?');"><span class='badge badge-style-bordered badge-success'>Enable</span></a>
 				<?php }else{?>
-				<a href="update_rwpermission?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>&&rwst=<?=$result_product_list['rwpoints_enable'];?>&&invuser=<?=$getinvuser?>&&invnumber=<?=base64_encode($result_product_list["inv_number"]);?>" onclick="return confirm('You want to confirm update to Enable Reward Points?');"><span class='badge badge-style-bordered badge-danger'>Disabled</span></a>
+				<a href="update_rwpermission?invoiceid=<?php echo base64_encode($result_product_list["inv_id"]);?>&&rwst=<?=htmlspecialchars((string)($result_product_list['rwpoints_enable']), ENT_QUOTES, 'ISO-8859-1', false);?>&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false)?>&&invnumber=<?=base64_encode($result_product_list["inv_number"]);?>" onclick="return confirm('You want to confirm update to Enable Reward Points?');"><span class='badge badge-style-bordered badge-danger'>Disabled</span></a>
 				<?php }?>
 				</td>
 													
@@ -354,20 +354,20 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 
 																										<td>
 													    <div class="actions-group">
-													        <a href="user-invoice-add?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$INVID_encode;?>&&action=edit&&gid=<?=$result_product_list['from_user_id'];?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+													        <a href="user-invoice-add?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=$INVID_encode;?>&&action=edit&&gid=<?=htmlspecialchars((string)($result_product_list['from_user_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
 													    </div>
 													</td>
 	
 <td>
 <?php if($result_product_list["sub_total"]>0){?>
-<a href="cnote_new.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=$INVID_encode;?>">
+<a href="cnote_new.php?invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&InvoiceID=<?=$INVID_encode;?>">
 <span class="badge badge-warning">Return</span></a>
 <?php } else{ echo "---";}?>
 </td>
 													
 																										<td>
 													    <div class="actions-group">
-													        <a href="delinvoice?invtype=noncustomer&&invuser=<?=$getinvuser;?>&&invid=<?=$INVID_encode;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
+													        <a href="delinvoice?invtype=noncustomer&&invuser=<?=htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false);?>&&invid=<?=$INVID_encode;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 													</td>
 													

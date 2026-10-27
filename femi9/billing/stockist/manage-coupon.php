@@ -1,4 +1,4 @@
-<?php /* include("checksession.php");?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; /* include("checksession.php");?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -96,8 +96,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-					<?php $select_product_list="select * from coupons where stock_user_tempid='$loguser_tempid' and user_type='stockiest' order by id desc";
-										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+					<?php $select_product_list="select * from coupons where stock_user_tempid=? and user_type='stockiest' order by id desc";
+										$fetch_product_list=db_q($db_conn,$select_product_list,[$loguser_tempid]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 											
@@ -107,22 +107,22 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                                                    <td>&#8377; <?php echo $result_product_list["plan_amount"];?></td>
-													<td><?php echo $result_product_list["valid_months"];?> Months</td>
+                                                    <td>&#8377; <?php echo htmlspecialchars((string)($result_product_list["plan_amount"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+													<td><?php echo htmlspecialchars((string)($result_product_list["valid_months"]), ENT_QUOTES, 'ISO-8859-1', false);?> Months</td>
 													
 													<td>
-													<input type="text" id="copyText<?php echo $result_product_list['id'];?>" value="<?php echo $result_product_list["coupon_number"];?>" class="txtbordernone" readonly>
+													<input type="text" id="copyText<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>" value="<?php echo htmlspecialchars((string)($result_product_list["coupon_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>" class="txtbordernone" readonly>
 													</td>
 													
 													<td>
 													<?php if($coupon_status=="none"){?>
-													<button id="copyButton" onclick="copyToClipboard<?php echo $result_product_list['id'];?>()" class="bordernone"><i class="material-icons-two-tone">copy</i></button>
+													<button id="copyButton" onclick="copyToClipboard<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>()" class="bordernone"><i class="material-icons-two-tone">copy</i></button>
 													<?php }else{ echo "<span class='badge badge-style-bordered badge-danger'>Used</span>"; }?> </td>
 													
 													<script>
-function copyToClipboard<?php echo $result_product_list['id'];?>() {
+function copyToClipboard<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>() {
     // Find the input element with the text to copy
-    var copyText = document.getElementById("copyText<?php echo $result_product_list['id'];?>");
+    var copyText = document.getElementById("copyText<?php echo htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>");
 
     // Select the text
     copyText.select();

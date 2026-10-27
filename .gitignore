@@ -26,3 +26,32 @@ femi9/billing/super-stockist/.env
 femi9/billing/company/logs/login_attempts.log
 femi9/billing/login/logs/login_attempts.log
 femi9/billing/salesbdm/logs/login_attempts.log
+
+# Runtime logs / rate-limit state - contain mobile numbers, paths, reset activity
+error_log
+**/error_log
+**/*.log
+femi9/billing/company/logs/rate_limit.json
+femi9/billing/login/logs/login_rate_limit.json
+# Never commit secrets, archives or backups
+*.zip
+*.bak
+*-backup.php
+
+# Uploaded user files (payment proofs, signatures, logos) - real data, never commit.
+femi9/billing/c-and-f/screenshot/*
+!femi9/billing/c-and-f/screenshot/.gitkeep
+femi9/billing/company/bussiness_logo/*
+!femi9/billing/company/bussiness_logo/.gitkeep
+femi9/billing/company/company_signature/*
+!femi9/billing/company/company_signature/.gitkeep
+femi9/billing/distributor/screenshot/*
+!femi9/billing/distributor/screenshot/.gitkeep
+femi9/billing/stockist/screenshot/*
+!femi9/billing/stockist/screenshot/.gitkeep
+femi9/billing/super-stockist/screenshot/*
+!femi9/billing/super-stockist/screenshot/.gitkeep
+femi9/billing/territory-partner/advance_payment_screenshots/*
+!femi9/billing/territory-partner/advance_payment_screenshots/.gitkeep
+femi9/billing/territory-partner/po_screenshots/*
+!femi9/billing/territory-partner/po_screenshots/.gitkeep

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 error_reporting(0);
@@ -43,8 +43,8 @@ $csv_content .= "Inv Num,Date of return,Qty of return,User ID,Name, District\n";
 
 // Fetching data and formatting into CSV rows
 
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype=? and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
@@ -52,8 +52,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid'";
-	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid=?";
+	$fetch_sumqty=db_q($db_conn,$select_sumqty,[$returnid]);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	
 	$selectRcd_VLSS1="select * from ".$tblname." where temp_id='$to_user_id'";
@@ -68,8 +68,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 											$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 
@@ -100,8 +100,8 @@ $csv_content .= "Inv Num,Date of return,Qty of return,User ID,Name, District, Ta
 
 // Fetching data and formatting into CSV rows
 
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype=? and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
@@ -109,8 +109,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid'";
-	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid=?";
+	$fetch_sumqty=db_q($db_conn,$select_sumqty,[$returnid]);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	
 	$selectRcd_VLSS1="select * from ".$tblname." where temp_id='$to_user_id'";
@@ -125,14 +125,14 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 											$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
-										$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+										$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 
@@ -164,8 +164,8 @@ $csv_content .= "Inv Num,Date of return,Qty of return,User ID,Name, District, Ta
 
 // Fetching data and formatting into CSV rows
 
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype=? and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
@@ -173,8 +173,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid'";
-	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid=?";
+	$fetch_sumqty=db_q($db_conn,$select_sumqty,[$returnid]);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	
 	$selectRcd_VLSS1="select * from ".$tblname." where temp_id='$to_user_id'";
@@ -189,14 +189,14 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 											$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
-										$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+										$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 

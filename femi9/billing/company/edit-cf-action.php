@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireStaffOnly();
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -6,7 +6,7 @@ include("RemoveSpecialChar.php");
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $update_id=$_REQUEST['update_id'];
-	$old_icon=$_REQUEST['old_icon'];
+	$old_icon=safe_old_file_param($_REQUEST['old_icon']);
 	$country_code=$_POST["country_code"];
 	
 	$name=str_replace("'","&#39;",$_REQUEST['name']);
@@ -44,7 +44,7 @@ $insfilename=$old_icon;
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='cf_user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfilename=$uploadfile;
 	   if($old_icon!="Nil")
 	   {
@@ -59,8 +59,8 @@ $insfilename=$old_icon;
 	
 	
 	//update process
-	$update_ss="update c_and_f set user_icon='$insfilename',name='$name',email='$email',mobile_number='$mobile_number',username='$mobile_number',address='$address',gstin='$gstin',country_code='$country_code',state_id='$state_id' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update c_and_f set user_icon=?,name=?,email=?,mobile_number=?,username=?,address=?,gstin=?,country_code=?,state_id=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$mobile_number,$mobile_number,$address,$gstin,$country_code,$state_id,$update_id]);
 	
 	echo "<script>window.location='manage_cf?updatedSuccess';</script>";
 	

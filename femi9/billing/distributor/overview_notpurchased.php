@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -77,7 +77,7 @@ else
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report_notpur?modelval=<?=$_REQUEST['modelval'];?>&&out1=<?=$_REQUEST['out1'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report_notpur?modelval=<?=htmlspecialchars((string)($_REQUEST['modelval']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -98,7 +98,7 @@ else
 						<a href="#" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title"><?=$DISPLAY_LABLE;?></span>
-                                                <span class="widget-stats-amount"><?=base64_decode($_REQUEST['out1']);?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)(base64_decode($_REQUEST['out1'])), ENT_QUOTES, 'UTF-8', false);?></span>
                                             </div>
 											</a>
                                         </div>
@@ -144,8 +144,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='super_stockiest' and onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl'";
-										$fetchRcd_VLSS1=mysqli_query($db_conn,$selectRcd_VLSS1);
+										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='super_stockiest' and onboard_userTYPE=? and onboard_userID=?";
+										$fetchRcd_VLSS1=db_q($db_conn,$selectRcd_VLSS1,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($resultRcd_VLSS1=mysqli_fetch_array($fetchRcd_VLSS1))
 										{
 											
@@ -158,8 +158,8 @@ $i= $start_from;
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
@@ -167,9 +167,9 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultusers["useridtext"];?></td>
-							<td><?=$resultusers["name"];?></td>
-							<td><?=$resultusers["mobile_number"];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 				
                                         </tr>
@@ -198,8 +198,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='stockiest' and onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl'";
-										$fetchRcd_VLSS1=mysqli_query($db_conn,$selectRcd_VLSS1);
+										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='stockiest' and onboard_userTYPE=? and onboard_userID=?";
+										$fetchRcd_VLSS1=db_q($db_conn,$selectRcd_VLSS1,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($resultRcd_VLSS1=mysqli_fetch_array($fetchRcd_VLSS1))
 										{
 											
@@ -212,14 +212,14 @@ $i= $start_from;
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultusers['taluk_id'];
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
@@ -227,9 +227,9 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultusers["useridtext"];?></td>
-							<td><?=$resultusers["name"];?></td>
-							<td><?=$resultusers["mobile_number"];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				
@@ -261,35 +261,35 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 											mysqli_query($db_conn,"TRUNCATE TABLE temp_not_purchased");
 											
 //distributor
-$select_nonpurchase_stockiest="select * from distributor where onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl' order by id asc";
-$fetch_nonpurchase_stockiest=mysqli_query($db_conn,$select_nonpurchase_stockiest);
+$select_nonpurchase_stockiest="select * from distributor where onboard_userTYPE=? and onboard_userID=? order by id asc";
+$fetch_nonpurchase_stockiest=db_q($db_conn,$select_nonpurchase_stockiest,[$Login_user_TYPEvl,$Login_user_IDvl]);
 while($result_nonpurchase_stockiest=mysqli_fetch_array($fetch_nonpurchase_stockiest))
 {
 	$NNP_stockiest_ID=$result_nonpurchase_stockiest['temp_id'];
-	$select_count_nonpurchase_stockiest="select count(*) as numnnss from user_invoice where to_user_id='$NNP_stockiest_ID' and to_user_type='$tousertype_non_purcah3' and date between '$get_data4' and '$get_data5'";
-	$fetch_count_nonpurchase_stockiest=mysqli_query($db_conn,$select_count_nonpurchase_stockiest);
+	$select_count_nonpurchase_stockiest="select count(*) as numnnss from user_invoice where to_user_id=? and to_user_type=? and date between ? and ?";
+	$fetch_count_nonpurchase_stockiest=db_q($db_conn,$select_count_nonpurchase_stockiest,[$NNP_stockiest_ID,$tousertype_non_purcah3,$get_data4,$get_data5]);
 	$result_count_nonpurchase_stockiest=mysqli_fetch_array($fetch_count_nonpurchase_stockiest);
 	$Total_purcahse_count_stockiest=$result_count_nonpurchase_stockiest['numnnss'];
 	
-	$SLCT_SS_cnt="select count(*) as numnnss23 from temp_not_purchased where userid='$NNP_stockiest_ID' and usertype='$tousertype_non_purcah3'";
-	$fetch_SS_cnt=mysqli_query($db_conn,$SLCT_SS_cnt);
+	$SLCT_SS_cnt="select count(*) as numnnss23 from temp_not_purchased where userid=? and usertype=?";
+	$fetch_SS_cnt=db_q($db_conn,$SLCT_SS_cnt,[$NNP_stockiest_ID,$tousertype_non_purcah3]);
 	$REsult_SS_cnt=mysqli_fetch_array($fetch_SS_cnt);
 	if($REsult_SS_cnt['numnnss23']==0)
 	{
-		$insert_report_nonpurcahse_stockiest="insert into temp_not_purchased (usertype,userid,purchse_count,searchtype,onboard_userTYPE,onboard_userID) values ('$tousertype_non_purcah3','$NNP_stockiest_ID',
-		'$Total_purcahse_count_stockiest','nil','$Login_user_TYPEvl','$Login_user_IDvl')";
-		mysqli_query($db_conn,$insert_report_nonpurcahse_stockiest);
+		$insert_report_nonpurcahse_stockiest="insert into temp_not_purchased (usertype,userid,purchse_count,searchtype,onboard_userTYPE,onboard_userID) values (?,?,
+		?,'nil',?,?)";
+		db_q($db_conn,$insert_report_nonpurcahse_stockiest,[$tousertype_non_purcah3,$NNP_stockiest_ID,$Total_purcahse_count_stockiest,$Login_user_TYPEvl,$Login_user_IDvl]);
 		
 	}
 	
 }
 											
-	echo "<script>window.location='overview_notpurchased?modelval=$get_data1&&out1=$get_data2&&frdate=$get_data4&&todate=$get_data5&&seaction=$get_data3';</script>";
+	echo "<script>window.location='overview_notpurchased?modelval=".urlencode($get_data1)."&&out1=".urlencode($get_data2)."&&frdate=".urlencode($get_data4)."&&todate=".urlencode($get_data5)."&&seaction=".urlencode($get_data3)."';</script>";
 										}
 										
 										
-$select_count_non_DTUSER="select count(*) as numDTUSER from temp_not_purchased where usertype='$tousertype_non_purcah3' and purchse_count='0'";
-$fethc_ount_non_DTUSER=mysqli_query($db_conn,$select_count_non_DTUSER);
+$select_count_non_DTUSER="select count(*) as numDTUSER from temp_not_purchased where usertype=? and purchse_count='0'";
+$fethc_ount_non_DTUSER=db_q($db_conn,$select_count_non_DTUSER,[$tousertype_non_purcah3]);
 $result_count_non_DTUSER=mysqli_fetch_array($fethc_ount_non_DTUSER);
 $show_nonpur_DTUSER=$result_count_non_DTUSER['numDTUSER'];
 
@@ -297,19 +297,19 @@ $show_nonpur_DTUSER=$result_count_non_DTUSER['numDTUSER'];
 										
 <h1><?=$DISPLAY_LABLE;?> <?php if($show_nonpur_DTUSER>0){ echo " (Count : ".$show_nonpur_DTUSER.")"; }?></h1>
 									
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="modelval" value="<?=$_REQUEST['modelval'];?>"/>
-<input type="hidden" name="out1" value="<?=$_REQUEST['out1'];?>"/>
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="modelval" value="<?=htmlspecialchars((string)($_REQUEST['modelval']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out1" value="<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="seaction" value="1"/>
 
 <div class="overviewcontainar">
 <div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$get_from_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($get_from_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$get_to_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($get_to_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
@@ -333,8 +333,8 @@ $show_nonpur_DTUSER=$result_count_non_DTUSER['numDTUSER'];
                                             </thead>
 											
 											<tbody>
-										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='distributor' and onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl'";
-										$fetchRcd_VLSS1=mysqli_query($db_conn,$selectRcd_VLSS1);
+										<?php $selectRcd_VLSS1="select * from temp_not_purchased where purchse_count='0' and usertype='distributor' and onboard_userTYPE=? and onboard_userID=?";
+										$fetchRcd_VLSS1=db_q($db_conn,$selectRcd_VLSS1,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($resultRcd_VLSS1=mysqli_fetch_array($fetchRcd_VLSS1))
 										{
 											
@@ -347,14 +347,14 @@ $show_nonpur_DTUSER=$result_count_non_DTUSER['numDTUSER'];
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultusers['taluk_id'];
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
@@ -362,9 +362,9 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultusers["useridtext"];?></td>
-							<td><?=$resultusers["name"];?></td>
-							<td><?=$resultusers["mobile_number"];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				

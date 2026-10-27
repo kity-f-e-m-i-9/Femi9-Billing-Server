@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ot_channels');
 error_reporting(0);
 ?>
@@ -115,7 +115,7 @@ error_reporting(0);
 													<th>Product Name</th>
 													
                                     				<?php foreach($products as $product) { ?>
-                                    				<th><?= $product['productName']; ?></th>
+                                    				<th><?= htmlspecialchars((string)($product['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></th>
                                     				<?php } ?>
 				
                                                 </tr>
@@ -134,7 +134,7 @@ error_reporting(0);
                                                     $return_date = $result_product_list["return_date"];
                                                     
                                                     // Get return details
-                                                    $select_ReturnDetails = "SELECT * FROM ot_sales_return WHERE tempid='$tempid' LIMIT 1";
+                                                    $select_ReturnDetails = "SELECT * FROM ot_sales_return WHERE tempid='".db_esc($tempid)."' LIMIT 1";
                                                     $fetch_ReturnDetails = mysqli_query($db_conn, $select_ReturnDetails);
                                                     $result_ReturnDetails = mysqli_fetch_array($fetch_ReturnDetails);
                                                     
@@ -142,12 +142,12 @@ error_reporting(0);
                                                         $prid = $result_ReturnDetails['prid'];
                                                         
                                                         // Get product details
-                                                        $selectProducts = "SELECT * FROM products WHERE id='$prid'";
+                                                        $selectProducts = "SELECT * FROM products WHERE id='".db_esc($prid)."'";
                                                         $fetchProducts = mysqli_query($db_conn, $selectProducts);
                                                         $resultProducts = mysqli_fetch_array($fetchProducts);
                                                         
                                                         // Get sales details
-                                                        $select_productDetails = "SELECT * FROM ot_sales WHERE tempid='$tempid'";
+                                                        $select_productDetails = "SELECT * FROM ot_sales WHERE tempid='".db_esc($tempid)."'";
                                                         $fetch_productDetails = mysqli_query($db_conn, $select_productDetails);
                                                         $result_productDetails = mysqli_fetch_array($fetch_productDetails);
                                                         
@@ -156,18 +156,18 @@ error_reporting(0);
                                             <tr>
                                                 <td><?php echo ++$i; ?></td>
 												<td><?php echo date("d/m/Y", strtotime($return_date)); ?></td>
-												<td><?php echo $result_productDetails["order_number"]; ?></td>
-												<td><?php echo $result_productDetails["customer_name"]; ?></td>
-												<td><?php echo $result_productDetails["customer_mobile"]; ?></td>
-												<td><?php echo $result_productDetails["customer_address"]; ?></td>
-												<td><?php echo $resultProducts["productName"]; ?></td>
+												<td><?php echo htmlspecialchars((string)($result_productDetails["order_number"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+												<td><?php echo htmlspecialchars((string)($result_productDetails["customer_name"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+												<td><?php echo htmlspecialchars((string)($result_productDetails["customer_mobile"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+												<td><?php echo htmlspecialchars((string)($result_productDetails["customer_address"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+												<td><?php echo htmlspecialchars((string)($resultProducts["productName"]), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
 												
 												<?php 
                                                 // Product wise quantities
                                                 foreach($products as $product) {
                                                     $prid_header = $product['id'];
                                                     
-                                                    $select_QTY = "SELECT qty FROM ot_sales_return WHERE tempid='$tempid' AND prid='$prid_header'";
+                                                    $select_QTY = "SELECT qty FROM ot_sales_return WHERE tempid='".db_esc($tempid)."' AND prid='".db_esc($prid_header)."'";
                                                     $fetch_QTY = mysqli_query($db_conn, $select_QTY);
                                                     $result_QTY = mysqli_fetch_array($fetch_QTY);
                                                     

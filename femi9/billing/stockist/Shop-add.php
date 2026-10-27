@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 header("Location: dashboard.php"); exit;
 include("config.php");
 
@@ -107,7 +107,7 @@ $tempID="".$randum_number."FSHP".$temp_date."".$temp_time."";?>
 	<?php $selectShopCat="select * from shop_category order by id asc";
 	$fetchShopCat=mysqli_query($db_conn,$selectShopCat);
 	while($resultShopCat=mysqli_fetch_array($fetchShopCat)){?>
-	<option value="<?php echo $resultShopCat['id'];?>"><?php echo $resultShopCat['catlable'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($resultShopCat['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($resultShopCat['catlable']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	<?php  } ?>
 	</select>
 	<br/>
@@ -146,12 +146,12 @@ $tempID="".$randum_number."FSHP".$temp_date."".$temp_time."";?>
 <select required="" name="pincode_id" class="form-control">
 <option value="" hidden="">Select</option>
 <?php 
-$SelectPincodeList="select * from pincode where assigned_SID='$Login_user_IDvl' order by pincode asc";
-$FetchPincodeList=mysqli_query($db_conn,$SelectPincodeList);
+$SelectPincodeList="select * from pincode where assigned_SID=? order by pincode asc";
+$FetchPincodeList=db_q($db_conn,$SelectPincodeList,[$Login_user_IDvl]);
 while($ResultPincodeList=mysqli_fetch_array($FetchPincodeList))
 {
 ?>
-<option value="<?php echo $ResultPincodeList['id'];?>"><?php echo $ResultPincodeList['pincode'];?></option>
+<option value="<?php echo htmlspecialchars((string)($ResultPincodeList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($ResultPincodeList['pincode']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>---->
 <br/>
@@ -181,7 +181,7 @@ while($ResultPincodeList=mysqli_fetch_array($FetchPincodeList))
 <?php $selectCountry="select * from country order by id asc";
 $fetchCountry=mysqli_query($db_conn,$selectCountry);
 while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
-<option value='<?php echo $resultCountry['c_code'];?>' ><?php echo $resultCountry['c_name'];?> (<?php echo $resultCountry['c_code'];?>)</option>
+<option value='<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>' ><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false);?>)</option>
 <?php }?>
 </select>
             </div>

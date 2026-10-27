@@ -504,7 +504,7 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
                         </div>
 
 
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 <?php if ($isTeamMode): ?>
 <input type="hidden" name="view_ms_ids" value="<?=htmlspecialchars(implode(',', $viewMsIds));?>">
 <?php else: ?>
@@ -913,12 +913,12 @@ $tpStatusHtml = "<div class='tp-status-box'>{$headerHtml}{$detailHtml}</div>";
 					<?php if ($isTeamMode): ?>
 					<td><?=htmlspecialchars($result_msDetailsRow['ms_name'] ?? '');?></td>
 					<?php endif; ?>
-					<td><?=$result_shopcatt['name'];?></td>
-					<td><?=$result_shopcatt['mobile_number'];?></td>
-					<td><?=ucwords($result_shopcatt["address"]);?></td>
+					<td><?=htmlspecialchars((string)($result_shopcatt['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)($result_shopcatt['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_shopcatt["address"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td><?=date("d/m/Y",strtotime($result_product_list["order_date"]));?></td>
-					<td><?=$result_product_list["marketing_tool"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["marketing_tool"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					
 					<!------------------------PRODUCT WISE SALES QTY------------------------------->
@@ -948,7 +948,7 @@ $tpStatusHtml = "<div class='tp-status-box'>{$headerHtml}{$detailHtml}</div>";
 
 					<td>
 					<?php if($result_product_list["latitude"]!=NULL && $result_product_list["longitude"]!=NULL){?>
-					<a href="https://www.google.com/maps?q=<?=$result_product_list["latitude"];?>,<?=$result_product_list["longitude"];?>" target="_blank" class="btn btn-sm btn-secondary">View Location</a>
+					<a href="https://www.google.com/maps?q=<?=htmlspecialchars((string)($result_product_list["latitude"]), ENT_QUOTES, 'ISO-8859-1', false);?>,<?=htmlspecialchars((string)($result_product_list["longitude"]), ENT_QUOTES, 'ISO-8859-1', false);?>" target="_blank" class="btn btn-sm btn-secondary">View Location</a>
 					<?php }else{ echo "---"; }?>
 					</td>
 

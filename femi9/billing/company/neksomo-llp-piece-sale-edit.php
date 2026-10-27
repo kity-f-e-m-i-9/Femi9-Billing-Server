@@ -81,7 +81,7 @@ $products = $db_conn->query("SELECT id, productName, unit_type FROM products ORD
 
 <form action="neksomo-llp-piece-sale-action.php" method="post">
 <input type="hidden" name="update_id" value="<?php echo (int)$entry['id']; ?>">
-<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 
                                         <div class="example-container">
                                             <div class="example-content">

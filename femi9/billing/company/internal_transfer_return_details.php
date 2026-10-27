@@ -164,7 +164,7 @@ $gd_to = mysqli_fetch_array($fetch_gd_to);
             <p class="bold">Total <span>&#8377;<?php echo inr_format($note['total'] ?? 0, 2);?></span></p>
                                                 </div>
 											<div style="margin-top:15px;">
-<a href="internal_transfer_return_delete?returnid=<?=$_REQUEST['returnid'];?>" class="btn btn-primary badge badge-style-bordered badge-danger" onclick="return confirm('Delete this credit note? The returned stock movement will be reversed.');">Delete Credit Note</a>
+<a href="internal_transfer_return_delete?returnid=<?=htmlspecialchars((string)($_REQUEST['returnid']), ENT_QUOTES, 'UTF-8', false);?>" class="btn btn-primary badge badge-style-bordered badge-danger" onclick="return confirm('Delete this credit note? The returned stock movement will be reversed.');">Delete Credit Note</a>
 											</div>
                                             </div>
                                         </div>

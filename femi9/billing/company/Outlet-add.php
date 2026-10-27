@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $title="Add Outlet";
@@ -198,7 +198,7 @@ function getXMLHTTP() { //fuction to return the xml http object
 	<?php $selectSTATE="select * from state order by st_name asc";
 	$fetchSTATE=mysqli_query($db_conn,$selectSTATE);
 	while($resultSTATE=mysqli_fetch_array($fetchSTATE)){?>
-	<option value="<?php echo $resultSTATE['id'];?>"><?php echo $resultSTATE['st_name'];?></option>
+	<option value="<?php echo htmlspecialchars((string)($resultSTATE['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($resultSTATE['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 	<?php  } ?>
 	</select>
 	
@@ -301,11 +301,11 @@ xmlhttp.send();}
 			<label class="form-label">Choose Plan</label>
             <select required="" name="plan_id" class="form-control">
 												<option value="" hidden="">Select</option>
-												<?php $select_plans="select * from plans where cat='$Coupon_category' order by amount asc";
-												$fetch_plans=mysqli_query($db_conn,$select_plans);
+												<?php $select_plans="select * from plans where cat=? order by amount asc";
+												$fetch_plans=db_q($db_conn,$select_plans,[$Coupon_category]);
 												while($result_plans=mysqli_fetch_array($fetch_plans))
 												{?>
-											<option value="<?php echo $result_plans['id'];?>">&#8377; <?php echo $result_plans['amount'];?> / <?php echo $result_plans['valid_months'];?> Days</option>
+											<option value="<?php echo htmlspecialchars((string)($result_plans['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">&#8377; <?php echo htmlspecialchars((string)($result_plans['amount']), ENT_QUOTES, 'ISO-8859-1', false);?> / <?php echo htmlspecialchars((string)($result_plans['valid_months']), ENT_QUOTES, 'ISO-8859-1', false);?> Days</option>
 												<?php } ?>
 												</select>
 												<?php */?>

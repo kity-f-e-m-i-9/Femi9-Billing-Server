@@ -5,7 +5,7 @@
  * Concurrency-safe using transaction + FOR UPDATE
  */
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['dt','sdt','ss','st']);
 include("config.php");
 
 error_reporting(E_ALL);

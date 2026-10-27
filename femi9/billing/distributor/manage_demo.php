@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -101,8 +101,8 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-				<?php $select_product_list="select * from demo_awareness where userid='$loguser_tempid' order by id desc";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+				<?php $select_product_list="select * from demo_awareness where userid=? order by id desc";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$loguser_tempid]);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 						
@@ -118,8 +118,8 @@ $i= $start_from;
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
 					<td><?=date("d/m/Y",strtotime($result_product_list["date"]));?></td>
-					<td><?=$result_product_list["title"];?></td>
-					<td><a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>" title="<?=$result_product_list["title"];?>"><img src="<?php echo $imgsrcname;?>" style="width:50px;border-radius:10px;" alt="<?=$result_product_list["title"];?>"></a></td>
+					<td><?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>" title="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>"><img src="<?php echo $imgsrcname;?>" style="width:50px;border-radius:10px;" alt="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>"></a></td>
 													
 			<td>
 			<a href="edit_demo.php?prid=<?php echo $rowid;?>&&actionupdate" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit Details">

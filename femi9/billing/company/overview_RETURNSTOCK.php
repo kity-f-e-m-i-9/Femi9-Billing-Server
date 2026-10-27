@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -80,7 +80,7 @@ $endDate=$_REQUEST['todate'];
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report_return?frdate=<?=$start_date;?>&&todate=<?=$endDate;?>&&lable=<?=$_REQUEST['lable'];?>&&rptlable=<?=$_REQUEST['rptlable'];?>&&out1=<?=$_REQUEST['out1'];?>&&out2=<?=$_REQUEST['out2'];?>&&out3=<?=$_REQUEST['out3'];?>&&out4=<?=$_REQUEST['out4'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report_return?frdate=<?=htmlspecialchars((string)($start_date), ENT_QUOTES, 'UTF-8', false);?>&&todate=<?=htmlspecialchars((string)($endDate), ENT_QUOTES, 'UTF-8', false);?>&&lable=<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>&&rptlable=<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>&&out2=<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>&&out3=<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>&&out4=<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -98,19 +98,19 @@ $endDate=$_REQUEST['todate'];
 												<table id="reportdash">
 												<tr>
 												<th>Today</th>
-												<td>:&nbsp;<?=$_REQUEST['out1'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<!-----<tr>
 												<th>Yesterday</th>
-												<td>:&nbsp;<?=$_REQUEST['out2'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>This&nbsp;Month</th>
-												<td>:&nbsp;<?=$_REQUEST['out3'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>
 												<tr>
 												<th>Last&nbsp;Month&nbsp;Till&nbsp;Date</th>
-												<td>:&nbsp;<?=$_REQUEST['out4'];?></td>
+												<td>:&nbsp;<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?></td>
 												</tr>---->
 												</table>
                                             </div>
@@ -121,23 +121,23 @@ $endDate=$_REQUEST['todate'];
 						<?php }?>
 						
 						
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
-<input type="hidden" name="lable" value="<?=$_REQUEST['lable'];?>"/>
-<input type="hidden" name="rptlable" value="<?=$_REQUEST['rptlable'];?>"/>
-<input type="hidden" name="out1" value="<?=$_REQUEST['out1'];?>"/>
-<input type="hidden" name="out2" value="<?=$_REQUEST['out2'];?>"/>
-<input type="hidden" name="out3" value="<?=$_REQUEST['out3'];?>"/>
-<input type="hidden" name="out4" value="<?=$_REQUEST['out4'];?>"/>
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
+<input type="hidden" name="lable" value="<?=htmlspecialchars((string)($_REQUEST['lable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="rptlable" value="<?=htmlspecialchars((string)($_REQUEST['rptlable']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out1" value="<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out2" value="<?=htmlspecialchars((string)($_REQUEST['out2']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out3" value="<?=htmlspecialchars((string)($_REQUEST['out3']), ENT_QUOTES, 'UTF-8', false);?>"/>
+<input type="hidden" name="out4" value="<?=htmlspecialchars((string)($_REQUEST['out4']), ENT_QUOTES, 'UTF-8', false);?>"/>
 <input type="hidden" name="setrigger" value="1"/>
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
 <label class="form-label">From Date</label>
-<input type="date" required="" name="frdate" value="<?=$start_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="frdate" value="<?=htmlspecialchars((string)($start_date), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
-<input type="date" required="" name="todate" value="<?=$endDate;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+<input type="date" required="" name="todate" value="<?=htmlspecialchars((string)($endDate), ENT_QUOTES, 'UTF-8', false);?>" class="form-control" onkeypress="restrictSpecialChars(event)">
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
@@ -189,8 +189,8 @@ $i= $start_from;
 											
 											<tbody>
 										<?php
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype=? and deleted_at is null and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
@@ -198,15 +198,15 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid=? and deleted_at is null";
+	$fetch_sumqty=db_q($db_conn,$select_sumqty,[$returnid]);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	if($result_sumqty[0]!=NULL){$TotalReturnQTY=$result_sumqty[0];}
 	else{$TotalReturnQTY="0";}
 	
 	//Total stock return (Rs.)
-	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$Fetch_sumreturnamount=mysqli_query($db_conn,$Select_sumreturnamount);
+	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid=? and deleted_at is null";
+	$Fetch_sumreturnamount=db_q($db_conn,$Select_sumreturnamount,[$returnid]);
 	$Result_sumreturnamount=mysqli_fetch_array($Fetch_sumreturnamount);
 	if($Result_sumreturnamount[0]!=NULL){$TotalReturnAmount=$Result_sumreturnamount[0];}
 	else{$TotalReturnAmount="0";}
@@ -223,8 +223,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 											$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 								
@@ -234,13 +234,13 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
                                             
                                                 <tr>
                             <td><?php echo ++$i; ?></td>
-							<td><?=$result_market_SSCASH_VLSS_THISMONTH['invnumber'];?></td>
+							<td><?=htmlspecialchars((string)($result_market_SSCASH_VLSS_THISMONTH['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=date("d/m/Y",strtotime($result_market_SSCASH_VLSS_THISMONTH['date']));?></td>
 							<td><?=$TotalReturnQTY;?></td>
 							<td><?=inr_format($TotalReturnAmount, 2);?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 				
                                         </tr>
@@ -272,8 +272,8 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											
 											<tbody>
 										<?php
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype=? and deleted_at is null and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
@@ -281,15 +281,15 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid=? and deleted_at is null";
+	$fetch_sumqty=db_q($db_conn,$select_sumqty,[$returnid]);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	if($result_sumqty[0]!=NULL){$TotalReturnQTY=$result_sumqty[0];}
 	else{$TotalReturnQTY="0";}
 	
 	//Total stock return (Rs.)
-	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$Fetch_sumreturnamount=mysqli_query($db_conn,$Select_sumreturnamount);
+	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid=? and deleted_at is null";
+	$Fetch_sumreturnamount=db_q($db_conn,$Select_sumreturnamount,[$returnid]);
 	$Result_sumreturnamount=mysqli_fetch_array($Fetch_sumreturnamount);
 	if($Result_sumreturnamount[0]!=NULL){$TotalReturnAmount=$Result_sumreturnamount[0];}
 	else{$TotalReturnAmount="0";}
@@ -306,14 +306,14 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 											$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
-										$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+										$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
@@ -322,13 +322,13 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
                                             
                                                 <tr>
                             <td><?php echo ++$i; ?></td>
-							<td><?=$result_market_SSCASH_VLSS_THISMONTH['invnumber'];?></td>
+							<td><?=htmlspecialchars((string)($result_market_SSCASH_VLSS_THISMONTH['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=date("d/m/Y",strtotime($result_market_SSCASH_VLSS_THISMONTH['date']));?></td>
 							<td><?=$TotalReturnQTY;?></td>
 							<td><?=inr_format($TotalReturnAmount, 2);?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				
@@ -360,8 +360,8 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 											
 											<tbody>
 										<?php
-$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype='$usertypevl' and deleted_at is null and date between '$start_date' and '$endDate'";
-$fetch_market_SSCASH_VLSS_THISMONTH=mysqli_query($db_conn,$select_market_SSCASH_VLSS_THISMONTH);
+$select_market_SSCASH_VLSS_THISMONTH="select * from user_return_stock where from_usertype=? and deleted_at is null and date between ? and ?";
+$fetch_market_SSCASH_VLSS_THISMONTH=db_q($db_conn,$select_market_SSCASH_VLSS_THISMONTH,[$usertypevl,$start_date,$endDate]);
 while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCASH_VLSS_THISMONTH))
 {
 	
@@ -369,15 +369,15 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 	$returnid=$result_market_SSCASH_VLSS_THISMONTH['returnid'];
 	
 	//qty of returned
-	$select_sumqty="select sum(qty) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$fetch_sumqty=mysqli_query($db_conn,$select_sumqty);
+	$select_sumqty="select sum(qty) from user_return_stock_items where returnid=? and deleted_at is null";
+	$fetch_sumqty=db_q($db_conn,$select_sumqty,[$returnid]);
 	$result_sumqty=mysqli_fetch_array($fetch_sumqty);
 	if($result_sumqty[0]!=NULL){$TotalReturnQTY=$result_sumqty[0];}
 	else{$TotalReturnQTY="0";}
 	
 	//Total stock return (Rs.)
-	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid='$returnid' and deleted_at is null";
-	$Fetch_sumreturnamount=mysqli_query($db_conn,$Select_sumreturnamount);
+	$Select_sumreturnamount="select sum(total) from user_return_stock_items where returnid=? and deleted_at is null";
+	$Fetch_sumreturnamount=db_q($db_conn,$Select_sumreturnamount,[$returnid]);
 	$Result_sumreturnamount=mysqli_fetch_array($Fetch_sumreturnamount);
 	if($Result_sumreturnamount[0]!=NULL){$TotalReturnAmount=$Result_sumreturnamount[0];}
 	else{$TotalReturnAmount="0";}
@@ -394,14 +394,14 @@ while($result_market_SSCASH_VLSS_THISMONTH=mysqli_fetch_array($fetch_market_SSCA
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 											$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultRcd_VLSS1['taluk_id'];
-										$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+										$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
@@ -410,13 +410,13 @@ $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
                                             
                                                 <tr>
                             <td><?php echo ++$i; ?></td>
-							<td><?=$result_market_SSCASH_VLSS_THISMONTH['invnumber'];?></td>
+							<td><?=htmlspecialchars((string)($result_market_SSCASH_VLSS_THISMONTH['invnumber']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=date("d/m/Y",strtotime($result_market_SSCASH_VLSS_THISMONTH['date']));?></td>
 							<td><?=$TotalReturnQTY;?></td>
 							<td><?=inr_format($TotalReturnAmount, 2);?></td>
 							<td><?=$useridtext;?></td>
 							<td><?=$usernametext;?></td>
-							<td><?=$resultRcd_VLSS1["mobile_number"];?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				

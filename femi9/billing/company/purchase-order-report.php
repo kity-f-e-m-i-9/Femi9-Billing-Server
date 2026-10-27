@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $title="Purchase Order Report : Completed";
 date_default_timezone_set("Asia/Kolkata");
 $current_date=date("Y-m-d");
@@ -86,7 +86,7 @@ error_reporting(0);
 									}
 									?>
 									
-<form action="<?=$_SERVER['PHP_SELF'];?>" method="post" enctype="multipart/form-data">
+<form action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" method="post" enctype="multipart/form-data">
 
                                         <div class="example-container">
                                             <div class="example-content">
@@ -119,20 +119,20 @@ error_reporting(0);
                                             </thead>
 											 <tbody>
 										<?php 
-		$select_picnode_list="select * from stock_request where status='billed' and date between '$get_from_date' and '$get_to_date' order by id asc";
-		$fetch_picnode_list=mysqli_query($db_conn,$select_picnode_list);
+		$select_picnode_list="select * from stock_request where status='billed' and date between ? and ? order by id asc";
+		$fetch_picnode_list=db_q($db_conn,$select_picnode_list,[$get_from_date,$get_to_date]);
 		while($result_pincode_list=mysqli_fetch_array($fetch_picnode_list))
 							{
 											$reqid=$result_pincode_list['reqid'];
 											//get product details
-$select_productsitems="select sum(qty) from stock_request_items where reqid='$reqid'";
-$fetch_productsitems=mysqli_query($db_conn,$select_productsitems);
+$select_productsitems="select sum(qty) from stock_request_items where reqid=?";
+$fetch_productsitems=db_q($db_conn,$select_productsitems,[$reqid]);
 $result_prodcutsitems=mysqli_fetch_array($fetch_productsitems);
 //
 /*$prid=$result_prodcutsitems['prid'];
 //
-$select_products="select * from products where id='$prid'";
-$fetch_products=mysqli_query($db_conn,$select_products);
+$select_products="select * from products where id=?";
+$fetch_products=db_q($db_conn,$select_products,[$prid]);
 $result_products=mysqli_fetch_array($fetch_products);
 $productname=strtoupper($result_products['productName']);*/
 
@@ -181,8 +181,8 @@ $displaytousersdetai=" ".$lblevl2."<br/>".strtoupper($tousername)."
 						<td><?=date("d/m/Y",strtotime($result_pincode_list['date']));?></td>
                                       
 									  <td>
-									  <?=$lblevl;?><br/><?=strtoupper($result_fromusers['name'])?>
-									  <br/><b>Mob:</b> <?=$result_fromusers['mobile_number'];?>
+									  <?=$lblevl;?><br/><?=htmlspecialchars((string)(strtoupper($result_fromusers['name'])), ENT_QUOTES, 'ISO-8859-1', false)?>
+									  <br/><b>Mob:</b> <?=htmlspecialchars((string)($result_fromusers['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?>
 									  </td>
 													
 									  <td>

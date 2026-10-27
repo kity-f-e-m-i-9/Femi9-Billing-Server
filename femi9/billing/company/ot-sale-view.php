@@ -216,7 +216,7 @@ if (isset($_SESSION['errorMessage'])) {
 <div class="overviewcontainar">
 <div id="searchleftcont">
 <label class="form-label">Invoice Number</label>
-<input type="text" required="" name="se_invoice" value="<?=$se_invoice;?>" class="form-control">
+<input type="text" required="" name="se_invoice" value="<?=htmlspecialchars((string)($se_invoice), ENT_QUOTES, 'UTF-8', false);?>" class="form-control">
 </div>
 
 <div id="searchbuttoncont">
@@ -303,7 +303,7 @@ function otSetAllDraftCheckboxes(checked) {
 					while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){
 					$productsList[] = $result_prdetails_header;
 					?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 
 													<th>Amount Status</th>
@@ -397,18 +397,18 @@ foreach ($tempidList as $tempid) {
                                                     <td><input type="checkbox" name="tempids[]" value="<?=htmlspecialchars($tempid, ENT_QUOTES)?>" class="ot-draft-checkbox" onclick="otUpdateBulkConfirmButton()"></td>
                                                     <td><?php echo ++$i; ?></td>
 				<td><?php echo $result_godowndetails["gname"] ?? '';?></td>
-													<td><?php echo $Result_productDetils["cat"];?></td>
+													<td><?php echo htmlspecialchars((string)($Result_productDetils["cat"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php if ($ot_row_status === 'draft'): ?><span class="badge badge-warning">Draft</span><?php else: ?><span class="badge badge-success">Confirmed</span><?php endif; ?></td>
 
 													<td><?php echo $Result_productDetils122["coupon_code"] ?? '';?></td>
 													<td><?php echo $Result_productDetils122["website_commission"] ?? '';?></td>
 
 					<td><?php echo date("d/m/y",strtotime($Result_productDetils["date"]));?></td>
-					<td><?php echo $Result_productDetils["order_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($Result_productDetils["order_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td><?php echo $ot_invoice_number;?></td>
 
-					<td><?php echo $Result_productDetils["customer_name"];?></td>
-					<td><?php echo $Result_productDetils["customer_mobile"];?></td>
+					<td><?php echo htmlspecialchars((string)($Result_productDetils["customer_name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td><?php echo htmlspecialchars((string)($Result_productDetils["customer_mobile"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
 					<?php
 $get_stateID=$Result_productDetils['state_id'];
@@ -420,7 +420,7 @@ $STName = $stateMap[(int)$get_stateID] ?? '';
 }
 ?>
 					<td><?php echo $STName;?></td>
-					<td><?php echo $Result_productDetils["customer_address"];?></td>
+					<td><?php echo htmlspecialchars((string)($Result_productDetils["customer_address"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 
 
 				<!------------------------PRODUCT WISE SALES QTY------------------------------->
@@ -448,7 +448,7 @@ function newPopup(url) {
 }
 </script>
 
-<td><?=$Result_productDetils["username"];?><br/><?=ucwords($Result_productDetils["usertype"]);?></td>
+<td><?=htmlspecialchars((string)($Result_productDetils["username"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/><?=htmlspecialchars((string)(ucwords($Result_productDetils["usertype"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							
 
 		

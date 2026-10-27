@@ -324,7 +324,7 @@ $recentSources = $db_conn->query("
                         </div>
                     </div>
                     <p class="no-print" style="color:#6b7280;font-size:13px;margin-top:4px;">
-                        Dispatch Slip's Box column says this shipment needs <b><?= $boxTotals['TotalBoxesDisplay']; ?></b>,
+                        Dispatch Slip's Box column says this shipment needs <b><?= htmlspecialchars((string)($boxTotals['TotalBoxesDisplay']), ENT_QUOTES, 'ISO-8859-1', false); ?></b>,
                         so <?= $totalBoxes; ?> label row<?= $totalBoxes !== 1 ? 's were' : ' was'; ?> started below with a computed Product breakdown.
                         Everything here is editable; Source is always typed in, since where a box actually ships from isn't tracked anywhere else.
                     </p>

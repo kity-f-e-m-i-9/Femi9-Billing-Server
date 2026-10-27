@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -8,7 +8,7 @@ $shop   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE id
 if (!$shop) { header("Location: shop-manage.php"); exit; }
 
 $shop_cat_id = $shop['shop_cat'];
-$cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_category WHERE id='$shop_cat_id' LIMIT 1"));
+$cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_category WHERE id='".db_esc($shop_cat_id)."' LIMIT 1"));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -53,16 +53,16 @@ $cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_cate
                                 <div class="card-body">
                                     <?php include("validate-scripts.php"); ?>
 <form action="shop-edit-action.php" method="post" enctype="multipart/form-data">
-<input type="hidden" name="update_id" value="<?php echo $shop['id']; ?>">
-<input type="hidden" name="old_icon"  value="<?php echo $shop['user_icon']; ?>">
+<input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($shop['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
+<input type="hidden" name="old_icon"  value="<?php echo htmlspecialchars((string)($shop['user_icon']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 <div class="example-container"><div class="example-content">
 
 <label class="form-label">Category*</label>
 <select name="shop_cat" class="form-control">
-    <option value="<?php echo $shop_cat_id; ?>" hidden><?php echo $cat['catlable']; ?></option>
+    <option value="<?php echo $shop_cat_id; ?>" hidden><?php echo htmlspecialchars((string)($cat['catlable']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
     <?php $r = mysqli_query($db_conn, "SELECT * FROM shop_category ORDER BY id ASC");
     while ($row = mysqli_fetch_array($r)) { ?>
-    <option value="<?php echo $row['id']; ?>"><?php echo $row['catlable']; ?></option>
+    <option value="<?php echo htmlspecialchars((string)($row['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($row['catlable']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
     <?php } ?>
 </select><br/>
 
@@ -73,10 +73,10 @@ $cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_cate
     <div style="flex:0 0 20%;">
         <label class="form-label">Country Code*</label>
         <select name="country_code" required class="form-control">
-            <option value="<?php echo $shop['country_code']; ?>" hidden><?php echo $shop['country_code']; ?></option>
+            <option value="<?php echo htmlspecialchars((string)($shop['country_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>" hidden><?php echo htmlspecialchars((string)($shop['country_code']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
             <?php $rc = mysqli_query($db_conn, "SELECT * FROM country ORDER BY c_name ASC");
             while ($rowc = mysqli_fetch_array($rc)) { ?>
-            <option value="<?php echo $rowc['c_code']; ?>"><?php echo $rowc['c_name']; ?> (<?php echo $rowc['c_code']; ?>)</option>
+            <option value="<?php echo htmlspecialchars((string)($rowc['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rowc['c_name']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($rowc['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
             <?php } ?>
         </select>
     </div>

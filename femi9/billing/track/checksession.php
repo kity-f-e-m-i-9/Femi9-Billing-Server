@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/csrf-guard.php'; femi_csrf_guard();
 // Standalone login portal — no cross-portal bridge/dual-account logic, by
 // explicit request 2026-09-04 ("track ku salesbdm link aagave aagathu" —
 // track must never be linked to salesbdm or any other portal).

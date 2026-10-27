@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
@@ -62,8 +62,8 @@ $invidprefix       = "CMPSHP";
 </tr></table></h1>
 
 <?php
-$sel_tpstock = "SELECT COUNT(*) AS n FROM territory_partner_stock WHERE territory_partner_id='$Login_user_IDvl'";
-$res_tpstock = mysqli_fetch_array(mysqli_query($db_conn, $sel_tpstock));
+$sel_tpstock = "SELECT COUNT(*) AS n FROM territory_partner_stock WHERE territory_partner_id=?";
+$res_tpstock = mysqli_fetch_array(db_q($db_conn,$sel_tpstock,[$Login_user_IDvl]));
 if ($res_tpstock['n'] == 0) { ?>
 <div class="alert alert-danger">Please update opening stock ! <a href="op-stock.php">Click here</a></div>
 <?php } else { ?>
@@ -110,37 +110,37 @@ select:focus, input[type=number]:focus { background:#fffa8f; }
     $Invoice_ID_encode = $_REQUEST['InvoiceID'];
     $Invoice_ID = base64_decode($_REQUEST['InvoiceID']);
 
-    $result_InvoieDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='$Invoice_ID'"));
+    $result_InvoieDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM user_invoice WHERE inv_id='".db_esc($Invoice_ID)."'"));
 
     // Receipt check
     $totalamount = $result_InvoieDetails["total"];
-    $Total_Receipt_amount = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(received) FROM receipt WHERE inv_id='$Invoice_ID'"))[0];
+    $Total_Receipt_amount = mysqli_fetch_array(mysqli_query($db_conn, "SELECT SUM(received) FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."'"))[0];
     $amount_received_fully = ($Total_Receipt_amount > 0 && $totalamount == $Total_Receipt_amount) ? "1" : "0";
 
     $CustomerID = $result_InvoieDetails['to_user_id'];
-    $result_CUSTDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='$CustomerID'"));
+    $result_CUSTDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='".db_esc($CustomerID)."'"));
 ?>
 
 <form action="shop-invoice-action2.php" method="post" enctype="multipart/form-data">
-<input type="hidden" name="inv_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="inv_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 <input type="hidden" name="invuser" value="<?php echo $getinvuser; ?>">
 <div class="example-container"><div class="example-content">
 
 <label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
 <?php
-$totalcountitems = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id='$Invoice_ID'"))['n'];
+$totalcountitems = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."'"))['n'];
 ?>
 <select name="customer_id" class="form-control">
-<option value="<?php echo $CustomerID; ?>" hidden><?php echo $result_CUSTDetails['name']; ?>, <?php echo $result_CUSTDetails['mobile_number']; ?></option>
+<option value="<?php echo $CustomerID; ?>" hidden><?php echo htmlspecialchars((string)($result_CUSTDetails['name']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($result_CUSTDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php if ($totalcountitems == 0) {
-    $res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userID='$Login_user_IDvl' AND onboard_userTYPE='$Login_user_TYPEvl' ORDER BY name ASC");
+    $res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userID='".db_esc($Login_user_IDvl)."' AND onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' ORDER BY name ASC");
     while ($r = mysqli_fetch_array($res_shops)) { ?>
-<option value="<?php echo $r['temp_id']; ?>"><?php echo ucwords($r['name']); ?>, <?php echo $r['mobile_number']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($r['temp_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucwords($r['name'])), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($r['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } } ?>
 </select>
 
 <label class="form-label">Invoice Date*</label>
-<input type="date" readonly name="date" value="<?php echo $result_InvoieDetails['date']; ?>" required class="form-control">
+<input type="date" readonly name="date" value="<?php echo htmlspecialchars((string)($result_InvoieDetails['date']), ENT_QUOTES, 'ISO-8859-1', false); ?>" required class="form-control">
 <br/>
 
 <?php if ($amount_received_fully == 0) { ?>
@@ -150,7 +150,7 @@ $totalcountitems = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS
 <?php
 $res_prods = mysqli_query($db_conn, "SELECT * FROM products ORDER BY id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) { ?>
-<option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rp['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 </select>
 <br/><br/>
@@ -183,30 +183,30 @@ function discamount() {
     <tbody>
 <?php
 $TotalAMount123 = 0; $CountProducts = 0; $rd = 0;
-$res_items = mysqli_query($db_conn, "SELECT * FROM user_invoice_items WHERE inv_id='$Invoice_ID' ORDER BY id DESC");
+$res_items = mysqli_query($db_conn, "SELECT * FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."' ORDER BY id DESC");
 $CountProducts = mysqli_num_rows($res_items);
 while ($ri = mysqli_fetch_array($res_items)) {
     $InV_Product_ID = $ri['pr_id'];
-    $pr = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='$InV_Product_ID'"));
+    $pr = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM products WHERE id='".db_esc($InV_Product_ID)."'"));
     $TotalAMount = $ri['total'];
     $TotalAMount123 += $TotalAMount;
     $ItemRowid = base64_encode($ri['id']);
 ?>
     <tr>
         <th><?php echo ++$rd; ?></th>
-        <td><?php echo $pr['productName']; ?></td>
-        <td><?php echo $ri['qty']; ?></td>
+        <td><?php echo htmlspecialchars((string)($pr['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
+        <td><?php echo htmlspecialchars((string)($ri['qty']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
         <td>&#8377;<?php echo inr_format($ri['amount'], 2); ?></td>
-        <td><?php echo $ri['discount_amount']; ?>(<?php echo $ri['discount_percentage']; ?>%)</td>
+        <td><?php echo htmlspecialchars((string)($ri['discount_amount']), ENT_QUOTES, 'ISO-8859-1', false); ?>(<?php echo htmlspecialchars((string)($ri['discount_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
         <td>&#8377;<?php echo inr_format($ri['subtotal'], 2); ?></td>
-        <td><?php echo $ri['gstamount_total']; ?>(<?php echo $ri['gst_percentage']; ?>%)</td>
+        <td><?php echo htmlspecialchars((string)($ri['gstamount_total']), ENT_QUOTES, 'ISO-8859-1', false); ?>(<?php echo htmlspecialchars((string)($ri['gst_percentage']), ENT_QUOTES, 'ISO-8859-1', false); ?>%)</td>
         <td align="right"><?php echo inr_format($TotalAMount, 2); ?></td>
         <?php if ($amount_received_fully == 0) { ?>
         <td>
         <?php
-        $cnt_ret = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='$Invoice_ID' AND prid='$InV_Product_ID'"));
+        $cnt_ret = mysqli_num_rows(mysqli_query($db_conn, "SELECT * FROM user_return_stock_items WHERE invnumber='".db_esc($Invoice_ID)."' AND prid='".db_esc($InV_Product_ID)."'"));
         if ($cnt_ret == 0) { ?>
-        <a href="shop-del-inv-product.php?invid=<?php echo $Invoice_ID_encode; ?>&&itemid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
+        <a href="shop-del-inv-product.php?invid=<?php echo htmlspecialchars((string)($Invoice_ID_encode), ENT_QUOTES, 'UTF-8', false); ?>&&itemid=<?php echo $ItemRowid; ?>&&invuser=<?php echo $getinvuser; ?>&&actionremove" onclick="return confirm('You want to delete confirm?');"><span class="badge bg-danger">Remove</span></a>
         <?php } else { echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>"; } ?>
         </td>
         <?php } ?>
@@ -242,9 +242,9 @@ function validateForm() {
     <td>Inv Num</td>
     <td style="color:#bd2b0e;">:&nbsp;
     <?php if ($get_action == "edit") { ?>
-    <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive"><span><?php echo $result_InvoieDetails['inv_number']; ?></span></a>
+    <a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive"><span><?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></span></a>
     <?php } else { ?>
-    <span><?php echo $result_InvoieDetails['inv_number']; ?></span>
+    <span><?php echo htmlspecialchars((string)($result_InvoieDetails['inv_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></span>
     <?php } ?>
     </td>
 </tr>
@@ -265,7 +265,7 @@ $roundoff      = $roundvalue - $unround_value;
 
 // Zero out invoice if items removed
 if ($CountProducts == 0 && $result_InvoieDetails['sub_total'] > 0) {
-    mysqli_query($db_conn, "UPDATE user_invoice SET sub_total='0',discount='0',total='0' WHERE inv_id='$Invoice_ID'");
+    mysqli_query($db_conn, "UPDATE user_invoice SET sub_total='0',discount='0',total='0' WHERE inv_id='".db_esc($Invoice_ID)."'");
 }
 ?>
 
@@ -281,7 +281,7 @@ function totalamount() {
 
 <div class="col-lg-3"><div class="invoice-info">
 
-<input type="hidden" name="invoice_id" value="<?php echo $Invoice_ID; ?>">
+<input type="hidden" name="invoice_id" value="<?php echo htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false); ?>">
 <input type="hidden" name="SubTotal" value="<?php echo $TotalAMount123; ?>">
 
 <p><b>Subtotal</b>
@@ -296,7 +296,7 @@ function totalamount() {
 </p>
 
 <p><b>Courier Charges</b>
-<input type="number" value="<?php echo $result_InvoieDetails['courier_charges']; ?>" name="courier_charges" min="0" required onkeyup="totalamount()" id="cucharge" class="form-control">
+<input type="number" value="<?php echo htmlspecialchars((string)($result_InvoieDetails['courier_charges']), ENT_QUOTES, 'ISO-8859-1', false); ?>" name="courier_charges" min="0" required onkeyup="totalamount()" id="cucharge" class="form-control">
 </p>
 
 <p><b>Total</b>
@@ -304,8 +304,8 @@ function totalamount() {
 </p>
 
 <?php
-$result_ReceiptDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='$Invoice_ID' ORDER BY id ASC"));
-$already_received = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COALESCE(SUM(received),0) AS total_received FROM receipt WHERE inv_id='$Invoice_ID'"))['total_received']);
+$result_ReceiptDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."' ORDER BY id ASC"));
+$already_received = (float)(mysqli_fetch_array(mysqli_query($db_conn, "SELECT COALESCE(SUM(received),0) AS total_received FROM receipt WHERE inv_id='".db_esc($Invoice_ID)."'"))['total_received']);
 $balance_due = max(0, (float)$roundvalue - $already_received);
 ?>
 
@@ -348,7 +348,7 @@ function receiptamount() {
 <?php if ($result_ReceiptDetails['receipt_method'] == NULL) { ?>
 <option value="" hidden>Select</option>
 <?php } else { ?>
-<option value="<?php echo $result_ReceiptDetails['receipt_method']; ?>" hidden><?php echo $result_ReceiptDetails['receipt_method']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($result_ReceiptDetails['receipt_method']), ENT_QUOTES, 'ISO-8859-1', false); ?>" hidden><?php echo htmlspecialchars((string)($result_ReceiptDetails['receipt_method']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 <option>--None--</option>
 <option>Cash</option>
@@ -454,9 +454,9 @@ invNumberSuggest();
 <select required name="customer_id" class="form-control" autofocus>
 <option value="" hidden>Select</option>
 <?php
-$res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userTYPE='$Login_user_TYPEvl' AND onboard_userID='$Login_user_IDvl' ORDER BY name ASC");
+$res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' AND onboard_userID='".db_esc($Login_user_IDvl)."' ORDER BY name ASC");
 while ($r = mysqli_fetch_array($res_shops)) { ?>
-<option value="<?php echo $r['temp_id']; ?>"><?php echo ucwords($r['name']); ?>, <?php echo $r['mobile_number']; ?>, <?php echo ucwords($r['address']); ?></option>
+<option value="<?php echo htmlspecialchars((string)($r['temp_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucwords($r['name'])), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($r['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)(ucwords($r['address'])), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 </select>
 
@@ -472,7 +472,7 @@ while ($r = mysqli_fetch_array($res_shops)) { ?>
 <?php
 $res_prods = mysqli_query($db_conn, "SELECT * FROM products ORDER BY id ASC");
 while ($rp = mysqli_fetch_array($res_prods)) { ?>
-<option value="<?php echo $rp['id']; ?>"><?php echo $rp['productName']; ?></option>
+<option value="<?php echo htmlspecialchars((string)($rp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rp['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
 <?php } ?>
 </select>
 <br/><br/>
@@ -518,10 +518,10 @@ function discamount() {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_invoice_action.php">
-                <input type="hidden" name="invuser"   value="<?php echo $_REQUEST['invuser']   ?? ''; ?>">
-                <input type="hidden" name="InvoiceID" value="<?php echo $_REQUEST['InvoiceID'] ?? ''; ?>">
-                <input type="hidden" name="action"    value="<?php echo $_REQUEST['action']    ?? ''; ?>">
-                <input type="hidden" name="gid"       value="<?php echo $_REQUEST['gid']       ?? ''; ?>">
+                <input type="hidden" name="invuser"   value="<?php echo htmlspecialchars((string)($_REQUEST['invuser']   ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+                <input type="hidden" name="InvoiceID" value="<?php echo htmlspecialchars((string)($_REQUEST['InvoiceID'] ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+                <input type="hidden" name="action"    value="<?php echo htmlspecialchars((string)($_REQUEST['action']    ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
+                <input type="hidden" name="gid"       value="<?php echo htmlspecialchars((string)($_REQUEST['gid']       ?? ''), ENT_QUOTES, 'UTF-8', false); ?>">
                 <input type="hidden" name="redirurl"  value="shop-invoice-add">
                 <input type="hidden" name="tblenme"   value="1">
                 <div class="example-content" style="padding:20px;">

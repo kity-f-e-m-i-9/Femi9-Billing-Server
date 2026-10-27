@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/csv-safe.php';
 // Streams the currently-filtered Bundle Report (either tab) as CSV —
 // mirrors export_GSTR1.php's plain-text streaming convention rather than
 // pulling in a spreadsheet library for a simple tabular export.
@@ -36,9 +36,9 @@ if ($tab === 'transactions') {
     header('Content-Disposition: attachment; filename="' . $filename . '"');
 
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['Date', 'Type', 'Bundle', 'Product', 'Godown', 'Warehouse', 'Qty', 'Detail', 'Ref ID', 'By']);
+    femi_fputcsv($out, ['Date', 'Type', 'Bundle', 'Product', 'Godown', 'Warehouse', 'Qty', 'Detail', 'Ref ID', 'By']);
     foreach ($rows as $r) {
-        fputcsv($out, [
+        femi_fputcsv($out, [
             date('d-M-Y H:i', strtotime($r['created_at'])),
             ucfirst($r['type']),
             !empty($r['is_bucket']) ? 'Loose pieces bucket' : 'Bundle #' . ($r['bundle_no'] ?? $r['bundle_id']),
@@ -62,12 +62,12 @@ header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 
 $out = fopen('php://output', 'w');
-fputcsv($out, [
+femi_fputcsv($out, [
     'Bundle', 'Product', 'Godown', 'Warehouse', 'Nominal', 'Remaining', 'Damaged', 'Extra Found',
     'Conversions', 'Packs Made', 'Status', 'Variance', 'Created By', 'Created At', 'Closed By', 'Closed At',
 ]);
 foreach ($rows as $b) {
-    fputcsv($out, [
+    femi_fputcsv($out, [
         $b['label'],
         $b['product_name'],
         $b['gname'],

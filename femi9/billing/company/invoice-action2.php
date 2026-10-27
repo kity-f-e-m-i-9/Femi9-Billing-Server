@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['ss','st','dt','sdt','shop','cus','stock_request','ot_channels','debit_note','manage_return','demo_free','report','payment_entry','manage_payment_entry','territory_partner']);
 include("config.php");
 require_once("include/StockService.php");
 
@@ -15,13 +15,13 @@ if(isset($_REQUEST['addInvoice']))
 	
 		
 		//3. update invoice
-		$update_Invoice="update invoice set customer_id='$customer_id',date='$date',inv_year='$inv_year' where inv_id='$inv_id' and user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
-		mysqli_query($db_conn,$update_Invoice);
+		$update_Invoice="update invoice set customer_id=?,date=?,inv_year=? where inv_id=? and user_type=? and user_id=?";
+		db_q($db_conn,$update_Invoice,[$customer_id,$date,$inv_year,$inv_id,$user_type_Loginvl,$user_id_Loginvl]);
 
 		// Invoice-level gst_type ("inner"/"outer") + buyer_gsttype were set
 		// once at header creation (invoice-action.php) — reuse them here
 		// rather than recomputing, same convention as customer-user-invoice-action2.php.
-		$select_InvHeader=mysqli_query($db_conn,"select gst_type,buyer_gsttype from invoice where inv_id='$inv_id'");
+		$select_InvHeader=mysqli_query($db_conn,"select gst_type,buyer_gsttype from invoice where inv_id='".db_esc($inv_id)."'");
 		$result_InvHeader=mysqli_fetch_array($select_InvHeader);
 		$gst_type=$result_InvHeader['gst_type'] ?: 'inner';
 		$buyer_gsttype=$result_InvHeader['buyer_gsttype'] ?: 'unregister';
@@ -39,7 +39,7 @@ if(isset($_REQUEST['addInvoice']))
 	// entered price, so the tax is carved out of subtotal (and NOT added
 	// again into total); exclusive-tax products get GST added on top —
 	// same convention as tp-invoice-print.php.
-	$select_prod=mysqli_query($db_conn,"select gst,gst_type,hsn from products where id='$pr_id'");
+	$select_prod=mysqli_query($db_conn,"select gst,gst_type,hsn from products where id='".db_esc($pr_id)."'");
 	$result_prod=mysqli_fetch_array($select_prod);
 	$gst_percentage=$result_prod['gst'] ?? 0;
 	$product_gst_type=($result_prod['gst_type'] ?? 'exclusive')==='inclusive' ? 'inclusive' : 'exclusive';
@@ -70,8 +70,8 @@ if(isset($_REQUEST['addInvoice']))
 		
 	}else{
 	
-	$select_count_invoiceItem="select count(*) as numInvoiceItem from invoice_items where inv_id='$inv_id' and pr_id='$pr_id' and user_type='$user_type_Loginvl' and user_id='$user_id_Loginvl'";
-	$fetch_count_invoiceItem=mysqli_query($db_conn,$select_count_invoiceItem);
+	$select_count_invoiceItem="select count(*) as numInvoiceItem from invoice_items where inv_id=? and pr_id=? and user_type=? and user_id=?";
+	$fetch_count_invoiceItem=db_q($db_conn,$select_count_invoiceItem,[$inv_id,$pr_id,$user_type_Loginvl,$user_id_Loginvl]);
 	$result_count_invoiceItem=mysqli_fetch_array($fetch_count_invoiceItem);
 	if($result_count_invoiceItem['numInvoiceItem']==0)
 	{
@@ -79,9 +79,9 @@ if(isset($_REQUEST['addInvoice']))
 		//1. insert invoice Items
 		$insert_InvoiceItems="insert into invoice_items (inv_id,pr_id,amount,qty,total,user_type,user_id,
 		gst_percentage,gstamount_singlepr,gstamount_total,subtotal,discount_percentage,discount_amount,gst_type,hsn,date,buyer_gsttype)
-		values ('$inv_id','$pr_id','$amount','$qty','$total','$Login_user_TYPEvl','$Login_user_IDvl',
-		'$gst_percentage','$gstamount_singlepr','$gstamount_total','$subtotal','$discount_percentage','$discount_amount','$gst_type','$hsn','$date','$buyer_gsttype')";
-		mysqli_query($db_conn,$insert_InvoiceItems);
+		values (?,?,?,?,?,?,?,
+		?,?,?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$pr_id,$amount,$qty,$total,$Login_user_TYPEvl,$Login_user_IDvl,$gst_percentage,$gstamount_singlepr,$gstamount_total,$subtotal,$discount_percentage,$discount_amount,$gst_type,$hsn,$date,$buyer_gsttype]);
 
 		//2. update stock — via StockService so this hits the same single
 		//(unassigned) row getClosingQty() just checked, and gets a proper

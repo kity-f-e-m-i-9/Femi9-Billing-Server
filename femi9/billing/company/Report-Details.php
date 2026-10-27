@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 ob_start();
 
 include("checksession.php");
@@ -450,9 +450,9 @@ $qparam = urlencode($search ?? '');
                                                     <input type="hidden" name="todate"      value="<?=$to_date;?>">
                                                     <input type="hidden" name="district_id" value="<?=$selected_district;?>">
                                                     <input type="hidden" name="taluk_id"    value="<?=$selected_taluk;?>">
-                                                    <input type="hidden" name="seller_type" value="<?=$selected_seller_type;?>">
+                                                    <input type="hidden" name="seller_type" value="<?=htmlspecialchars((string)($selected_seller_type), ENT_QUOTES, 'UTF-8', false);?>">
                                                     <input type="hidden" name="seller_id"   value="<?=htmlspecialchars($selected_seller_id, ENT_QUOTES);?>">
-                                                    <input type="hidden" name="buyer_type"  value="<?=$selected_buyer_type;?>">
+                                                    <input type="hidden" name="buyer_type"  value="<?=htmlspecialchars((string)($selected_buyer_type), ENT_QUOTES, 'UTF-8', false);?>">
                                                     <input type="hidden" name="buyer_district_id" value="<?=$selected_buyer_district;?>">
                                                     <input type="hidden" name="q"           value="<?=htmlspecialchars($search, ENT_QUOTES);?>"><!-- preserve search -->
                                                     <button type="submit" class="btn btn-success btn-sm">
@@ -487,7 +487,7 @@ $qparam = urlencode($search ?? '');
                                         <h5 class="card-title">Advanced Filters</h5>
                                     </div>
                                     <div class="card-body">
-                                        <form method="post" action="<?=$_SERVER['PHP_SELF'];?>" id="filterForm">
+                                        <form method="post" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" id="filterForm">
                                             <input type="hidden" name="state_id" value="<?=$selected_state_id;?>"/>
                                             
                                             <!-- Row 1: Date and Location Filters -->
@@ -514,7 +514,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($dist = $dist_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_district == $dist['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$dist['id'].'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($dist['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
                                                             }
                                                             $stmt_dist->close();
                                                         }
@@ -535,7 +535,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($taluk = $taluk_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_taluk == $taluk['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$taluk['id'].'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($taluk['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
                                                             }
                                                             $stmt_taluk->close();
                                                         }
@@ -579,7 +579,7 @@ $qparam = urlencode($search ?? '');
                                                                     if($seller_result) {
                                                                         while($seller = mysqli_fetch_assoc($seller_result)) {
                                                                             $selected_attr = ($selected_seller_id == $seller['id']) ? 'selected' : '';
-                                                                            echo '<option value="'.$seller['id'].'" '.$selected_attr.'>'.htmlspecialchars($seller['name']).'</option>';
+                                                                            echo '<option value="'.htmlspecialchars((string)($seller['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($seller['name']).'</option>';
                                                                         }
                                                                     }
                                                                 } else {
@@ -637,7 +637,7 @@ $qparam = urlencode($search ?? '');
                                                                         if($seller_result) {
                                                                             while($seller = mysqli_fetch_assoc($seller_result)) {
                                                                                 $selected_attr = ($selected_seller_id == $seller['id']) ? 'selected' : '';
-                                                                                echo '<option value="'.$seller['id'].'" '.$selected_attr.'>'.htmlspecialchars($seller['name']).'</option>';
+                                                                                echo '<option value="'.htmlspecialchars((string)($seller['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($seller['name']).'</option>';
                                                                             }
                                                                         }
                                                                     }
@@ -684,14 +684,14 @@ $qparam = urlencode($search ?? '');
                                                                 $buyer_list_result = mysqli_query($db_conn, $buyer_list_query);
                                                                 if($buyer_list_result) while($b = mysqli_fetch_assoc($buyer_list_result)) {
                                                                     $sel = ($selected_buyer_id == $b['id']) ? 'selected' : '';
-                                                                    echo '<option value="'.$b['id'].'" '.$sel.'>'.htmlspecialchars($b['name']).'</option>';
+                                                                    echo '<option value="'.htmlspecialchars((string)($b['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$sel.'>'.htmlspecialchars($b['name']).'</option>';
                                                                 }
                                                             }
                                                         } elseif($selected_buyer_type == 'customer') {
                                                             $cq = mysqli_query($db_conn, "SELECT id, name FROM customers ORDER BY name ASC LIMIT 1000");
                                                             if($cq) while($c = mysqli_fetch_assoc($cq)) {
                                                                 $sel = ($selected_buyer_id == $c['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$c['id'].'" '.$sel.'>'.htmlspecialchars($c['name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($c['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$sel.'>'.htmlspecialchars($c['name']).'</option>';
                                                             }
                                                         }
                                                         ?>
@@ -711,7 +711,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($bdist = $buyer_dist_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_buyer_district == $bdist['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$bdist['id'].'" '.$selected_attr.'>'.htmlspecialchars($bdist['dist_name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($bdist['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($bdist['dist_name']).'</option>';
                                                             }
                                                             $stmt_buyer_dist->close();
                                                         }
@@ -825,15 +825,15 @@ $qparam = urlencode($search ?? '');
                                     <div class="card-header py-3 bg-white border-0">
                                         <div class="d-flex align-items-center justify-content-between">
                                             <!-- LEFT: Show entries -->
-                                            <form method="post" action="<?=$_SERVER['PHP_SELF'];?>" class="d-flex align-items-center gap-2">
+                                            <form method="post" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" class="d-flex align-items-center gap-2">
                                                 <input type="hidden" name="state_id" value="<?=$selected_state_id;?>">
                                                 <input type="hidden" name="frdate" value="<?=$from_date;?>">
                                                 <input type="hidden" name="todate" value="<?=$to_date;?>">
                                                 <input type="hidden" name="district_id" value="<?=$selected_district;?>">
                                                 <input type="hidden" name="taluk_id" value="<?=$selected_taluk;?>">
-                                                <input type="hidden" name="seller_type" value="<?=$selected_seller_type;?>">
+                                                <input type="hidden" name="seller_type" value="<?=htmlspecialchars((string)($selected_seller_type), ENT_QUOTES, 'UTF-8', false);?>">
                                                 <input type="hidden" name="seller_id" value="<?=htmlspecialchars($selected_seller_id, ENT_QUOTES);?>">
-                                                <input type="hidden" name="buyer_type" value="<?=$selected_buyer_type;?>">
+                                                <input type="hidden" name="buyer_type" value="<?=htmlspecialchars((string)($selected_buyer_type), ENT_QUOTES, 'UTF-8', false);?>">
                                                 <input type="hidden" name="page" value="1">
                                                 <input type="hidden" name="buyer_district_id" value="<?=$selected_buyer_district;?>">
                                                 <input type="hidden" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>"><!-- keep search -->
@@ -849,7 +849,7 @@ $qparam = urlencode($search ?? '');
 
                                             <!-- RIGHT: Universal search + page info -->
                                             <div class="d-flex align-items-center gap-3">
-                                              <form method="get" action="<?=$_SERVER['PHP_SELF'];?>" id="searchForm" class="d-flex align-items-center gap-2">
+                                              <form method="get" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" id="searchForm" class="d-flex align-items-center gap-2">
                                                 <input type="hidden" name="page" value="1">
                                                 <input type="text"
                                                        name="q"
@@ -1391,7 +1391,7 @@ $qparam = urlencode($search ?? '');
                                                     WHERE rs.invnumber IN ($inv_list)
                                                       AND rs.total > 0
                                                       AND rs.deleted_at IS NULL
-                                                      AND rs.date BETWEEN '$from_date' AND '$to_date'
+                                                      AND rs.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
                                                 ");
                                             
                                                 $return_ids = [];

@@ -1,20 +1,20 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 $prid=$_GET['q'];
 $reqid=$_GET['reqid'];
 $reqid=base64_decode($reqid); 
 error_reporting(0);
 
-$select_ProductsPrice="select * from stock_request_items where prid='$prid' and reqid='$reqid'";
-		$fetch_ProductsPrice=mysqli_query($db_conn,$select_ProductsPrice);
+$select_ProductsPrice="select * from stock_request_items where prid=? and reqid=?";
+		$fetch_ProductsPrice=db_q($db_conn,$select_ProductsPrice,[$prid,$reqid]);
 		$Result_ProductsPrice=mysqli_fetch_array($fetch_ProductsPrice);
 		 
 ?>
 
- <input type="number" min="0" name="qty" value="<?=$Result_ProductsPrice['qty'];?>" readonly id="qty" onKeyup="totalkm()" required="" placeholder="Qty" class="numberinput">
+ <input type="number" min="0" name="qty" value="<?=htmlspecialchars((string)($Result_ProductsPrice['qty']), ENT_QUOTES, 'ISO-8859-1', false);?>" readonly id="qty" onKeyup="totalkm()" required="" placeholder="Qty" class="numberinput">
 
-<input type="number" min="0" name="amount" value="<?=$Result_ProductsPrice['amount'];?>" readonly id="amount" onKeyup="totalkm()" required="" placeholder="Price">
+<input type="number" min="0" name="amount" value="<?=htmlspecialchars((string)($Result_ProductsPrice['amount']), ENT_QUOTES, 'ISO-8859-1', false);?>" readonly id="amount" onKeyup="totalkm()" required="" placeholder="Price">
 
-<input type="number" min="0" name="total" value="<?=$Result_ProductsPrice['subtotal'];?>" readonly id="output" class="numberinput" required="" placeholder="Total">
+<input type="number" min="0" name="total" value="<?=htmlspecialchars((string)($Result_ProductsPrice['subtotal']), ENT_QUOTES, 'ISO-8859-1', false);?>" readonly id="output" class="numberinput" required="" placeholder="Total">
 		
 		<script>
   function discamount(){

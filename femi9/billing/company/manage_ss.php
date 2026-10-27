@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ss');
 error_reporting(0);
@@ -281,8 +281,8 @@ $canDeleteSs = hasPermission('ss_delete');
                                                 {
                                                     // Get district name
                                                     $district_id=$result_product_list['district_id'];
-                                                    $select_distict="select * from district where id='$district_id'";
-                                                    $fetch_district=mysqli_query($db_conn,$select_distict);
+                                                    $select_distict="select * from district where id=?";
+                                                    $fetch_district=db_q($db_conn,$select_distict,[$district_id]);
                                                     $result_district=mysqli_fetch_array($fetch_district);
                                                     $district_name=$result_district['dist_name'];
                                                     
@@ -290,8 +290,8 @@ $canDeleteSs = hasPermission('ss_delete');
                                                     $taluk_name = '';
                                                     if(isset($result_product_list['taluk_id']) && !empty($result_product_list['taluk_id'])) {
                                                         $taluk_id=$result_product_list['taluk_id'];
-                                                        $select_taluk="select * from taluk where id='$taluk_id'";
-                                                        $fetch_taluk=mysqli_query($db_conn,$select_taluk);
+                                                        $select_taluk="select * from taluk where id=?";
+                                                        $fetch_taluk=db_q($db_conn,$select_taluk,[$taluk_id]);
                                                         $result_taluk=mysqli_fetch_array($fetch_taluk);
                                                         $taluk_name=$result_taluk['taluk'];
                                                     }
@@ -305,9 +305,9 @@ $canDeleteSs = hasPermission('ss_delete');
                                                 
                                                 <tr>
                                                     <td class="text-center serial-number"><?php echo ++$i; ?></td>
-                                                    <td class="text-center"><?=$result_product_list["useridtext"];?></td>
+                                                    <td class="text-center"><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                                                     <td>
-                                                        <div class="user-name"><?php echo ucwords($result_product_list["name"]);?></div>
+                                                        <div class="user-name"><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></div>
                                                         <div class="info-text">
                                                             <strong>D:</strong> <?=ucwords($district_name);?>
                                                             <?php if(!empty($taluk_name)) { ?>
@@ -322,24 +322,24 @@ $canDeleteSs = hasPermission('ss_delete');
                                                         <a href="#" 
                                                            class="mobile-link" 
                                                            data-bs-toggle="modal" 
-                                                           data-bs-target="#exampleModalLive<?php echo $result_product_list["id"];?>" 
+                                                           data-bs-target="#exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" 
                                                            title="Click to Update Mobile Number">
-                                                            <?=$result_product_list["country_code"];?>&nbsp;<?=$result_product_list["mobile_number"];?>
+                                                            <?=htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
                                                         </a>
                                                         
                                                         <!-- Mobile Update Modal -->
-                                                        <div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+                                                        <div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
                                                             <div class="modal-dialog">
                                                                 <div class="modal-content">
                                                                     <div class="modal-header">
                                                                         <h5 class="modal-title" id="exampleModalLiveLabel">
                                                                             Update Mobile Number<br/>
-                                                                            <?=$result_product_list["mobile_number"];?>
+                                                                            <?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
                                                                         </h5>
                                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                     </div>
                                                                     <form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_mobile_action">	
-                                                                        <input type="hidden" name="old_mobile_number" value="<?=$result_product_list["mobile_number"];?>">
+                                                                        <input type="hidden" name="old_mobile_number" value="<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
                                                                         <input type="hidden" name="update_usertype" value="super_stockiest">
                                                                         
                                                                         <div class="modal-body" style="padding:20px;">
@@ -372,7 +372,7 @@ $canDeleteSs = hasPermission('ss_delete');
                                                         ?>
                                                             <a href="inactive_user?usr=super_stockiest&backurl=manage_ss&usrid=<?=$rowid;?>&usrname=<?=$encoded_name;?>&userlabel=Super Stockist" 
                                                                class="status-link" 
-                                                               onclick="return confirm('You want to confirm Deactivate this (<?php echo strtoupper($result_product_list["name"]);?>) user?');" 
+                                                               onclick="return confirm('You want to confirm Deactivate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>) user?');" 
                                                                data-bs-toggle="tooltip" 
                                                                data-bs-placement="top" 
                                                                title="Click to Deactivate user">
@@ -385,7 +385,7 @@ $canDeleteSs = hasPermission('ss_delete');
                                                         ?>
                                                             <a href="active_user?usr=super_stockiest&backurl=manage_ss&usrid=<?=$rowid;?>&usrname=<?=$encoded_name;?>&userlabel=Super Stockist" 
                                                                class="status-link" 
-                                                               onclick="return confirm('You want to confirm Activate this (<?php echo strtoupper($result_product_list["name"]);?>) user?');" 
+                                                               onclick="return confirm('You want to confirm Activate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>) user?');" 
                                                                data-bs-toggle="tooltip" 
                                                                data-bs-placement="top" 
                                                                title="Click to Activate user">

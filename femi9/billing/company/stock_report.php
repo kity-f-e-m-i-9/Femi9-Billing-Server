@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -80,7 +80,7 @@ else
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report6?modelval=<?=$_REQUEST['modelval'];?>&&out1=<?=$_REQUEST['out1'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report6?modelval=<?=htmlspecialchars((string)($_REQUEST['modelval']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h1>
@@ -100,7 +100,7 @@ else
 						<a href="#" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title"><?=$DISPLAY_LABLE;?></span>
-                                                <span class="widget-stats-amount"><?=base64_decode($_REQUEST['out1']);?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)(base64_decode($_REQUEST['out1'])), ENT_QUOTES, 'UTF-8', false);?></span>
                                             </div>
 											</a>
                                         </div>
@@ -146,7 +146,7 @@ $i= $start_from;
 				<?php $select_prdetails_header="select * from `products` order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 				
 												</tr>
@@ -161,8 +161,8 @@ $i= $start_from;
 											$state_id_VLSS1=$resultRcd_VLSS1['state_id'];
 											$district_id_VLSS1=$resultRcd_VLSS1['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
@@ -170,8 +170,8 @@ $i= $start_from;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultRcd_VLSS1["useridtext"];?></td>
-							<td><?=$resultRcd_VLSS1["name"];?></td>
+                            <td><?=htmlspecialchars((string)($resultRcd_VLSS1["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS1["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							
 							<!------------------------PRODUCT WISE SALES QTY------------------------------->
@@ -184,8 +184,8 @@ $i= $start_from;
 					
 					//SALES QTY — SUM across any per-warehouse rows (a product's stock
 					// can now be split across physical godowns H1/G1/G2)
-					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id='$tempid' and user_type='$usertype_stock' and product_id='$prid_header'";
-					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
+					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id=? and user_type=? and product_id=?";
+					$fetch_SUM_QTY=db_q($db_conn,$select_SUM_QTY,[$tempid,$usertype_stock,$prid_header]);
 					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
 					if($result_SUM_QTY['closing_qty']!=NULL){ $clqty=$result_SUM_QTY['closing_qty']; }else{$clqty="0";}
 
@@ -210,7 +210,7 @@ $i= $start_from;
 				<?php $select_prdetails_header="select * from `products` order by `id` asc";
 				$fetch_prdetails_header=mysqli_query($db_conn,$select_prdetails_header);
 				while($result_prdetails_header=mysqli_fetch_array($fetch_prdetails_header)){?>
-				<th><?=$result_prdetails_header['productName'];?></th>
+				<th><?=htmlspecialchars((string)($result_prdetails_header['productName']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 				<?php }?>
 												</tr>
                                             </thead>
@@ -227,8 +227,8 @@ $i= $start_from;
 //DISTRICT
 if(is_numeric($district_id_VLSS2))
 {
-										$selectrecords_VLSS2="select * from district where state_id='$state_id_VLSS2' and id='$district_id_VLSS2'";
-										$fetchrecords_VLSS2=mysqli_query($db_conn,$selectrecords_VLSS2);
+										$selectrecords_VLSS2="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS2=db_q($db_conn,$selectrecords_VLSS2,[$state_id_VLSS2,$district_id_VLSS2]);
 										$resultrecords_VLSS2=mysqli_fetch_array($fetchrecords_VLSS2);
 										$district_name_VLSS2=$resultrecords_VLSS2['dist_name'];
 }else{
@@ -238,8 +238,8 @@ if(is_numeric($district_id_VLSS2))
 //TALUK										
 if(is_numeric($taluk_id_VLSS2))
 {	
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS2' and dist_id='$district_id_VLSS2' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS2,$district_id_VLSS2,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 }else{
@@ -250,8 +250,8 @@ $taluk_name_VLSS2=$taluk_id_VLSS2;
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-                            <td><?=$resultRcd_VLSS2["useridtext"];?></td>
-							<td><?=$resultRcd_VLSS2["name"];?></td>
+                            <td><?=htmlspecialchars((string)($resultRcd_VLSS2["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultRcd_VLSS2["name"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS2;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 							
@@ -265,8 +265,8 @@ $taluk_name_VLSS2=$taluk_id_VLSS2;
 					
 					//SALES QTY — SUM across any per-warehouse rows (a product's stock
 					// can now be split across physical godowns H1/G1/G2)
-					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id='$tempid' and user_type='$usertype_stock' and product_id='$prid_header'";
-					$fetch_SUM_QTY=mysqli_query($db_conn,$select_SUM_QTY);
+					$select_SUM_QTY="select sum(closing_qty) as closing_qty from stock where user_id=? and user_type=? and product_id=?";
+					$fetch_SUM_QTY=db_q($db_conn,$select_SUM_QTY,[$tempid,$usertype_stock,$prid_header]);
 					$result_SUM_QTY=mysqli_fetch_array($fetch_SUM_QTY);
 					if($result_SUM_QTY['closing_qty']!=NULL){ $clqty=$result_SUM_QTY['closing_qty']; }else{$clqty="0";}
 

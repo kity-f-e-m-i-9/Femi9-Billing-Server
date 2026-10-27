@@ -271,7 +271,7 @@ $Currency_Name   = "INR";
 <tr valign="top">
 <td>
 <?php if (empty($result_Invoice_Details['cp_gst_enabled']) && $result_Godown['logo'] != NULL): ?>
-<img src="<?= $result_Godown['logo']; ?>" style="width:150px;margin-right:5px;"/>
+<img src="<?= htmlspecialchars((string)($result_Godown['logo']), ENT_QUOTES, 'ISO-8859-1', false); ?>" style="width:150px;margin-right:5px;"/>
 <?php endif; ?>
 </td>
 <td valign="top">

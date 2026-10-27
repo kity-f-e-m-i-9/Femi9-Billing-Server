@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../../shared/db-helpers.php';
 /**
  * GSTR-1 offline-tool style JSON (gstin, fp, b2b, b2cs, nil, hsn, doc_issue)
  * for one company godown and period. Used by export_GSTR1_json.php.
@@ -60,7 +60,7 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         LEFT JOIN stockiest       st ON uii.to_user_type='stockiest'       AND st.temp_id=uii.to_user_id
         LEFT JOIN distributor     dt ON uii.to_user_type='distributor'     AND dt.temp_id=uii.to_user_id
         LEFT JOIN shop            sh ON uii.to_user_type='shop'            AND sh.temp_id=uii.to_user_id
-        WHERE uii.from_user_type='$Login_user_TYPEvl' AND uii.from_user_id='$gid_e' AND uii.date BETWEEN '$from_date' AND '$to_date'
+        WHERE uii.from_user_type='".db_esc($Login_user_TYPEvl)."' AND uii.from_user_id='$gid_e' AND uii.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY ui.inv_number, uii.gst_percentage, uii.gst_type, uii.buyer_gsttype, uii.to_user_type, uii.to_user_id, ss.gstin, st.gstin, dt.gstin, sh.gstin");
     while ($r = mysqli_fetch_assoc($res)) {
         $push($r['inum'], $r['d'], $r['bgt'] === 'register', $r['gstin'], $intra_fn($r['gst_type']), $r['rate'], $r['taxable'], $r['gst'], $r['total']);
@@ -73,7 +73,7 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         FROM invoice_items ii
         LEFT JOIN invoice i ON i.inv_id = ii.inv_id
         LEFT JOIN customers c ON c.id = ii.customer_id
-        WHERE ii.user_type='$Login_user_TYPEvl' AND ii.user_id='$gid_e' AND ii.date BETWEEN '$from_date' AND '$to_date'
+        WHERE ii.user_type='".db_esc($Login_user_TYPEvl)."' AND ii.user_id='$gid_e' AND ii.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY i.inv_number, ii.gst_percentage, ii.gst_type, ii.buyer_gsttype, ii.customer_id, c.gstin");
     while ($r = mysqli_fetch_assoc($res)) {
         $push($r['inum'], $r['d'], $r['bgt'] === 'register', $r['gstin'], $intra_fn($r['gst_type']), $r['rate'], $r['taxable'], $r['gst'], $r['total']);
@@ -87,7 +87,7 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         FROM ot_sales s
         LEFT JOIN ot_sales_invoice i ON i.tempid = s.tempid
         LEFT JOIN state stt ON stt.id = s.state_id
-        WHERE s.godownid='$gid_e' AND s.date BETWEEN '$from_date' AND '$to_date'
+        WHERE s.godownid='$gid_e' AND s.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY s.tempid, i.inv_number, s.gst, s.gst_type, s.buyer_gsttype, s.gst_number, stt.st_name");
     while ($r = mysqli_fetch_assoc($res)) {
         $push($r['inum'], $r['d'], $r['bgt'] === 'register', $r['gstin'], $intra_fn($r['gst_type']), $r['rate'], $r['taxable'], $r['gst'], $r['total'], $r['st_name']);
@@ -109,7 +109,7 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         LEFT JOIN internal_transfer_invoice iti ON iti.tempid = it.tempid
         JOIN company_godown cg ON cg.id = it.send_to
         JOIN company_godown it_from ON it_from.id = it.send_from
-        WHERE it.send_from='$gid_e' AND it.date BETWEEN '$from_date' AND '$to_date'
+        WHERE it.send_from='$gid_e' AND it.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY COALESCE(iti.inv_number, it.tempid), it.gst, it.gst_type, cg.gstin, cg.state, it_from.state");
     while ($r = mysqli_fetch_assoc($res)) {
         $fallback = strtolower(trim($r['to_state'])) == strtolower(trim($r['from_state']));
@@ -169,14 +169,14 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
     }
 
     // ---- returns (unregistered-buyer credit notes net off B2CS / nil) ----
-    $res = mysqli_query($db_conn, "select gst_percentage as rate, gst_type, buyer_gsttype as bgt, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$gid_e' and date between '$from_date' and '$to_date' group by gst_percentage, gst_type, buyer_gsttype");
+    $res = mysqli_query($db_conn, "select gst_percentage as rate, gst_type, buyer_gsttype as bgt, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst from user_return_stock_items where to_usertype='".db_esc($Login_user_TYPEvl)."' and to_userid='$gid_e' and date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by gst_percentage, gst_type, buyer_gsttype");
     while ($r = mysqli_fetch_assoc($res)) {
         $is_reg = ($r['bgt'] === 'register'); $is_intra = $intra_fn($r['gst_type']);
         if ((float)$r['rate'] <= 0) { $nil[($is_intra ? 'INTRA' : 'INTR') . ($is_reg ? 'B2B' : 'B2C')] -= (float)$r['taxable']; continue; }
         if ($is_reg) continue; // registered returns would be cdnr — not produced
         $add_b2cs($is_intra, (float)$r['rate'], $own_code, -(float)$r['taxable'], -(float)$r['gst']);
     }
-    $res = mysqli_query($db_conn, "select p.gst as rate, osr.gst_type, osr.buyer_gsttype as bgt, sum(osr.total) as taxable from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$gid_e' and osr.return_date between '$from_date' and '$to_date' group by p.gst, osr.gst_type, osr.buyer_gsttype");
+    $res = mysqli_query($db_conn, "select p.gst as rate, osr.gst_type, osr.buyer_gsttype as bgt, sum(osr.total) as taxable from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$gid_e' and osr.return_date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by p.gst, osr.gst_type, osr.buyer_gsttype");
     while ($r = mysqli_fetch_assoc($res)) {
         $is_reg = ($r['bgt'] === 'register'); $is_intra = $intra_fn($r['gst_type']);
         $rate = (float)$r['rate']; $tx = (float)$r['taxable'];

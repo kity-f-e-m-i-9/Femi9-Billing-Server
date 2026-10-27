@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; 
 // Load environment variables FIRST (before anything else)
 require_once __DIR__ . '/../shared/env-loader.php';
 
@@ -103,8 +103,8 @@ if(isset($_REQUEST['add-users']))
 	$username=$_REQUEST['username'];
 	$password=$_REQUEST['password'];
 	
-	// Encrypt password
-	$encryptedPassword = $encryption->encrypt($password);
+	// Stored as a bcrypt hash (hashed where the INSERT binds it below)
+	$encryptedPassword = $password;
 	
 	$usertype="users";
 	$state="0";
@@ -191,8 +191,8 @@ if(isset($_REQUEST['add-users']))
     if(isset($_REQUEST['internal_transfer']) && $_REQUEST['internal_transfer']==1){$internal_transfer="1";}else{$internal_transfer="0";}
 
 
-	$select_count_users="select count(*) as numusers from admin_log where username='$username'";
-	$fetch_count_users=mysqli_query($db_conn,$select_count_users);
+	$select_count_users="select count(*) as numusers from admin_log where username=?";
+	$fetch_count_users=db_q($db_conn,$select_count_users,[$username]);
 	$result_count_users=mysqli_fetch_array($fetch_count_users);
 	if($result_count_users['numusers']==1)
 	{
@@ -200,9 +200,9 @@ if(isset($_REQUEST['add-users']))
 	    exit;
 	}
 
-		$insert_users="INSERT INTO admin_log (username,password,usertype,state,dash,report,company_profile,users_demo,reward_points,demo_free,demo_free_edit,demo_free_delete,manage_return,manage_return_edit,manage_return_delete,debit_note,debit_note_edit,debit_note_delete,stock_request,products,products_edit,products_delete,ot_channels,location,ss,ss_edit,ss_delete,st,st_edit,st_delete,dt,dt_edit,dt_delete,sdt,sdt_edit,sdt_delete,shop,shop_edit,shop_delete,cus,cus_edit,cus_delete,ms,ms_edit,ms_delete,salesbdm_manage,salesbdm_manage_edit,salesbdm_manage_delete,unassigned,remap,users_network,payment_entry, manage_payment_entry, manage_payment_entry_edit, manage_payment_entry_delete, consolidated_payment_entry, consolidated_payment_entry_edit, consolidated_payment_entry_delete, bonus_calculator ,manage_bonus_points, manage_bonus_points_edit, manage_bonus_points_delete, add_input_stock,manage_input_stock,manage_input_stock_edit,manage_input_stock_delete ,add_input_stock_users, manage_input_stock_users, manage_input_stock_users_edit, manage_input_stock_users_delete, partner_location, channel_partner, channel_partner_edit, channel_partner_delete, territory_partner, territory_partner_edit, territory_partner_delete, stock_transfers, internal_transfer) values ('$username','$encryptedPassword','$usertype','$state','$dash','$report','$company_profile','$users_demo',
-		'$reward_points','$demo_free','$demo_free_edit','$demo_free_delete','$manage_return','$manage_return_edit','$manage_return_delete','$debit_note','$debit_note_edit','$debit_note_delete','$stock_request','$products','$products_edit','$products_delete','$ot_channels','$location','$ss','$ss_edit','$ss_delete','$st','$st_edit','$st_delete','$dt','$dt_edit','$dt_delete','$sdt','$sdt_edit','$sdt_delete','$shop','$shop_edit','$shop_delete','$cus','$cus_edit','$cus_delete','$ms','$ms_edit','$ms_delete','$salesbdm_manage','$salesbdm_manage_edit','$salesbdm_manage_delete','$unassigned','$remap','$users_network','$add_payment_entry','$manage_payment_entry','$manage_payment_entry_edit','$manage_payment_entry_delete','$consolidated_payment_entry','$consolidated_payment_entry_edit','$consolidated_payment_entry_delete','$bonus_calculator','$manage_bonus_points','$manage_bonus_points_edit','$manage_bonus_points_delete','$add_input_stock','$manage_input_stock','$manage_input_stock_edit','$manage_input_stock_delete','$add_input_stock_users','$manage_input_stock_users','$manage_input_stock_users_edit','$manage_input_stock_users_delete','$partner_location','$channel_partner','$channel_partner_edit','$channel_partner_delete','$territory_partner','$territory_partner_edit','$territory_partner_delete','$stock_transfers','$internal_transfer')";
-		mysqli_query($db_conn,$insert_users);
+		$insert_users="INSERT INTO admin_log (username,password,usertype,state,dash,report,company_profile,users_demo,reward_points,demo_free,demo_free_edit,demo_free_delete,manage_return,manage_return_edit,manage_return_delete,debit_note,debit_note_edit,debit_note_delete,stock_request,products,products_edit,products_delete,ot_channels,location,ss,ss_edit,ss_delete,st,st_edit,st_delete,dt,dt_edit,dt_delete,sdt,sdt_edit,sdt_delete,shop,shop_edit,shop_delete,cus,cus_edit,cus_delete,ms,ms_edit,ms_delete,salesbdm_manage,salesbdm_manage_edit,salesbdm_manage_delete,unassigned,remap,users_network,payment_entry, manage_payment_entry, manage_payment_entry_edit, manage_payment_entry_delete, consolidated_payment_entry, consolidated_payment_entry_edit, consolidated_payment_entry_delete, bonus_calculator ,manage_bonus_points, manage_bonus_points_edit, manage_bonus_points_delete, add_input_stock,manage_input_stock,manage_input_stock_edit,manage_input_stock_delete ,add_input_stock_users, manage_input_stock_users, manage_input_stock_users_edit, manage_input_stock_users_delete, partner_location, channel_partner, channel_partner_edit, channel_partner_delete, territory_partner, territory_partner_edit, territory_partner_delete, stock_transfers, internal_transfer) values (?,?,?,?,?,?,?,?,
+		?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$insert_users,[$username,femi_password_hash((string)($encryptedPassword)),$usertype,$state,$dash,$report,$company_profile,$users_demo,$reward_points,$demo_free,$demo_free_edit,$demo_free_delete,$manage_return,$manage_return_edit,$manage_return_delete,$debit_note,$debit_note_edit,$debit_note_delete,$stock_request,$products,$products_edit,$products_delete,$ot_channels,$location,$ss,$ss_edit,$ss_delete,$st,$st_edit,$st_delete,$dt,$dt_edit,$dt_delete,$sdt,$sdt_edit,$sdt_delete,$shop,$shop_edit,$shop_delete,$cus,$cus_edit,$cus_delete,$ms,$ms_edit,$ms_delete,$salesbdm_manage,$salesbdm_manage_edit,$salesbdm_manage_delete,$unassigned,$remap,$users_network,$add_payment_entry,$manage_payment_entry,$manage_payment_entry_edit,$manage_payment_entry_delete,$consolidated_payment_entry,$consolidated_payment_entry_edit,$consolidated_payment_entry_delete,$bonus_calculator,$manage_bonus_points,$manage_bonus_points_edit,$manage_bonus_points_delete,$add_input_stock,$manage_input_stock,$manage_input_stock_edit,$manage_input_stock_delete,$add_input_stock_users,$manage_input_stock_users,$manage_input_stock_users_edit,$manage_input_stock_users_delete,$partner_location,$channel_partner,$channel_partner_edit,$channel_partner_delete,$territory_partner,$territory_partner_edit,$territory_partner_delete,$stock_transfers,$internal_transfer]);
 		
 		
     if(isset($_REQUEST['ot_catID']) && is_array($_REQUEST['ot_catID']) && count($_REQUEST['ot_catID']) > 0) {
@@ -210,11 +210,11 @@ if(isset($_REQUEST['add-users']))
         $ex_catid = explode("#", $catid);
         
         foreach ($ex_catid as $key => $value) {   
-            $select_count_users12 = "select * from admin_log_ot where username='$username' and ot_cat='$value'";
-            $fetch_count_users12 = mysqli_query($db_conn, $select_count_users12);
+            $select_count_users12 = "select * from admin_log_ot where username=? and ot_cat=?";
+            $fetch_count_users12 = db_q($db_conn,$select_count_users12,[$username,$value]);
             if(mysqli_num_rows($fetch_count_users12) == 0) {
-                $insert_ot = "insert into admin_log_ot (username,ot_cat) values ('$username','$value')";
-                mysqli_query($db_conn, $insert_ot);
+                $insert_ot = "insert into admin_log_ot (username,ot_cat) values (?,?)";
+                db_q($db_conn,$insert_ot,[$username,$value]);
             }
         }
     }    
@@ -222,12 +222,12 @@ if(isset($_REQUEST['add-users']))
   foreach ($ex_catid as $key => $value)
    {   
     
-    $select_count_users12="select * from admin_log_ot where username='$username' and ot_cat='$value'";
-	$fetch_count_users12=mysqli_query($db_conn,$select_count_users12);
+    $select_count_users12="select * from admin_log_ot where username=? and ot_cat=?";
+	$fetch_count_users12=db_q($db_conn,$select_count_users12,[$username,$value]);
 	if(mysqli_num_rows($fetch_count_users12)==0)
 	{
-		$insert_ot="insert into admin_log_ot (username,ot_cat) values ('$username','$value')";
-		mysqli_query($db_conn,$insert_ot);
+		$insert_ot="insert into admin_log_ot (username,ot_cat) values (?,?)";
+		db_q($db_conn,$insert_ot,[$username,$value]);
 	} /// End validate duplicate
 	
    } /// End foreach
@@ -323,7 +323,7 @@ if(isset($_REQUEST['add-users']))
 				$fetch_sls_category=mysqli_query($db_conn,$ot_sls_category);
 				while($result_sls_category=mysqli_fetch_array($fetch_sls_category)){?>
 				<label>
-				<input type="checkbox" name="ot_catID[]" value="<?=$result_sls_category['id'];?>">&nbsp;<?=$result_sls_category['cat'];?></label> <?php echo "<br/>";?>
+				<input type="checkbox" name="ot_catID[]" value="<?=htmlspecialchars((string)($result_sls_category['id']), ENT_QUOTES, 'ISO-8859-1', false);?>">&nbsp;<?=htmlspecialchars((string)($result_sls_category['cat']), ENT_QUOTES, 'ISO-8859-1', false);?></label> <?php echo "<br/>";?>
 				<?php }?>
 
 <br/>

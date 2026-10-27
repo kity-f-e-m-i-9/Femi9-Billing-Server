@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -9,9 +9,9 @@ $backlink   = "customer-manage-invoice.php";
 $title      = "Update Customer";
 $lablenamedisplay = "Customer Name";
 
-$inv     = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='$invid' LIMIT 1"));
+$inv     = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM invoice WHERE inv_id='".db_esc($invid)."' LIMIT 1"));
 $CuSTID  = $inv['customer_id'] ?? '';
-$resCust = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE id='$CuSTID' LIMIT 1"));
+$resCust = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM customers WHERE id='".db_esc($CuSTID)."' LIMIT 1"));
 $Cust_Name  = $resCust['name']   ?? '';
 $Cust_Mbile = $resCust['mobile'] ?? '';
 ?>
@@ -68,8 +68,8 @@ $Cust_Mbile = $resCust['mobile'] ?? '';
                         </table>
 
                         <form action="update_customer_action3.php" method="post" enctype="multipart/form-data" onsubmit="return confirm('Confirm update?');">
-                        <input type="hidden" name="invid" value="<?php echo $invid; ?>">
-                        <input type="hidden" name="invuser" value="<?php echo $getinvuser; ?>">
+                        <input type="hidden" name="invid" value="<?php echo htmlspecialchars((string)($invid), ENT_QUOTES, 'UTF-8', false); ?>">
+                        <input type="hidden" name="invuser" value="<?php echo htmlspecialchars((string)($getinvuser), ENT_QUOTES, 'UTF-8', false); ?>">
                         <input type="hidden" name="old_customer_id" value="<?php echo $CuSTID; ?>">
                         <div class="example-container"><div class="example-content">
 
@@ -77,10 +77,10 @@ $Cust_Mbile = $resCust['mobile'] ?? '';
                         <select required name="new_customer_id" class="form-control">
                         <option value="" hidden>Select Customer</option>
                         <?php
-                        $res = mysqli_query($db_conn, "SELECT * FROM customers WHERE user_type='$Login_user_TYPEvl' AND user_id='$Login_user_IDvl' ORDER BY name ASC");
+                        $res = mysqli_query($db_conn, "SELECT * FROM customers WHERE user_type='".db_esc($Login_user_TYPEvl)."' AND user_id='".db_esc($Login_user_IDvl)."' ORDER BY name ASC");
                         while ($rc = mysqli_fetch_array($res)) {
                             $sel = ($rc['id'] == $CuSTID) ? '' : '';
-                            echo "<option value='{$rc['id']}'>" . htmlspecialchars(strtoupper($rc['name'])) . ", " . htmlspecialchars($rc['mobile']) . "</option>";
+                            echo "<option value='".htmlspecialchars((string)($rc['id']), ENT_QUOTES, 'ISO-8859-1', false)."'>" . htmlspecialchars(strtoupper($rc['name'])) . ", " . htmlspecialchars($rc['mobile']) . "</option>";
                         }
                         ?>
                         </select>

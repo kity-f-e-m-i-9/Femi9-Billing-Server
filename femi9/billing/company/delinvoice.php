@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['cus','shop','ss']);
 require_once("include/StockService.php");
 
 $invtype  = $_REQUEST['invtype']  ?? '';
@@ -59,10 +59,10 @@ if ($invtype === "noncustomer") {
         } else {
             $_SESSION['errorMessage'] = "Could not delete invoice. Please try again.";
         }
-        echo "<script>window.location='user-manage-invoice?deletedsuccess&&invuser={$invuser}';</script>";
+        echo "<script>window.location='user-manage-invoice?deletedsuccess&&invuser=".urlencode($invuser)."';</script>";
     } else {
         $_SESSION['errorMessage'] = "This invoice has items. Remove all items before deleting.";
-        echo "<script>window.location='user-manage-invoice?productnonempty&&invuser={$invuser}';</script>";
+        echo "<script>window.location='user-manage-invoice?productnonempty&&invuser=".urlencode($invuser)."';</script>";
     }
 }
 

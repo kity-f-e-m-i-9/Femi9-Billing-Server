@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -33,7 +33,7 @@ $filename_SCR1=$rand_isd_SCR1 . '.' . $file_extension_SCR1;
 $filenameINS_SCR1="".$datefile."".$timefile."SCR1".$filename_SCR1."";
                  $uploaddir_SCR1='screenshot/';
                  $uploadfile_SCR1=$uploaddir_SCR1.$filenameINS_SCR1;
-	   move_uploaded_file($_FILES['screenshot']['tmp_name'],$uploadfile_SCR1);
+	   safe_move_uploaded_file($_FILES['screenshot']['tmp_name'],$uploadfile_SCR1);
 	}else{$filenameINS_SCR1="Nil";}
 	
 	
@@ -47,11 +47,11 @@ $filename_SCR2=$rand_isd_SCR2 . '.' . $file_extension_SCR2;
 $filenameINS_SCR2="".$datefile."".$timefile."SCR2".$filename_SCR2."";
                  $uploaddir_SCR2='screenshot/';
                  $uploadfile_SCR2=$uploaddir_SCR2.$filenameINS_SCR2;
-	   move_uploaded_file($_FILES['screenshot2']['tmp_name'],$uploadfile_SCR2);
+	   safe_move_uploaded_file($_FILES['screenshot2']['tmp_name'],$uploadfile_SCR2);
 	}else{$filenameINS_SCR2="Nil";}
 	
-	$select_count_invoice="select count(*) as numrequest from stock_request where reqid='$reqid'";
-	$fetch_count_invoice=mysqli_query($db_conn,$select_count_invoice);
+	$select_count_invoice="select count(*) as numrequest from stock_request where reqid=?";
+	$fetch_count_invoice=db_q($db_conn,$select_count_invoice,[$reqid]);
 	$result_count_invoice=mysqli_fetch_array($fetch_count_invoice);
 	if($result_count_invoice['numrequest']==0)
 	{
@@ -62,9 +62,9 @@ $filenameINS_SCR2="".$datefile."".$timefile."SCR2".$filename_SCR2."";
 		
 		$insert_Invoice="insert into stock_request (reqid,date,fromusertype,fromuserid,tousertype,touserid,status,inv_id,
 		screenshot,screenshot2,verified,reqtype,delivery_address,amount,utr)
-		values ('$reqid','$date','$fromusertype','$fromuserid','$tousertype','$touserid','pending','nil',
-		'$filenameINS_SCR1','$filenameINS_SCR2','0','$reqtype','$delivery_address','$amount','$utr')";
-		mysqli_query($db_conn,$insert_Invoice);
+		values (?,?,?,?,?,?,'pending','nil',
+		?,?,'0',?,?,?,?)";
+		db_q($db_conn,$insert_Invoice,[$reqid,$date,$fromusertype,$fromuserid,$tousertype,$touserid,$filenameINS_SCR1,$filenameINS_SCR2,$reqtype,$delivery_address,$amount,$utr]);
 		
 	}
 	
@@ -82,8 +82,8 @@ for ($i=0; $i<=$number; $i++)
      $prid_value = $prid_ex[$i]; 
 	 
 	 //get product amount
-	 $select_pramount="select * from products where id='$prid_value'";
-	 $fetch_pramount=mysqli_query($db_conn,$select_pramount);
+	 $select_pramount="select * from products where id=?";
+	 $fetch_pramount=db_q($db_conn,$select_pramount,[$prid_value]);
 	 $result_pramount=mysqli_fetch_array($fetch_pramount);
 	 
 	 $gst=$result_pramount['gst'];
@@ -97,16 +97,16 @@ for ($i=0; $i<=$number; $i++)
 	 $gsttotal=number_format($gsttotal,2,'.','');
 	 $total=$subtotal+$gsttotal;
 	 
-	 $select_count_invoice12="select count(*) as numrequest2 from stock_request_items where reqid='$reqid' and prid='$prid_value'";
-	$fetch_count_invoice12=mysqli_query($db_conn,$select_count_invoice12);
+	 $select_count_invoice12="select count(*) as numrequest2 from stock_request_items where reqid=? and prid=?";
+	$fetch_count_invoice12=db_q($db_conn,$select_count_invoice12,[$reqid,$prid_value]);
 	$result_count_invoice12=mysqli_fetch_array($fetch_count_invoice12);
 	if($result_count_invoice12['numrequest2']==0 && $prid_value!=NULL)
 	{
 		
 		$insert_Invoice12="insert into stock_request_items (reqid,prid,amount,qty,total,fromusertype,fromuserid,tousertype,touserid,subtotal,gst,gsttotal,hsn)
 		values 
-		('$reqid','$prid_value','$pramount','$qty_value','$total','$fromusertype','$fromuserid','$tousertype','$touserid','$subtotal','$gst','$gsttotal','$hsn')";
-		mysqli_query($db_conn,$insert_Invoice12);
+		(?,?,?,?,?,?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$insert_Invoice12,[$reqid,$prid_value,$pramount,$qty_value,$total,$fromusertype,$fromuserid,$tousertype,$touserid,$subtotal,$gst,$gsttotal,$hsn]);
 		
 	}
 	

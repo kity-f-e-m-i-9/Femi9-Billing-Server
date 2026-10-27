@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 include("config.php"); 
 error_reporting(0);?>
 <!DOCTYPE html>
@@ -135,14 +135,14 @@ $i= $start_from;
                                             </thead>
 											
 											<tbody>
-				<?php $select_product_list="select * from super_stockiest where onboard_userTYPE='$onboard_userTYPE' and onboard_userID='$onboard_userID' order by id desc";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+				<?php $select_product_list="select * from super_stockiest where onboard_userTYPE=? and onboard_userID=? order by id desc";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$onboard_userTYPE,$onboard_userID]);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 									//district details		
 									$district_id=$result_product_list['district_id'];
-$select_distict="select * from district where id='$district_id'";
-	$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+	$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 	$result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 											
@@ -152,31 +152,31 @@ $district_name=	$result_district['dist_name'];
                                             
                                                 <tr>
                     <td><?php echo ++$i; ?></td>
-					<td><?=$result_product_list["useridtext"];?></td>
+					<td><?=htmlspecialchars((string)($result_product_list["useridtext"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_product_list["name"]);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					<?php echo $district_name;?>
 					</td>
 					
 					
 					<td>
-					<a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo $result_product_list["id"];?>" title="Click to Update Mobile Number">
-					<?=$result_product_list["country_code"];?>&nbsp;<?=$result_product_list["mobile_number"];?>
+					<a href="#" id="linkcaption" data-bs-toggle="modal" data-bs-target="#exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" title="Click to Update Mobile Number">
+					<?=htmlspecialchars((string)($result_product_list["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</a>
 					
-					<div class="modal fade" id="exampleModalLive<?php echo $result_product_list["id"];?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
+					<div class="modal fade" id="exampleModalLive<?php echo htmlspecialchars((string)($result_product_list["id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" tabindex="-1" aria-labelledby="exampleModalLiveLabel" aria-hidden="true">
 													
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
                                                                 <h5 class="modal-title" id="exampleModalLiveLabel">Update Mobile Number<br/>
-																<?=$result_product_list["mobile_number"];?>
+																<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
 																</h5>
                                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                             </div>
 									<form method="post" onsubmit="return confirm('Please make a confirm!');" enctype="multipart/form-data" action="update_mobile_action">	
 	
-									<input type="hidden" name="old_mobile_number" value="<?=$result_product_list["mobile_number"];?>">
+									<input type="hidden" name="old_mobile_number" value="<?=htmlspecialchars((string)($result_product_list["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
 									<input type="hidden" name="update_usertype" value="super_stockiest">
 															
                                                             <div class="example-content" style="padding:20px;">
@@ -199,16 +199,16 @@ $district_name=	$result_district['dist_name'];
 					<?php /*?>
 					<!----<td>
 					<a href="JavaScript:newPopup('update-username.php?pageNme=superstockist&&prid=<?php echo $rowid;?>&&ActionUpdate');" data-bs-toggle="tooltip" data-bs-placement="top" title="Update Username">
-			        <b><?php echo $result_product_list["username"];?></b></a>
+			        <b><?php echo htmlspecialchars((string)($result_product_list["username"]), ENT_QUOTES, 'ISO-8859-1', false);?></b></a>
 					</td>----->
 					
-					<td>&#8377; <?php echo $result_product_list["plan_amount"];?><br/>
-					<?php echo $result_product_list["valid_months"];?> Days<br/>
+					<td>&#8377; <?php echo htmlspecialchars((string)($result_product_list["plan_amount"]), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?php echo htmlspecialchars((string)($result_product_list["valid_months"]), ENT_QUOTES, 'ISO-8859-1', false);?> Days<br/>
 					<?php echo date("d/m/Y",strtotime($result_product_list["valid_from"]));?>
 					(to) <?php echo date("d/m/Y",strtotime($result_product_list["valid_to"]));?>
 					</td>
 					
-					<td><?php echo $result_product_list["ref_number"];?></td>
+					<td><?php echo htmlspecialchars((string)($result_product_list["ref_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<?php */?>
 					
 					<td>
@@ -220,11 +220,11 @@ $district_name=	$result_district['dist_name'];
 			else if($result_product_list['account_status']=="active")
 			{
 			?>
-			<a href="inactive_user?usr=super_stockiest&&backurl=manage_sust&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=Super Stockist" onclick="return confirm('You want to confirm Deactivate this (<?php echo strtoupper($result_product_list["name"]);?>)  user?');" data-bs-toggle="tooltip" data-bs-placement="top" title="Click to Deactivate user"><span class='badge badge-style-bordered badge-success'>Active</span></a>
+			<a href="inactive_user?usr=super_stockiest&&backurl=manage_sust&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=Super Stockist" onclick="return confirm('You want to confirm Deactivate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>)  user?');" data-bs-toggle="tooltip" data-bs-placement="top" title="Click to Deactivate user"><span class='badge badge-style-bordered badge-success'>Active</span></a>
 			<?php
 			}else{
 				?>
-				<a href="active_user?usr=super_stockiest&&backurl=manage_sust&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=Super Stockist" onclick="return confirm('You want to confirm Activate this (<?php echo strtoupper($result_product_list["name"]);?>)  user?');" data-bs-toggle="tooltip" data-bs-placement="top" title="Click to Activate user"><span class='badge badge-style-bordered badge-danger'>Deactive</span></a>
+				<a href="active_user?usr=super_stockiest&&backurl=manage_sust&&usrid=<?=$rowid;?>&&usrname=<?=base64_encode($result_product_list["name"]);?>&&userlabel=Super Stockist" onclick="return confirm('You want to confirm Activate this (<?php echo htmlspecialchars((string)(strtoupper($result_product_list["name"])), ENT_QUOTES, 'ISO-8859-1', false);?>)  user?');" data-bs-toggle="tooltip" data-bs-placement="top" title="Click to Activate user"><span class='badge badge-style-bordered badge-danger'>Deactive</span></a>
 				
 				<?php
 			}

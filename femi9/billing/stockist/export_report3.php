@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 error_reporting(0);
@@ -24,15 +24,15 @@ $to_date=$_REQUEST['todate'];
 // Set the filename for download
 $file = "".$Report_LABLE."".$from_date."(to)".$to_date.".csv";
 
-$select_Count_records="select count(*) as numRecords from ot_sales where date between '$from_date' and '$to_date'";
-$fetch_Count_records=mysqli_query($db_conn,$select_Count_records);
+$select_Count_records="select count(*) as numRecords from ot_sales where date between ? and ?";
+$fetch_Count_records=db_q($db_conn,$select_Count_records,[$from_date,$to_date]);
 $result_Count_records=mysqli_fetch_array($fetch_Count_records);
 if($result_Count_records['numRecords']>0)
 										{
 											
 // Fetch product data from database
-$select_records = "select distinct tempid from ot_sales where date between '$from_date' and '$to_date' order by id asc";
-$fetch_records = mysqli_query($db_conn, $select_records);
+$select_records = "select distinct tempid from ot_sales where date between ? and ? order by id asc";
+$fetch_records = db_q($db_conn,$select_records,[$from_date,$to_date]);
 
 // Initialize CSV content
 $csv_content = '';
@@ -46,26 +46,26 @@ while ($result_product_list = mysqli_fetch_array($fetch_records)) {
 	
 	$ot_tempid=$result_product_list['tempid'];
 
-										$selectrecords="select * from ot_sales where tempid='$ot_tempid'";
-										$fetchrecords=mysqli_query($db_conn,$selectrecords);
+										$selectrecords="select * from ot_sales where tempid=?";
+										$fetchrecords=db_q($db_conn,$selectrecords,[$ot_tempid]);
 										$resultrecords=mysqli_fetch_array($fetchrecords);
 											
 											//company profile details
 											$godownid=$resultrecords['godownid'];
-$select_Customers="select * from company_godown where id='$godownid'";
-										$fetch_Customers=mysqli_query($db_conn,$select_Customers);
+$select_Customers="select * from company_godown where id=?";
+										$fetch_Customers=db_q($db_conn,$select_Customers,[$godownid]);
 										$result_Customers=mysqli_fetch_array($fetch_Customers);
 										
 										
-										$selectsumTotalAmount="select sum(total) from ot_sales where tempid='$ot_tempid'";
-				$fetchsumTotalAmount=mysqli_query($db_conn,$selectsumTotalAmount);
+										$selectsumTotalAmount="select sum(total) from ot_sales where tempid=?";
+				$fetchsumTotalAmount=db_q($db_conn,$selectsumTotalAmount,[$ot_tempid]);
 				$resultsumTotalAmount=mysqli_fetch_array($fetchsumTotalAmount);
 				if($resultsumTotalAmount[0]!=NULL){
 				$TotalAmount=$resultsumTotalAmount[0];}else{$TotalAmount="0";}
 				$TotalAmount123+=$TotalAmount;
 				
-				$selectsumTotalQTY="select sum(qty) from ot_sales where tempid='$ot_tempid'";
-				$fetchsumTotalQTY=mysqli_query($db_conn,$selectsumTotalQTY);
+				$selectsumTotalQTY="select sum(qty) from ot_sales where tempid=?";
+				$fetchsumTotalQTY=db_q($db_conn,$selectsumTotalQTY,[$ot_tempid]);
 				$resultsumTotalQTY=mysqli_fetch_array($fetchsumTotalQTY);
 				if($resultsumTotalQTY[0]!=NULL){
 				$TotalPrQty=$resultsumTotalQTY[0];}else{$TotalPrQty="0";}

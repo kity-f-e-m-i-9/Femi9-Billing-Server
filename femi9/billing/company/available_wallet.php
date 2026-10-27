@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 
 $title="Available Wallet";
@@ -101,7 +101,7 @@ elseif($usertype=="stockiest") {$tablenameWE="stockiest";}
 elseif($usertype=="distributor"){$tablenameWE="distributor";}
 else{$tablenameWE="super_distributor";}
 
-$select_onbaord_user_records="select temp_id from ".$tablenameWE." where mobile_number='$mobile'";
+$select_onbaord_user_records="select temp_id from ".$tablenameWE." where mobile_number='".db_esc($mobile)."'";
 $fetch_onbaord_user_records=mysqli_query($db_conn,$select_onbaord_user_records);
 $result_onbaord_user_records=mysqli_fetch_array($fetch_onbaord_user_records);
 
@@ -136,7 +136,7 @@ $tablename_USER=base64_decode($_REQUEST['tablename']);
 			<?php if($se_usertype==NULL){?>
 			<option value="" hidden>Select Usertype</option>
 			<?php }else{?>
-			<option value="<?=$se_usertype;?>" hidden><?=$se_usertype;?></option>
+			<option value="<?=htmlspecialchars((string)($se_usertype), ENT_QUOTES, 'UTF-8', false);?>" hidden><?=htmlspecialchars((string)($se_usertype), ENT_QUOTES, 'UTF-8', false);?></option>
 			<?php }?>
 			<option value="super_stockiest">super_stockiest</option>
 			<option value="stockiest">stockiest</option>
@@ -162,7 +162,7 @@ $tablename_USER=base64_decode($_REQUEST['tablename']);
 		
 		
 		<?php 
-$select_USER_Records123="select * from ".$tablename_USER." where temp_id='$se_userID'";
+$select_USER_Records123="select * from ".$tablename_USER." where temp_id='".db_esc($se_userID)."'";
 $fetch_USER_Records123=mysqli_query($db_conn,$select_USER_Records123);
 $result_USER_Records133=mysqli_fetch_array($fetch_USER_Records123);
 
@@ -182,14 +182,14 @@ $user_det_Mobile=$result_USER_Records133['mobile_number'];
 									
 									<?php
 								//Total wallet amount
-$select_wallet_amount_ST="select sum(commission_amount) from wallet_monthly_sls_report where refer_by_usertype='$se_usertype' and refer_by_userid='$se_userID'";
-$fetch_wallet_amount_ST=mysqli_query($db_conn,$select_wallet_amount_ST);
+$select_wallet_amount_ST="select sum(commission_amount) from wallet_monthly_sls_report where refer_by_usertype=? and refer_by_userid=?";
+$fetch_wallet_amount_ST=db_q($db_conn,$select_wallet_amount_ST,[$se_usertype,$se_userID]);
 $result_wallet_amount_ST=mysqli_fetch_array($fetch_wallet_amount_ST);
 $Total_wallet_amount_ST=$result_wallet_amount_ST[0] ?? '0';
 
 //Total Withdraw Amount
-$select_wallet_withdraw_amount_ST="select sum(amount) from wallet_withdraw where user_type='$se_usertype' and user_id='$se_userID' and req_status='approved'";
-$fetch_wallet_withdraw_amount_ST=mysqli_query($db_conn,$select_wallet_withdraw_amount_ST);
+$select_wallet_withdraw_amount_ST="select sum(amount) from wallet_withdraw where user_type=? and user_id=? and req_status='approved'";
+$fetch_wallet_withdraw_amount_ST=db_q($db_conn,$select_wallet_withdraw_amount_ST,[$se_usertype,$se_userID]);
 $result_wallet_withdraw_amount_ST=mysqli_fetch_array($fetch_wallet_withdraw_amount_ST);
 $Total_withdraw_amount_ST=$result_wallet_withdraw_amount_ST[0] ?? '0';
 
@@ -214,8 +214,8 @@ $Average_available_walletAmount_ST=$Total_wallet_amount_ST-$Total_withdraw_amoun
 							  <h5 class="todo-menu-title">Last 10 Credit</h5>
                                     <ul class="list-unstyled">		
 <?php 
-$select_wallet_History1234="select * from wallet_monthly_sls_report where refer_by_usertype='$se_usertype' and refer_by_userid='$se_userID' order by from_date desc LIMIT 0,10";
-$fetch_wallet_History1234=mysqli_query($db_conn,$select_wallet_History1234);
+$select_wallet_History1234="select * from wallet_monthly_sls_report where refer_by_usertype=? and refer_by_userid=? order by from_date desc LIMIT 0,10";
+$fetch_wallet_History1234=db_q($db_conn,$select_wallet_History1234,[$se_usertype,$se_userID]);
 while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 {
 
@@ -226,8 +226,8 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 													<?php if($result_wallet_History1234['commission_type']=="Refferral"){?>
                                                         <div class="todo-item-content">
                                                             <span class="todo-item-title">&#8377;<?=inr_format($result_wallet_History1234['commission_amount'], 2);?><span class="badge badge-style-light rounded-pill badge-success">Credit</span></span>
-															<span>Refferral (<?=$result_wallet_History1234['commission_percentage'];?>%)</span><br/>
-															<span class="todo-item-subtitle"><?=$result_wallet_History1234['month'];?>, <?=$result_wallet_History1234['year'];?></span>
+															<span>Refferral (<?=htmlspecialchars((string)($result_wallet_History1234['commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</span><br/>
+															<span class="todo-item-subtitle"><?=htmlspecialchars((string)($result_wallet_History1234['month']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_wallet_History1234['year']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                                         </div>
 													<?php 
 													} 
@@ -237,9 +237,9 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 														?>
 													<div class="todo-item-content">
                                                             <span class="todo-item-title">&#8377;<?=inr_format($result_wallet_History1234['commission_amount'], 2);?><span class="badge badge-style-light rounded-pill badge-success">Credit</span></span>
-                                                            <span>Cashback (<?=$result_wallet_History1234['commission_percentage'];?>%)</span><br/>
-															<span><?=$result_wallet_History1234['remarks'];?></span>
-															<span class="todo-item-subtitle"><?=$result_wallet_History1234['month'];?>, <?=$result_wallet_History1234['year'];?></span>
+                                                            <span>Cashback (<?=htmlspecialchars((string)($result_wallet_History1234['commission_percentage']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</span><br/>
+															<span><?=htmlspecialchars((string)($result_wallet_History1234['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
+															<span class="todo-item-subtitle"><?=htmlspecialchars((string)($result_wallet_History1234['month']), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_wallet_History1234['year']), ENT_QUOTES, 'ISO-8859-1', false);?></span>
                                                         </div>
 													<?php }?>
                                                         <!-----<div class="todo-item-actions">
@@ -260,8 +260,8 @@ while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
                                                 <ul class="list-unstyled">
 												
 <?php 
-$select_wallet_History1234="select * from wallet_withdraw where user_type='$se_usertype' and user_id='$se_userID' order by date desc LIMIT 0,10";
-$fetch_wallet_History1234=mysqli_query($db_conn,$select_wallet_History1234);
+$select_wallet_History1234="select * from wallet_withdraw where user_type=? and user_id=? order by date desc LIMIT 0,10";
+$fetch_wallet_History1234=db_q($db_conn,$select_wallet_History1234,[$se_usertype,$se_userID]);
 while($result_wallet_History1234=mysqli_fetch_array($fetch_wallet_History1234))
 {
 ?>

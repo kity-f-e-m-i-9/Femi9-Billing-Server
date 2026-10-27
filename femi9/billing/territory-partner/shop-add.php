@@ -85,7 +85,7 @@ $tempID = "" . $randum_number . "FSHP" . $temp_date . "" . $temp_time . "";
     $fetchShopCat = mysqli_query($db_conn, $selectShopCat);
     while ($resultShopCat = mysqli_fetch_array($fetchShopCat)) {
     ?>
-    <option value="<?php echo $resultShopCat['id']; ?>"><?php echo $resultShopCat['catlable']; ?></option>
+    <option value="<?php echo htmlspecialchars((string)($resultShopCat['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($resultShopCat['catlable']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
     <?php } ?>
 </select>
 <br/>
@@ -110,7 +110,7 @@ foreach ($layers as $_layer):
         onchange="geoPopulate(<?php echo $_d; ?>, this.value)">
     <option value="">Select <?php echo htmlspecialchars($_layer['layer_name']); ?></option>
     <?php if ($_d === 2): foreach ($geoNodes as $_n): if ($_n['depth'] === 2): ?>
-    <option value="<?php echo $_n['id']; ?>"><?php echo htmlspecialchars($_n['name']); ?></option>
+    <option value="<?php echo htmlspecialchars((string)($_n['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars($_n['name']); ?></option>
     <?php endif; endforeach; endif; ?>
 </select>
 <br/>
@@ -129,7 +129,7 @@ foreach ($layers as $_layer):
             $fetchCountry = mysqli_query($db_conn, $selectCountry);
             while ($resultCountry = mysqli_fetch_array($fetchCountry)) {
             ?>
-            <option value="<?php echo $resultCountry['c_code']; ?>"><?php echo $resultCountry['c_name']; ?> (<?php echo $resultCountry['c_code']; ?>)</option>
+            <option value="<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
             <?php } ?>
         </select>
     </div>

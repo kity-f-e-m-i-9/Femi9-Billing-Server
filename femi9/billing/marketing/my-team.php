@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 require_once("include/TeamLevelColors.php");
@@ -94,8 +94,8 @@ if ($hasDateFilter) {
         "SELECT o.ms_id, COUNT(DISTINCT o.shop_id) AS cnt
          FROM ms_orders o JOIN ms_shop s ON s.id = o.shop_id
          WHERE o.ms_id IN ($idList) AND o.new_order='yes'
-               AND o.order_date BETWEEN '$fromDate' AND '$toDate'
-               AND DATE(s.created_at) < '$fromDate'
+               AND o.order_date BETWEEN '".db_esc($fromDate)."' AND '".db_esc($toDate)."'
+               AND DATE(s.created_at) < '".db_esc($fromDate)."'
          GROUP BY o.ms_id"
     );
     if ($_rs) { while ($r = $_rs->fetch_assoc()) { $rawStats[(int)$r['ms_id']]['oldshops'] = (int)$r['cnt']; } }
@@ -188,10 +188,10 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
     $html .= '<td>' . ($indent ? '&#8618;&nbsp;' : '') . ($indent ? '' : '<b>') . htmlspecialchars($row['ms_name']) . ($indent ? '' : '</b>') . '</td>';
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
     $html .= '<td style="max-width:220px;">' . ($district !== '' ? '<span style="display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;" title="' . htmlspecialchars($district) . '">' . htmlspecialchars($district) . '</span>' : '<span class="text-muted" style="font-size:11px;">&mdash;</span>') . '</td>';
-    $html .= '<td><span class="stat-pill">' . $sum['shops'] . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . $sum['oldshops'] . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . $sum['got'] . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . $sum['no'] . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['shops']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['oldshops']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['got']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['no']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
     $html .= '<td>';
     $html .= '<div class="actions-cell">';
     if ($sum['shops'] > 0) {

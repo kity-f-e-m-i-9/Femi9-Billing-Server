@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -8,8 +8,8 @@ $manage_title="Manage Expenses";
 $message_title="Expenses";
 
 $get_id=base64_decode($_REQUEST['prid']);
-$select_product_list="select * from ms_exp where id='$get_id'";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from ms_exp where id=?";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$get_id]);
 				$result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -90,19 +90,19 @@ $select_product_list="select * from ms_exp where id='$get_id'";
 <?php include("validate-scripts.php");?>
 <form action="exp_action_update" method="post" enctype="multipart/form-data" id="uploadForm">
 
-<input type="hidden" name="update_id" value="<?=$get_id;?>">
-<input type="hidden" name="old_icon" value="<?=$result_product_list["photos"];?>">
+<input type="hidden" name="update_id" value="<?=htmlspecialchars((string)($get_id), ENT_QUOTES, 'UTF-8', false);?>">
+<input type="hidden" name="old_icon" value="<?=htmlspecialchars((string)($result_product_list["photos"]), ENT_QUOTES, 'ISO-8859-1', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
 											
 											
 					<label class="form-label">Date*</label>
-            <input type="date" value="<?=$result_product_list['date'];?>" disabled required class="form-control">
+            <input type="date" value="<?=htmlspecialchars((string)($result_product_list['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" disabled required class="form-control">
 			<br/>
 			
             <label class="form-label">Amount*</label>
-            <input type="number" name="amount" value="<?=$result_product_list['amount'];?>" min="1" max="99999" required class="form-control">
+            <input type="number" name="amount" value="<?=htmlspecialchars((string)($result_product_list['amount']), ENT_QUOTES, 'ISO-8859-1', false);?>" min="1" max="99999" required class="form-control">
 			<br/>
 			
 			<label class="form-label">Bill Copy*</label>
@@ -119,7 +119,7 @@ $select_product_list="select * from ms_exp where id='$get_id'";
 
 			
 			<label class="form-label">Remarks*</label>
-            <textarea name="remarks" onkeypress="restrictSpecialChars(event)" class="form-control" required><?=$result_product_list['remarks'];?></textarea>
+            <textarea name="remarks" onkeypress="restrictSpecialChars(event)" class="form-control" required><?=htmlspecialchars((string)($result_product_list['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
 			
 			

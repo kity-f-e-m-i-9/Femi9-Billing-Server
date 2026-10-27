@@ -904,14 +904,14 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         districtSelect.html('<option value="">All Districts</option>');
                         
                         response.data.forEach(function(district) {
-                            const selected = '<?php echo $filter_payer_district_id; ?>' == district.id ? 'selected' : '';
+                            const selected = '<?php echo htmlspecialchars((string)($filter_payer_district_id), ENT_QUOTES, 'UTF-8', false); ?>' == district.id ? 'selected' : '';
                             districtSelect.append(
                                 '<option value="' + escapeHtml(district.id) + '" ' + selected + '>' + 
                                 escapeHtml(district.name) + '</option>'
                             );
                         });
                         
-                        if ('<?php echo $filter_payer_district_id; ?>') {
+                        if ('<?php echo htmlspecialchars((string)($filter_payer_district_id), ENT_QUOTES, 'UTF-8', false); ?>') {
                             loadPayerNames();
                         }
                     }
@@ -971,14 +971,14 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         districtSelect.html('<option value="">All Districts</option>');
                         
                         response.data.forEach(function(district) {
-                            const selected = '<?php echo $filter_receiver_district_id; ?>' == district.id ? 'selected' : '';
+                            const selected = '<?php echo htmlspecialchars((string)($filter_receiver_district_id), ENT_QUOTES, 'UTF-8', false); ?>' == district.id ? 'selected' : '';
                             districtSelect.append(
                                 '<option value="' + escapeHtml(district.id) + '" ' + selected + '>' + 
                                 escapeHtml(district.name) + '</option>'
                             );
                         });
                         
-                        if ('<?php echo $filter_receiver_district_id; ?>') {
+                        if ('<?php echo htmlspecialchars((string)($filter_receiver_district_id), ENT_QUOTES, 'UTF-8', false); ?>') {
                             loadReceiverNames();
                         }
                     }
@@ -1109,7 +1109,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
             
             $.post('get-advance-payment-details.php', {
                 id: id, 
-                csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+                csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
             })
             .done(function(response) {
                 $('#modalContent').html(response);
@@ -1129,7 +1129,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
             
             $.post('get-advance-payment-edit-form.php', {
                 id: id, 
-                csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+                csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
             })
             .done(function(response) {
                 $('#editModalContent').html(response);
@@ -1186,7 +1186,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
             
             $.post('delete-advance-payment-action.php', {
                 id: id,
-                csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+                csrf_token: '<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>'
             })
             .done(function(response) {
                 if (response.success) {

@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -78,16 +78,16 @@ if ($from_month != '') {
         $hsn_rate = (float)$h['gst'];
         $rate_filter = $hsn_rate == 0 ? '=0' : '>0';
 
-        $q = "select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn='$hsn_code' and gst_percentage$rate_filter and date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and from_user_id='$tp_id'";
-        $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+        $q = "select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn=? and gst_percentage$rate_filter and date between ? and ? and from_user_type=? and from_user_id=?";
+        $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
         $qty = (float)($r[0] ?? 0); $val = (float)($r[1] ?? 0);
 
-        $q = "select sum(qty), sum(total-gstamount_total) from invoice_items where hsn='$hsn_code' and gst_percentage$rate_filter and date between '$from_date' and '$to_date' and user_type='$Login_user_TYPEvl' and user_id='$tp_id'";
-        $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+        $q = "select sum(qty), sum(total-gstamount_total) from invoice_items where hsn=? and gst_percentage$rate_filter and date between ? and ? and user_type=? and user_id=?";
+        $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
         $qty += (float)($r[0] ?? 0); $val += (float)($r[1] ?? 0);
 
-        $q = "select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn='$hsn_code' and gst_percentage$rate_filter and date between '$from_date' and '$to_date' and to_usertype='$Login_user_TYPEvl' and to_userid='$tp_id'";
-        $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+        $q = "select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn=? and gst_percentage$rate_filter and date between ? and ? and to_usertype=? and to_userid=?";
+        $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
         $qty -= (float)($r[0] ?? 0); $val -= (float)($r[1] ?? 0);
 
         if ($qty == 0 && $val == 0) continue;
@@ -116,16 +116,16 @@ if ($from_month != '') {
         $hsn_rate = (float)$h['gst'];
         $b2b_qty = 0; $b2b_val = 0; $b2c_qty = 0; $b2c_val = 0;
         foreach (['register' => true, 'unregister' => false] as $bg => $is_b2b) {
-            $q = "select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn='$hsn_code' and gst_percentage>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and from_user_type='$Login_user_TYPEvl' and from_user_id='$tp_id'";
-            $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+            $q = "select sum(qty), sum(total-gstamount_total) from user_invoice_items where hsn=? and gst_percentage>0 and buyer_gsttype=? and date between ? and ? and from_user_type=? and from_user_id=?";
+            $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$bg,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
             $qty = (float)($r[0] ?? 0); $val = (float)($r[1] ?? 0);
 
-            $q = "select sum(qty), sum(total-gstamount_total) from invoice_items where hsn='$hsn_code' and gst_percentage>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and user_type='$Login_user_TYPEvl' and user_id='$tp_id'";
-            $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+            $q = "select sum(qty), sum(total-gstamount_total) from invoice_items where hsn=? and gst_percentage>0 and buyer_gsttype=? and date between ? and ? and user_type=? and user_id=?";
+            $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$bg,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
             $qty += (float)($r[0] ?? 0); $val += (float)($r[1] ?? 0);
 
-            $q = "select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn='$hsn_code' and gst_percentage>0 and buyer_gsttype='$bg' and date between '$from_date' and '$to_date' and to_usertype='$Login_user_TYPEvl' and to_userid='$tp_id'";
-            $r = mysqli_fetch_array(mysqli_query($db_conn, $q));
+            $q = "select sum(qty), sum(total-gstamount_total) from user_return_stock_items where hsn=? and gst_percentage>0 and buyer_gsttype=? and date between ? and ? and to_usertype=? and to_userid=?";
+            $r = mysqli_fetch_array(db_q($db_conn,$q,[$hsn_code,$bg,$from_date,$to_date,$Login_user_TYPEvl,$tp_id]));
             $qty -= (float)($r[0] ?? 0); $val -= (float)($r[1] ?? 0);
 
             if ($is_b2b) { $b2b_qty = $qty; $b2b_val = $val; } else { $b2c_qty = $qty; $b2c_val = $val; }
@@ -159,8 +159,8 @@ if ($from_month != '') {
     $doc_grand_total = 0;
     $doc_rows = [];
     foreach ($doc_channels as $dc) {
-        $dq = "select {$dc['num_col']} as num from {$dc['table']} where {$dc['where']} and {$dc['date_col']} between '$from_date' and '$to_date' order by {$dc['date_col']} asc, {$dc['num_col']} asc";
-        $dres = mysqli_query($db_conn, $dq);
+        $dq = "select {$dc['num_col']} as num from {$dc['table']} where {$dc['where']} and {$dc['date_col']} between ? and ? order by {$dc['date_col']} asc, {$dc['num_col']} asc";
+        $dres = db_q($db_conn,$dq,[$from_date,$to_date]);
         $series_groups = [];
         while ($drow = mysqli_fetch_assoc($dres)) {
             $series_groups[doc_series_code($drow['num'])][] = $drow['num'];
@@ -229,7 +229,7 @@ if ($from_month != '') {
                                 </div>
                             </div>
 
-                            <form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+                            <form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
                             <div class="overviewcontainar">
                             <div id="searchleftcont">
                             <label class="form-label">From Month</label>
@@ -431,7 +431,7 @@ if ($from_month != '') {
                         <tr>
                         <td style="text-align:left;"><?=htmlspecialchars($hr['hsn']);?></td>
                         <td style="text-align:left;"><?=$hr['rate'] > 0 ? $hr['rate'].'%' : 'Nil';?></td>
-                        <td style="text-align:left;"><?=$hr['qty'];?></td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($hr['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                         <td style="text-align:left;"><?=$hr['rate'] == 0 ? inr_format($hr['val'], 2) : '';?></td>
                         <td style="text-align:left;"><?=$hr['rate'] > 0 ? inr_format($hr['val'], 2) : '';?></td>
                         </tr>
@@ -458,10 +458,10 @@ if ($from_month != '') {
                         <?php foreach ($hsn_b2b_rows as $hr): ?>
                         <tr>
                         <td style="text-align:left;"><?=htmlspecialchars($hr['hsn']);?></td>
-                        <td style="text-align:left;"><?=$hr['rate'];?>%</td>
-                        <td style="text-align:left;"><?=$hr['b2b_qty'];?></td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($hr['rate']), ENT_QUOTES, 'ISO-8859-1', false);?>%</td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($hr['b2b_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                         <td style="text-align:left;"><?=inr_format($hr['b2b_val'], 2);?></td>
-                        <td style="text-align:left;"><?=$hr['b2c_qty'];?></td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($hr['b2c_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                         <td style="text-align:left;"><?=inr_format($hr['b2c_val'], 2);?></td>
                         </tr>
                         <?php endforeach; ?>
@@ -532,7 +532,7 @@ if ($from_month != '') {
                         <td style="text-align:left;"><?=htmlspecialchars($dr['series']);?></td>
                         <td style="text-align:left;"><?=htmlspecialchars($dr['from']);?></td>
                         <td style="text-align:left;"><?=htmlspecialchars($dr['to']);?></td>
-                        <td style="text-align:left;"><?=$dr['count'];?></td>
+                        <td style="text-align:left;"><?=htmlspecialchars((string)($dr['count']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
                         </tr>
                         <?php endforeach; ?>
                         <tr>

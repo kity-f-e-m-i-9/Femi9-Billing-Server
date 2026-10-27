@@ -272,11 +272,11 @@ $pagedSummary = array_slice($tpSummary, ($page - 1) * $perPage, $perPage, true);
                                                         <?=htmlspecialchars($s['name'] ?? '-')?>
                                                         <?php if (!empty($s['code'])): ?><br/><span class="text-muted" style="font-size:11px;"><?=htmlspecialchars($s['code'])?></span><?php endif; ?>
                                                     </td>
-                                                    <td><span class="tp-tag tp-tag-info"><?=$s['get_order']?></span></td>
-                                                    <td><span class="tp-tag tp-tag-neutral"><?=$s['pending']?></span></td>
-                                                    <td><span class="tp-tag" style="background:#fef3c7;color:#92400e;"><?=$s['incomplete']?></span></td>
-                                                    <td><span class="tp-tag tp-tag-good"><?=$s['completed']?></span></td>
-                                                    <td><span class="tp-tag tp-tag-bad"><?=$s['no_order']?></span></td>
+                                                    <td><span class="tp-tag tp-tag-info"><?=htmlspecialchars((string)($s['get_order']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                                    <td><span class="tp-tag tp-tag-neutral"><?=htmlspecialchars((string)($s['pending']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                                    <td><span class="tp-tag" style="background:#fef3c7;color:#92400e;"><?=htmlspecialchars((string)($s['incomplete']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                                    <td><span class="tp-tag tp-tag-good"><?=htmlspecialchars((string)($s['completed']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
+                                                    <td><span class="tp-tag tp-tag-bad"><?=htmlspecialchars((string)($s['no_order']), ENT_QUOTES, 'ISO-8859-1', false)?></span></td>
                                                     <td>&#8377;<?=number_format($s['est_amount'], 2)?></td>
                                                     <td>&#8377;<?=number_format($s['converted_amount'], 2)?></td>
                                                 </tr>
@@ -287,11 +287,11 @@ $pagedSummary = array_slice($tpSummary, ($page - 1) * $perPage, $perPage, true);
                                                 <tr>
                                                     <td></td>
                                                     <td>Total</td>
-                                                    <td><?=$grand['get_order']?></td>
-                                                    <td><?=$grand['pending']?></td>
-                                                    <td><?=$grand['incomplete']?></td>
-                                                    <td><?=$grand['completed']?></td>
-                                                    <td><?=$grand['no_order']?></td>
+                                                    <td><?=htmlspecialchars((string)($grand['get_order']), ENT_QUOTES, 'ISO-8859-1', false)?></td>
+                                                    <td><?=htmlspecialchars((string)($grand['pending']), ENT_QUOTES, 'ISO-8859-1', false)?></td>
+                                                    <td><?=htmlspecialchars((string)($grand['incomplete']), ENT_QUOTES, 'ISO-8859-1', false)?></td>
+                                                    <td><?=htmlspecialchars((string)($grand['completed']), ENT_QUOTES, 'ISO-8859-1', false)?></td>
+                                                    <td><?=htmlspecialchars((string)($grand['no_order']), ENT_QUOTES, 'ISO-8859-1', false)?></td>
                                                     <td>&#8377;<?=number_format($grand['est_amount'], 2)?></td>
                                                     <td>&#8377;<?=number_format($grand['converted_amount'], 2)?></td>
                                                 </tr>

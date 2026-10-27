@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../../shared/db-helpers.php';
 /**
  * Table 4 (GSTR-1) B2B buyer-wise computation for the territory-partner
  * login — a scaled-down port of company/include/B2bBuyerHelper.php, since a
@@ -49,7 +49,7 @@ function tp_compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $tp_id, $from_date,
     // This TP's own GSTIN state-code, used to check each buyer's GSTIN
     // state-code against it.
     $tp_state_code = '';
-    $gres = mysqli_query($db_conn, "select gstin from territory_partners where id='$tp_id'");
+    $gres = mysqli_query($db_conn, "select gstin from territory_partners where id='".db_esc($tp_id)."'");
     if ($grow = mysqli_fetch_assoc($gres)) { $tp_state_code = tp_b2b_gstin_state_code($grow['gstin']); }
 
     // Shop sales. gst_percentage>0 only — Table 4 is B2B *rated* supplies.
@@ -60,8 +60,8 @@ function tp_compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $tp_id, $from_date,
         FROM user_invoice_items uii
         LEFT JOIN user_invoice ui ON ui.inv_id = uii.inv_id
         LEFT JOIN shop sh ON sh.temp_id = uii.to_user_id
-        WHERE uii.from_user_type='$Login_user_TYPEvl' AND uii.from_user_id='$tp_id'
-          AND uii.buyer_gsttype='register' AND uii.gst_percentage>0 AND uii.date BETWEEN '$from_date' AND '$to_date'
+        WHERE uii.from_user_type='".db_esc($Login_user_TYPEvl)."' AND uii.from_user_id='".db_esc($tp_id)."'
+          AND uii.buyer_gsttype='register' AND uii.gst_percentage>0 AND uii.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY uii.to_user_id, ui.inv_number, uii.date, uii.gst_type, sh.name, sh.gstin
     ";
     $res = mysqli_query($db_conn, $q);
@@ -78,8 +78,8 @@ function tp_compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $tp_id, $from_date,
         FROM invoice_items ii
         LEFT JOIN invoice i ON i.inv_id = ii.inv_id
         LEFT JOIN customers c ON c.id = ii.customer_id
-        WHERE ii.user_type='$Login_user_TYPEvl' AND ii.user_id='$tp_id'
-          AND ii.buyer_gsttype='register' AND ii.gst_percentage>0 AND ii.date BETWEEN '$from_date' AND '$to_date'
+        WHERE ii.user_type='".db_esc($Login_user_TYPEvl)."' AND ii.user_id='".db_esc($tp_id)."'
+          AND ii.buyer_gsttype='register' AND ii.gst_percentage>0 AND ii.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY ii.customer_id, i.inv_number, ii.date, ii.gst_type, c.name, c.gstin
     ";
     $res = mysqli_query($db_conn, $q);
@@ -94,8 +94,8 @@ function tp_compute_b2b_buyers($db_conn, $Login_user_TYPEvl, $tp_id, $from_date,
         SELECT rsi.from_usertype, rsi.from_userid, rsi.gst_type,
                SUM(rsi.total-rsi.gstamount_total) AS taxable, SUM(rsi.gstamount_total) AS gst_amt
         FROM user_return_stock_items rsi
-        WHERE rsi.to_usertype='$Login_user_TYPEvl' AND rsi.to_userid='$tp_id'
-          AND rsi.buyer_gsttype='register' AND rsi.gst_percentage>0 AND rsi.date BETWEEN '$from_date' AND '$to_date'
+        WHERE rsi.to_usertype='".db_esc($Login_user_TYPEvl)."' AND rsi.to_userid='".db_esc($tp_id)."'
+          AND rsi.buyer_gsttype='register' AND rsi.gst_percentage>0 AND rsi.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY rsi.from_usertype, rsi.from_userid, rsi.gst_type
     ";
     $res = mysqli_query($db_conn, $q);

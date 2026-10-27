@@ -1,5 +1,5 @@
 <?php
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('shop');
 include("config.php");
 require_once("include/StockService.php");
 
@@ -84,7 +84,7 @@ if (isset($_REQUEST['inv_id']))
 			$db_conn->rollback();
 			error_log("shop-user-del-inv-product.php error: " . $e->getMessage());
 			$_SESSION['errorMessage'] = "Failed to remove item. Please try again.";
-			echo "<script>window.location='shop-user-invoice-add?InvoiceID=".$invoice_id_encode."&&invuser=".$invuser."&&action=".$_SESSION['ACTIONEDIT']."&&gid=".$Login_user_IDvl."';</script>";
+			echo "<script>window.location='shop-user-invoice-add?InvoiceID=".urlencode($invoice_id_encode)."&&invuser=".urlencode($invuser)."&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($Login_user_IDvl)."';</script>";
 			exit;
 		}
 	}
@@ -97,7 +97,7 @@ if (isset($_REQUEST['inv_id']))
 		$stmtDel->close();
 	}
 
-	echo "<script>window.location='shop-user-invoice-add?InvoiceID=".$invoice_id_encode."&&DeleteSuccess&&invuser=".$invuser."&&ActionRemove&&action=".$_SESSION['ACTIONEDIT']."&&gid=".$Login_user_IDvl."';</script>";
+	echo "<script>window.location='shop-user-invoice-add?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&ActionRemove&&action=".urlencode($_SESSION['ACTIONEDIT'])."&&gid=".urlencode($Login_user_IDvl)."';</script>";
 
 }
 ?>

@@ -1248,8 +1248,8 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                         foreach ($data as $g => $r) {
                                             $pct = $grand > 0 ? round($r['amt'] / $grand * 100, 1) : 0;
                                             echo "<tr>
-                                                <td><b>{$r['lbl']}</b></td>
-                                                <td>{$r['cnt']}</td>
+                                                <td><b>".htmlspecialchars((string)($r['lbl']), ENT_QUOTES, 'ISO-8859-1', false)."</b></td>
+                                                <td>".htmlspecialchars((string)($r['cnt']), ENT_QUOTES, 'ISO-8859-1', false)."</td>
                                                 <td><b>&#x20B9;" . inr_format($r['amt'], 2) . "</b></td>
                                                 <td><div class='d-flex align-items-center gap-2'>
                                                     <div class='progress-bar-mis' style='width:80px'><div class='progress-fill' style='width:{$pct}%;background:#7e57c2'></div></div>
@@ -1365,7 +1365,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             <?php $pct = round($s['revenue'] / $total_state_rev * 100, 1); ?>
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($s['state_name']); ?></b></td>
-                                                <td><?php echo $s['cnt']; ?></td>
+                                                <td><?php echo htmlspecialchars((string)($s['cnt']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                 <td><span class="badge-rev">&#x20B9;<?php echo inr_format($s['revenue'], 2); ?></span></td>
                                                 <td>
                                                     <div class="d-flex align-items-center gap-2">
@@ -1397,7 +1397,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             <?php $pct = round($d['revenue'] / $total_dist_rev * 100, 1); ?>
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($d['district_name']); ?></b></td>
-                                                <td><?php echo $d['cnt']; ?></td>
+                                                <td><?php echo htmlspecialchars((string)($d['cnt']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                 <td><span class="badge-rev">&#x20B9;<?php echo inr_format($d['revenue'], 2); ?></span></td>
                                                 <td>
                                                     <div class="d-flex align-items-center gap-2">
@@ -1435,7 +1435,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             <tr>
                                                 <td><span class="rank-badge <?php echo $i===0?'top1':($i===1?'top2':($i===2?'top3':'')); ?>"><?php echo $i+1; ?></span></td>
                                                 <td><b><?php echo htmlspecialchars($s['shop_name']); ?></b></td>
-                                                <td><?php echo $s['inv_cnt']; ?></td>
+                                                <td><?php echo htmlspecialchars((string)($s['inv_cnt']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                 <td><span class="badge-qty"><?php echo inr_format((int)$s['units'], 0); ?></span></td>
                                                 <td>
                                                     <span class="badge-rev">&#x20B9;<?php echo inr_format($s['revenue'], 2); ?></span>
@@ -1465,7 +1465,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             <tr>
                                                 <td><span class="rank-badge <?php echo $i===0?'top1':($i===1?'top2':($i===2?'top3':'')); ?>"><?php echo $i+1; ?></span></td>
                                                 <td><b><?php echo htmlspecialchars($c['cust_name']); ?></b></td>
-                                                <td><?php echo $c['inv_cnt']; ?></td>
+                                                <td><?php echo htmlspecialchars((string)($c['inv_cnt']), ENT_QUOTES, 'ISO-8859-1', false); ?></td>
                                                 <td><span class="badge-qty"><?php echo inr_format((int)$c['units'], 0); ?></span></td>
                                                 <td>
                                                     <span class="badge-rev">&#x20B9;<?php echo inr_format($c['revenue'], 2); ?></span>
@@ -1555,7 +1555,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                             ?>
                                             <tr>
                                                 <td><b><?php echo htmlspecialchars($tr['loc_name']); ?></b></td>
-                                                <td><span style="font-size:11px;background:#e8eaf6;padding:2px 6px;border-radius:4px;">L<?php echo $tr['depth']; ?></span></td>
+                                                <td><span style="font-size:11px;background:#e8eaf6;padding:2px 6px;border-radius:4px;">L<?php echo htmlspecialchars((string)($tr['depth']), ENT_QUOTES, 'ISO-8859-1', false); ?></span></td>
                                                 <td>&#x20B9;<?php echo inr_format($tr['target'], 2); ?></td>
                                                 <td class="target-pct-display" data-napkin-sub="&#x20B9;<?php echo inr_format($tr['napkin_achieved'], 2); ?>" data-combined-sub="&#x20B9;<?php echo inr_format($tr['achieved'], 2); ?>">&#x20B9;<?php echo inr_format($tr['napkin_achieved'], 2); ?></td>
                                                 <td class="target-pct-display"
@@ -1647,7 +1647,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                                     <?php if ($m['growth'] === null): ?>
                                                         <span style="color:#888">—</span>
                                                     <?php elseif ($m['growth'] >= 0): ?>
-                                                        <span class="growth-pos">▲ <?php echo $m['growth']; ?>%</span>
+                                                        <span class="growth-pos">▲ <?php echo htmlspecialchars((string)($m['growth']), ENT_QUOTES, 'ISO-8859-1', false); ?>%</span>
                                                     <?php else: ?>
                                                         <span class="growth-neg">▼ <?php echo abs($m['growth']); ?>%</span>
                                                     <?php endif; ?>
@@ -1695,7 +1695,7 @@ $j_pqty    = json_encode(array_map('intval', array_column($product_sales, 'total
                                                     <?php if ($r['status'] === 'pending'): ?>
                                                     <span class="status-badge badge-partial">Pending</span>
                                                     <?php else: ?>
-                                                    <span class="status-badge badge-paid"><?php echo ucfirst($r['status']); ?></span>
+                                                    <span class="status-badge badge-paid"><?php echo htmlspecialchars((string)(ucfirst($r['status'])), ENT_QUOTES, 'ISO-8859-1', false); ?></span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td><a href="cnote_details.php?returnid=<?php echo base64_encode($r['returnid']); ?>">View</a></td>

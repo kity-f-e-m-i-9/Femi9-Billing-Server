@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
 
 $sdid=$_REQUEST['distributorid'];
 
@@ -85,13 +85,14 @@ function closerefresh()
 		$st_ref_userid_conc="".$st_ref_userid."".$st_ref_userid2."";
 		
 		$tblename=$_REQUEST['tblename'];
+		if (!in_array($tblename, ['distributor','super_stockiest','stockiest','super_distributor'], true)) { http_response_code(400); exit('Invalid request'); } // table name goes into SQL: allowlist only
 		
 		if($st_ref_type=="company")
 		{
 		    
 		    $UPDATE_REFERED="update distributor_referral set ref_by_user_type='company',
-			ref_by_user_id='company',updated='1' where distributor_id='$sdid'";
-			mysqli_query($db_conn,$UPDATE_REFERED);
+			ref_by_user_id='company',updated='1' where distributor_id=?";
+			db_q($db_conn,$UPDATE_REFERED,[$sdid]);
 					
 					$_SESSION['successMessage']="Referral Details Updated Success!";
 			echo "<script> opener.location.reload(true);
@@ -100,15 +101,15 @@ function closerefresh()
 		    
 		}else{
 		
-		$select_count_REFERID="select * from ".$tblename." where useridtext='$st_ref_userid_conc'";
+		$select_count_REFERID="select * from ".$tblename." where useridtext='".db_esc($st_ref_userid_conc)."'";
 		$fetch_count_REFERID=mysqli_query($db_conn,$select_count_REFERID);
 		$result_count_REFERID=mysqli_num_rows($fetch_count_REFERID);
 		if($result_count_REFERID==1)
 		{
 							
-	$UPDATE_REFERED="update distributor_referral set ref_by_user_type='$st_ref_type',
-	ref_by_user_id='$st_ref_userid_conc',updated='1' where distributor_id='$sdid'";
-							mysqli_query($db_conn,$UPDATE_REFERED);
+	$UPDATE_REFERED="update distributor_referral set ref_by_user_type=?,
+	ref_by_user_id=?,updated='1' where distributor_id=?";
+							db_q($db_conn,$UPDATE_REFERED,[$st_ref_type,$st_ref_userid_conc,$sdid]);
 							
 							$_SESSION['successMessage']="Referral Details Updated Success!";
 			echo "<script> opener.location.reload(true);
@@ -117,7 +118,7 @@ function closerefresh()
 							
 		}else{
 			
-			echo "<script>window.location='super_Distributor_update_referral?InvalidReferedID&&sdid=$sdid';</script>";
+			echo "<script>window.location='super_Distributor_update_referral?InvalidReferedID&&sdid=".urlencode($sdid)."';</script>";
 			exit;
 		}
 		
@@ -157,7 +158,7 @@ function closerefresh()
 						
 						
 <form action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" method="post" enctype="multipart/form-data" onsubmit="return confirm('Please make a confirm!')">
-<input type="hidden" name="sdid" value="<?=$sdid;?>">
+<input type="hidden" name="sdid" value="<?=htmlspecialchars((string)($sdid), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">

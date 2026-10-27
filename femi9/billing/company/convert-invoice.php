@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); require_once("include/PermissionCheck.php"); requireAnyPermission(['ss','st','dt','sdt','shop','cus','stock_request','ot_channels','debit_note','manage_return','demo_free','report','payment_entry','manage_payment_entry','territory_partner']);
 include("config.php");
 require_once("include/StockService.php");
 error_reporting(0);
@@ -8,8 +8,8 @@ if(isset($_REQUEST['convertinvoice']))
 	$reqid_encode=$_REQUEST['reqid'];
 	$reqid=base64_decode($reqid_encode);
 	//
-	$select_requestdetails="select * from stock_request where reqid='$reqid'";
-	 $fetch_requestdetails=mysqli_query($db_conn,$select_requestdetails);
+	$select_requestdetails="select * from stock_request where reqid=?";
+	 $fetch_requestdetails=db_q($db_conn,$select_requestdetails,[$reqid]);
 	 $result_requestdetails=mysqli_fetch_array($fetch_requestdetails);
 	
 	$randum_number=rand(1,9899989);;
@@ -43,8 +43,8 @@ else{$gst_type="outer";}
 	
 	$prid=$_REQUEST['prid'];
 	
-	$selectproducts="select * from products where id='$prid'";
-$fetchproducts=mysqli_query($db_conn,$selectproducts);
+	$selectproducts="select * from products where id=?";
+$fetchproducts=db_q($db_conn,$selectproducts,[$prid]);
 $resultproducts=mysqli_fetch_array($fetchproducts);
 $gst_percentage=$resultproducts['gst'];
 $product_gst_type=($resultproducts['gst_type'] ?? 'exclusive')==='inclusive' ? 'inclusive' : 'exclusive';
@@ -52,8 +52,8 @@ $product_gst_type=($resultproducts['gst_type'] ?? 'exclusive')==='inclusive' ? '
 $gstamount_singlepr="0";
 	 
 	 //
-	 $select_pramount="select * from stock_request_items where reqid='$reqid' and prid='$prid'";
-	 $fetch_pramount=mysqli_query($db_conn,$select_pramount);
+	 $select_pramount="select * from stock_request_items where reqid=? and prid=?";
+	 $fetch_pramount=db_q($db_conn,$select_pramount,[$reqid,$prid]);
 	 $result_pramount=mysqli_fetch_array($fetch_pramount);
 	 
 	$amount=$result_pramount['amount'];
@@ -74,14 +74,14 @@ $gstamount_singlepr="0";
 		$total=$subtotal+$gstamount_total;
 	}
 	
-	$select_count_invoice="select count(*) as numInvoice from user_invoice where inv_id='$inv_id' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and to_user_type='$invuser' and to_user_id='$customer_id'";
-	$fetch_count_invoice=mysqli_query($db_conn,$select_count_invoice);
+	$select_count_invoice="select count(*) as numInvoice from user_invoice where inv_id=? and from_user_type=? and from_user_id=? and to_user_type=? and to_user_id=?";
+	$fetch_count_invoice=db_q($db_conn,$select_count_invoice,[$inv_id,$Login_user_TYPEvl,$Login_user_IDvl,$invuser,$customer_id]);
 	$result_count_invoice=mysqli_fetch_array($fetch_count_invoice);
 	if($result_count_invoice['numInvoice']==0)
 	{
 		//1. get last id_only (invoice number generate)
-		$select_MaxID="select max(id_only) from user_invoice where from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl'";
-		$fetch_MaxID=mysqli_query($db_conn,$select_MaxID);
+		$select_MaxID="select max(id_only) from user_invoice where from_user_type=? and from_user_id=?";
+		$fetch_MaxID=db_q($db_conn,$select_MaxID,[$Login_user_TYPEvl,$Login_user_IDvl]);
 		$result_MaxID=mysqli_fetch_array($fetch_MaxID);
 		$id_only=$result_MaxID[0]+1;
 		$format_num = str_pad($id_only, 3, '0', STR_PAD_LEFT);
@@ -92,9 +92,9 @@ $gstamount_singlepr="0";
 		//2. insert invoice
 		$insert_Invoice="insert into user_invoice (inv_id,id_only,inv_number,date,inv_year,sub_total,discount,total,to_user_type,to_user_id,from_user_type,from_user_id,credit,gst_type)
 		values 
-		('$inv_id','$id_only','$inv_number','$date','$inv_year','0','0','0',
-		'$invuser','$customer_id','$Login_user_TYPEvl','$Login_user_IDvl','0','$gst_type')";
-		mysqli_query($db_conn,$insert_Invoice);
+		(?,?,?,?,?,'0','0','0',
+		?,?,?,?,'0',?)";
+		db_q($db_conn,$insert_Invoice,[$inv_id,$id_only,$inv_number,$date,$inv_year,$invuser,$customer_id,$Login_user_TYPEvl,$Login_user_IDvl,$gst_type]);
 		
 	}
 	
@@ -106,7 +106,7 @@ $gstamount_singlepr="0";
 
 	if($AVMstock===null || $AVMstock<$qty)
 	{
-		echo "<script>window.location='stock_request_details?reqid=".$reqid_encode."&&InvalidStock&&AlertStockError';</script>";
+		echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."&&InvalidStock&&AlertStockError';</script>";
 		
 	}else{
 		
@@ -114,16 +114,16 @@ $gstamount_singlepr="0";
 		//insert product details
 		//-------------------------------------------
 		
-	$select_count_invoiceItem="select count(*) as numInvoiceItem from user_invoice_items where inv_id='$inv_id' and pr_id='$prid' and from_user_type='$Login_user_TYPEvl' and from_user_id='$Login_user_IDvl' and to_user_type='$invuser' and to_user_id='$customer_id'";
-	$fetch_count_invoiceItem=mysqli_query($db_conn,$select_count_invoiceItem);
+	$select_count_invoiceItem="select count(*) as numInvoiceItem from user_invoice_items where inv_id=? and pr_id=? and from_user_type=? and from_user_id=? and to_user_type=? and to_user_id=?";
+	$fetch_count_invoiceItem=db_q($db_conn,$select_count_invoiceItem,[$inv_id,$prid,$Login_user_TYPEvl,$Login_user_IDvl,$invuser,$customer_id]);
 	$result_count_invoiceItem=mysqli_fetch_array($fetch_count_invoiceItem);
 	if($result_count_invoiceItem['numInvoiceItem']==0)
 	{
 		
 		//1. insert invoice Items
 		$insert_InvoiceItems="insert into user_invoice_items (inv_id,pr_id,amount,qty,gst_percentage,gstamount_singlepr,gstamount_total,total,to_user_type,to_user_id,from_user_type,from_user_id)
-		values ('$inv_id','$prid','$amount','$qty','$gst_percentage','$gstamount_singlepr','','$total','$invuser','$customer_id','$Login_user_TYPEvl','$Login_user_IDvl')";
-		mysqli_query($db_conn,$insert_InvoiceItems);
+		values (?,?,?,?,?,?,'',?,?,?,?,?)";
+		db_q($db_conn,$insert_InvoiceItems,[$inv_id,$prid,$amount,$qty,$gst_percentage,$gstamount_singlepr,$total,$invuser,$customer_id,$Login_user_TYPEvl,$Login_user_IDvl]);
 
 		//------------------------------------------------------------------
 		//2/3. Move stock from this seller to the buyer via StockService —
@@ -136,15 +136,15 @@ $gstamount_singlepr="0";
 				'user_invoice', $inv_id, $Login_user_IDvl
 			);
 		} catch (StockException $e) {
-			echo "<script>window.location='stock_request_details?reqid=".$reqid_encode."&&InvalidStock&&AlertStockError';</script>";
+			echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."&&InvalidStock&&AlertStockError';</script>";
 			exit;
 		}
 
-		echo "<script>window.location='stock_request_details?reqid=".$reqid_encode."&&AddedSuccess&&&&FemiAdded';</script>";
+		echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."&&AddedSuccess&&&&FemiAdded';</script>";
 		
 	}else{
 		
-		echo "<script>window.location='stock_request_details?reqid=".$reqid_encode."&&ItemAlreadyExists&&AlertMessage';</script>";
+		echo "<script>window.location='stock_request_details?reqid=".urlencode($reqid_encode)."&&ItemAlreadyExists&&AlertMessage';</script>";
 	}
 		
 }

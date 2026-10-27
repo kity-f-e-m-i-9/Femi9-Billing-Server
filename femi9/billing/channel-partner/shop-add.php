@@ -85,7 +85,7 @@ $tempID = "" . $randum_number . "FSHP" . $temp_date . "" . $temp_time . "";
     $fetchShopCat = mysqli_query($db_conn, $selectShopCat);
     while ($resultShopCat = mysqli_fetch_array($fetchShopCat)) {
     ?>
-    <option value="<?php echo $resultShopCat['id']; ?>"><?php echo $resultShopCat['catlable']; ?></option>
+    <option value="<?php echo htmlspecialchars((string)($resultShopCat['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($resultShopCat['catlable']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
     <?php } ?>
 </select>
 <br/>
@@ -104,7 +104,7 @@ $tempID = "" . $randum_number . "FSHP" . $temp_date . "" . $temp_time . "";
     $fetch_states = mysqli_query($db_conn, $sel_states);
     while ($res_state = mysqli_fetch_array($fetch_states)) {
     ?>
-    <option value="<?php echo $res_state['id']; ?>"><?php echo $res_state['st_name']; ?></option>
+    <option value="<?php echo htmlspecialchars((string)($res_state['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($res_state['st_name']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
     <?php } ?>
 </select>
 <br/>
@@ -130,7 +130,7 @@ $tempID = "" . $randum_number . "FSHP" . $temp_date . "" . $temp_time . "";
             $fetchCountry = mysqli_query($db_conn, $selectCountry);
             while ($resultCountry = mysqli_fetch_array($fetchCountry)) {
             ?>
-            <option value="<?php echo $resultCountry['c_code']; ?>"><?php echo $resultCountry['c_name']; ?> (<?php echo $resultCountry['c_code']; ?>)</option>
+            <option value="<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($resultCountry['c_name']), ENT_QUOTES, 'ISO-8859-1', false); ?> (<?php echo htmlspecialchars((string)($resultCountry['c_code']), ENT_QUOTES, 'ISO-8859-1', false); ?>)</option>
             <?php } ?>
         </select>
     </div>

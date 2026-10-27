@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 ?>
@@ -120,34 +120,34 @@ $i= $start_from;
 											
 											<tbody>
 										<?php 
-									$select_product_list12="select * from `internal_transfer_ss` where from_usertype='$Login_user_TYPEvl' and from_userid='$Login_user_IDvl' order by date desc";
-										$fetch_product_list12=mysqli_query($db_conn,$select_product_list12);
+									$select_product_list12="select * from `internal_transfer_ss` where from_usertype=? and from_userid=? order by date desc";
+										$fetch_product_list12=db_q($db_conn,$select_product_list12,[$Login_user_TYPEvl,$Login_user_IDvl]);
 										while($ResultRecords12=mysqli_fetch_array($fetch_product_list12))
 										{
 											
 											//product details
 											$product_id=$ResultRecords12['prid'];
-											$select_productDetils="select * from products where id='$product_id'";
-						$Fetch_productDetils=mysqli_query($db_conn,$select_productDetils);
+											$select_productDetils="select * from products where id=?";
+						$Fetch_productDetils=db_q($db_conn,$select_productDetils,[$product_id]);
 						$Result_productDetils=mysqli_fetch_array($Fetch_productDetils);
 						
 						//SEND TO
 						$send_to=$ResultRecords12['to_userid'];
-						$select_godowndetails2="select * from super_stockiest where temp_id='$send_to'";
-						$fetch_godowndetails2=mysqli_query($db_conn,$select_godowndetails2);
+						$select_godowndetails2="select * from super_stockiest where temp_id=?";
+						$fetch_godowndetails2=db_q($db_conn,$select_godowndetails2,[$send_to]);
 						$result_godowndetails2=mysqli_fetch_array($fetch_godowndetails2);
 											?>
                                             
                                                 <tr>
                                                     <td><?php echo ++$i; ?></td>
-													<td><?php echo strtoupper($result_godowndetails2["name"]);?><br/>
+													<td><?php echo htmlspecialchars((string)(strtoupper($result_godowndetails2["name"])), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
 													<b>
-													<?php echo $result_godowndetails2["mobile_number"];?>
+													<?php echo htmlspecialchars((string)($result_godowndetails2["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?>
 													</b>
 													</td>
 					<td><?php echo date("d/M/Y",strtotime($ResultRecords12["date"]));?></td>
-                    <td><?php echo $Result_productDetils["productName"];?></td>
-				<th><?=$ResultRecords12['qty'];?></th>
+                    <td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+				<th><?=htmlspecialchars((string)($ResultRecords12['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></th>
 													
 													<td>
 <a href="delete_internal.php?rowid=<?=base64_encode($ResultRecords12['id']);?>" onclick="return confirm('You want to delete confirm?');">

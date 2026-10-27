@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -17,12 +17,12 @@ $advBalance = 0;
 
 // ---- Sales Report (user_invoice) ----
 function tp_sales_count($db, $utype, $uid, $from, $to) {
-    $q = "SELECT COUNT(*) as cnt, COALESCE(SUM(sub_total),0) as subtotal, COALESCE(SUM(total),0) as total FROM user_invoice WHERE date BETWEEN '$from' AND '$to' AND from_user_type='$utype' AND from_user_id='$uid' AND sub_total>0";
+    $q = "SELECT COUNT(*) as cnt, COALESCE(SUM(sub_total),0) as subtotal, COALESCE(SUM(total),0) as total FROM user_invoice WHERE date BETWEEN '".db_esc($from)."' AND '".db_esc($to)."' AND from_user_type='".db_esc($utype)."' AND from_user_id='".db_esc($uid)."' AND sub_total>0";
     $r = mysqli_fetch_array(mysqli_query($db, $q));
     return [$r['cnt'], $r['subtotal'], $r['total']];
 }
 function tp_sales_qty($db, $utype, $uid, $from, $to) {
-    $q = "SELECT COALESCE(SUM(qty),0) as qty FROM user_invoice_items WHERE date BETWEEN '$from' AND '$to' AND from_user_type='$utype' AND from_user_id='$uid'";
+    $q = "SELECT COALESCE(SUM(qty),0) as qty FROM user_invoice_items WHERE date BETWEEN '".db_esc($from)."' AND '".db_esc($to)."' AND from_user_type='".db_esc($utype)."' AND from_user_id='".db_esc($uid)."'";
     $r = mysqli_fetch_array(mysqli_query($db, $q));
     return $r['qty'];
 }
@@ -44,12 +44,12 @@ $lastmonth_total_qty = tp_sales_qty($db_conn, $ut, $ui, $lastmonth_date_start, $
 
 // ---- Shop Sales ----
 function tp_shop_sales_count($db, $uid, $from, $to) {
-    $q = "SELECT COUNT(*) as cnt, COALESCE(SUM(sub_total),0) as subtotal, COALESCE(SUM(total),0) as total FROM user_invoice WHERE date BETWEEN '$from' AND '$to' AND from_user_id='$uid' AND to_user_type='shop' AND sub_total>0";
+    $q = "SELECT COUNT(*) as cnt, COALESCE(SUM(sub_total),0) as subtotal, COALESCE(SUM(total),0) as total FROM user_invoice WHERE date BETWEEN '".db_esc($from)."' AND '".db_esc($to)."' AND from_user_id='".db_esc($uid)."' AND to_user_type='shop' AND sub_total>0";
     $r = mysqli_fetch_array(mysqli_query($db, $q));
     return [$r['cnt'], $r['subtotal'], $r['total']];
 }
 function tp_shop_sales_qty($db, $uid, $from, $to) {
-    $q = "SELECT COALESCE(SUM(qty),0) as qty FROM user_invoice_items WHERE date BETWEEN '$from' AND '$to' AND from_user_id='$uid'";
+    $q = "SELECT COALESCE(SUM(qty),0) as qty FROM user_invoice_items WHERE date BETWEEN '".db_esc($from)."' AND '".db_esc($to)."' AND from_user_id='".db_esc($uid)."'";
     $r = mysqli_fetch_array(mysqli_query($db, $q));
     return $r['qty'];
 }
@@ -67,9 +67,9 @@ $thismonth_total_qty_shop = tp_shop_sales_qty($db_conn, $ui, $start_date, $endDa
 $lastmonth_total_qty_shop = tp_shop_sales_qty($db_conn, $ui, $lastmonth_date_start, $lastmonth_date_end);
 
 // ---- Onboarded Counts ----
-$count_shop_today = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) as c FROM shop WHERE DATE(created_at)='$today_date' AND onboard_userID='$ui' AND onboard_userTYPE='territory_partner'"))['c'] ?? 0;
-$count_shop_month = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) as c FROM shop WHERE DATE(created_at) BETWEEN '$start_date' AND '$endDate' AND onboard_userID='$ui' AND onboard_userTYPE='territory_partner'"))['c'] ?? 0;
-$countshp_Overall = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) as c FROM shop WHERE onboard_userID='$ui' AND onboard_userTYPE='territory_partner'"))['c'] ?? 0;
+$count_shop_today = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) as c FROM shop WHERE DATE(created_at)='".db_esc($today_date)."' AND onboard_userID='".db_esc($ui)."' AND onboard_userTYPE='territory_partner'"))['c'] ?? 0;
+$count_shop_month = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) as c FROM shop WHERE DATE(created_at) BETWEEN '".db_esc($start_date)."' AND '".db_esc($endDate)."' AND onboard_userID='".db_esc($ui)."' AND onboard_userTYPE='territory_partner'"))['c'] ?? 0;
+$countshp_Overall = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) as c FROM shop WHERE onboard_userID='".db_esc($ui)."' AND onboard_userTYPE='territory_partner'"))['c'] ?? 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">

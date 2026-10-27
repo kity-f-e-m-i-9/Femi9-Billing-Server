@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -70,8 +70,8 @@
 						
 						$se_msid=$_REQUEST['se_msid'];
 						//
-						$select_msDetails12="select * from marketing_staff where id='$se_msid'";
-$fetch_msDetails12=mysqli_query($db_conn,$select_msDetails12);
+						$select_msDetails12="select * from marketing_staff where id=?";
+$fetch_msDetails12=db_q($db_conn,$select_msDetails12,[$se_msid]);
 $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 						?>
 						
@@ -80,7 +80,7 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 									<tr>
 									<td>Marketing Staff > Expenses Report</td>
 									<td>
-									<a href="ms_expenses_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=$se_msid;?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
+									<a href="ms_expenses_pdf?frd=<?=$from_date;?>&&tod=<?=$to_date;?>&&se_msid=<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" title="Export" target="_blank"><img src="32-pdf.png"></a>
 									</td>
 									</tr>
 									</table>
@@ -90,7 +90,7 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
                         </div>
 						
 						
-						<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+						<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -107,14 +107,14 @@ $result_msDetails12=mysqli_fetch_array($fetch_msDetails12);
 <?php if($se_msid==NULL){?>
 <option value="" hidden="">Select</option>
 <?php }else{?>
-<option value="<?=$se_msid;?>" hidden=""><?=strtoupper($result_msDetails12['ms_name']);?>, <?=$result_msDetails12['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($se_msid), ENT_QUOTES, 'UTF-8', false);?>" hidden=""><?=htmlspecialchars((string)(strtoupper($result_msDetails12['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetails12['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 <?php $select_msDetailsOPT="select * from marketing_staff order by ms_name asc";
 $fetch_msDetailsOPT=mysqli_query($db_conn,$select_msDetailsOPT);
 while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 {
 ?>
-<option value="<?=$result_msDetailsOPT['id'];?>"><?=strtoupper($result_msDetailsOPT['ms_name']);?>, <?=$result_msDetailsOPT['ms_mobile'];?></option>
+<option value="<?=htmlspecialchars((string)($result_msDetailsOPT['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_msDetailsOPT['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetailsOPT['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
 </select>
 </div>
@@ -166,15 +166,15 @@ $select_product_list="select * from ms_exp order by id desc";
 }
 if($from_date!=NULL && $se_msid==NULL)
 {
-$select_product_list="select * from ms_exp where date between '$from_date' and '$to_date' order by date asc";
+$select_product_list="select * from ms_exp where date between '".db_esc($from_date)."' and '".db_esc($to_date)."' order by date asc";
 }
 if($from_date!=NULL && $se_msid!=NULL)
 {
-$select_product_list="select * from ms_exp where ms_id='$se_msid' and date between '$from_date' and '$to_date' and ms_id='$se_msid' order by date asc";
+$select_product_list="select * from ms_exp where ms_id=? and date between ? and ? and ms_id=? order by date asc";
 }
 
 
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$fetch_product_list=db_q($db_conn,$select_product_list,[$se_msid,$from_date,$to_date,$se_msid]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {																
 
@@ -189,20 +189,20 @@ while($result_product_list=mysqli_fetch_array($fetch_product_list))
 				
 				//marketing staff details
 $ms_id=$result_product_list['ms_id'];
-$select_msDetails="select * from marketing_staff where id='$ms_id'";
-$fetch_msDetails=mysqli_query($db_conn,$select_msDetails);
+$select_msDetails="select * from marketing_staff where id=?";
+$fetch_msDetails=db_q($db_conn,$select_msDetails,[$ms_id]);
 $result_msDetails=mysqli_fetch_array($fetch_msDetails);
 				
 ?>                                            
                     <tr>
                     <td><?php echo ++$i; ?></td>
-                    <td><?=$result_msDetails['ms_name'];?><br/>
-					<?=$result_msDetails['ms_mobile'];?>
+                    <td><?=htmlspecialchars((string)($result_msDetails['ms_name']), ENT_QUOTES, 'ISO-8859-1', false);?><br/>
+					<?=htmlspecialchars((string)($result_msDetails['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>
 					</td>
 					<td>
 					<b><?php echo date("d/m/Y",strtotime($result_product_list["date"]));?></td>
 					<td><?=inr_format($exp_amount, 2);?></td>
-					<td><?=ucwords($result_product_list["remarks"]);?></td>
+					<td><?=htmlspecialchars((string)(ucwords($result_product_list["remarks"])), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td>
 					<a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>">View&nbsp;Photo</a>

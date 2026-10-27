@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/PasswordService.php'; require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php"); 
 include("config.php");
 error_reporting(0);
 
@@ -41,8 +41,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	$username_generate=$mobile_number;
 	
 	
-$Select_CNTMoblenm="select count(*) as numMob from super_stockiest where mobile_number='$mobile_number'";
-$Fetch_Count_MobilenUmber=mysqli_query($db_conn,$Select_CNTMoblenm);
+$Select_CNTMoblenm="select count(*) as numMob from super_stockiest where mobile_number=?";
+$Fetch_Count_MobilenUmber=db_q($db_conn,$Select_CNTMoblenm,[$mobile_number]);
 $Result_Count_MobilenUmber=mysqli_fetch_array($Fetch_Count_MobilenUmber);
 if($Result_Count_MobilenUmber['numMob']==1)
 {
@@ -55,16 +55,16 @@ if($Result_Count_MobilenUmber['numMob']==1)
 	
 	
 	
-	$select_count_dist="select count(*) as numdist from super_stockiest where state_id='$state_id' and district_id='$district_id'";
-$fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
+	$select_count_dist="select count(*) as numdist from super_stockiest where state_id=? and district_id=?";
+$fetc_count_dist=db_q($db_conn,$select_count_dist,[$state_id,$district_id]);
 	$result_count_dist=mysqli_fetch_array($fetc_count_dist);
 	if($result_count_dist['numdist']==0)
 	{
 	
 	//plans details
 	$plan_id=$_POST["plan_id"];
-	$select_plans="select * from plans where id='$plan_id'";
-	$fetch_plans=mysqli_query($db_conn,$select_plans);
+	$select_plans="select * from plans where id=?";
+	$fetch_plans=db_q($db_conn,$select_plans,[$plan_id]);
 	$result_plans=mysqli_fetch_array($fetch_plans);
 	$plan_amount="0";//$result_plans["amount"];
 	$valid_months="0";//$result_plans["valid_months"];
@@ -77,7 +77,7 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	}else{$uploadfile="Nil";}
 	
 	
@@ -102,16 +102,16 @@ $fetc_count_dist=mysqli_query($db_conn,$select_count_dist);
 	
         $sql="insert into super_stockiest (temp_id,user_icon,name,state_id,district_id,email,mobile_number,username,password,plan_amount,valid_months,valid_from,valid_to,amount_method,amount_status,ref_number,account_status,merchantOrderId,merchantTransactionId,merchantUserId,gstin,address,userid,useridtext,country_code,onboard_userTYPE,onboard_userID)
 
-		values ('$temp_id','$uploadfile','$name','$state_id','$district_id','$user_email','$mobile_number',
-		'$username_generate','$user_password','$plan_amount','$valid_months',
-		'$valid_from','$valid_to','phonepe','pending','Nil','pending',
-		'$merchantOrderId','$merchantTransactionId','$merchantUserId','$gstin','$address','$userid','$useridtext','$country_code','$onboard_userTYPE','$onboard_userID')";
-		mysqli_query($db_conn,$sql);
+		values (?,?,?,?,?,?,?,
+		?,?,?,?,
+		?,?,'phonepe','pending','Nil','pending',
+		?,?,?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$sql,[$temp_id,$uploadfile,$name,$state_id,$district_id,$user_email,$mobile_number,$username_generate,femi_password_hash((string)($user_password)),$plan_amount,$valid_months,$valid_from,$valid_to,$merchantOrderId,$merchantTransactionId,$merchantUserId,$gstin,$address,$userid,$useridtext,$country_code,$onboard_userTYPE,$onboard_userID]);
 
 		
 		//assigned super stockist to districtwise
-$UPTassignedID="update district set assigned_SSID='$temp_id' where state_id='$state_id' and id='$district_id'";
-mysqli_query($db_conn,$UPTassignedID);
+$UPTassignedID="update district set assigned_SSID=? where state_id=? and id=?";
+db_q($db_conn,$UPTassignedID,[$temp_id,$state_id,$district_id]);
 
 
 echo "<script>window.location='manage_sust?addedsuccess';</script>";

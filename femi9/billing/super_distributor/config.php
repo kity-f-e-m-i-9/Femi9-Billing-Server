@@ -1,4 +1,4 @@
-<?php 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; 
 /* -----------------------------
 // Usertype
 - company
@@ -49,12 +49,12 @@ $onboard_userID=$result_LoGuserDtails['temp_id'];
 $Login_user_useridtext=$result_LoGuserDtails['useridtext'];
 
 //REFERAL PERSON & CATEGORY DETAILS
-$select_RFRDtailsCNG="select * from super_distributor_referral where sd_id='$Login_user_IDvl'";
+$select_RFRDtailsCNG="select * from super_distributor_referral where sd_id='".db_esc($Login_user_IDvl)."'";
 $fetch_RFRDtailsCNG=mysqli_query($db_conn,$select_RFRDtailsCNG);
 $result_RFRDtailsCNG=mysqli_fetch_array($fetch_RFRDtailsCNG);
 $target_amount=$result_RFRDtailsCNG['target_amount'];
 
-$select_RFRDtailsCNG_CAT="select * from super_distributor_category where amount='$target_amount'";
+$select_RFRDtailsCNG_CAT="select * from super_distributor_category where amount='".db_esc($target_amount)."'";
 $fetch_RFRDtailsCNG_CAT=mysqli_query($db_conn,$select_RFRDtailsCNG_CAT);
 $result_RFRDtailsCNG_CAT=mysqli_fetch_array($fetch_RFRDtailsCNG_CAT);
 $Login_person_CAT=$result_RFRDtailsCNG_CAT['amount'];

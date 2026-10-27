@@ -1,4 +1,4 @@
-<?php include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); 
 date_default_timezone_set("Asia/Kolkata"); 
 error_reporting(0);
 include("config.php");
@@ -9,8 +9,8 @@ include("config.php");
 	$get_req_id=$_REQUEST['reqid'];
 	$get_req_id_DECODE=base64_decode($get_req_id);
 	//
-	 $select_requestdetails="select * from stock_request where reqid='$get_req_id_DECODE'";
-	 $fetch_requestdetails=mysqli_query($db_conn,$select_requestdetails);
+	 $select_requestdetails="select * from stock_request where reqid=?";
+	 $fetch_requestdetails=db_q($db_conn,$select_requestdetails,[$get_req_id_DECODE]);
 	 $result_requestdetails=mysqli_fetch_array($fetch_requestdetails);
 	 
 	 $get_from_usertype=$result_requestdetails['fromusertype'];
@@ -161,16 +161,16 @@ else
 				
 				//get qty total
 				//get qty total
-				$select_qtytotal="select sum(qty) from stock_request_items where reqid='$reqid'";
-				$fetch_qtytotal=mysqli_query($db_conn,$select_qtytotal);
+				$select_qtytotal="select sum(qty) from stock_request_items where reqid=?";
+				$fetch_qtytotal=db_q($db_conn,$select_qtytotal,[$reqid]);
 				$result_qtytotal=mysqli_fetch_array($fetch_qtytotal);
 				if($result_qtytotal[0]!=NULL){
 				$totalqty=$result_qtytotal[0];
 				}else{$totalqty="0";}
 				
 				//get total amount
-				$select_TotalAMont="select sum(total) from stock_request_items where reqid='$reqid'";
-				$fetch_TotalAMont=mysqli_query($db_conn,$select_TotalAMont);
+				$select_TotalAMont="select sum(total) from stock_request_items where reqid=?";
+				$fetch_TotalAMont=db_q($db_conn,$select_TotalAMont,[$reqid]);
 				$result_TotalAMont=mysqli_fetch_array($fetch_TotalAMont);
 				if($result_TotalAMont[0]!=NULL){
 				$totalAmount=inr_format($result_TotalAMont[0], 2);
@@ -185,7 +185,7 @@ else
   <tr valign="top">
                                  <td><?php echo date("d/m/Y",strtotime($result_requestdetails["date"]));?></td>
 								 
-								<td><b><?=strtoupper($result_distlist['name']);?></b>
+								<td><b><?=htmlspecialchars((string)(strtoupper($result_distlist['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b>
 								<br/>
 								<span style="font-size:13px;color:#999;"><?=strtoupper($fromusertype);?></span>
 								</td>	
@@ -209,7 +209,7 @@ else
 <?php if($result_requestdetails['screenshot']!="Nil"){ ?>
 <div style="margin-top:0px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -217,7 +217,7 @@ else
 <?php if($result_requestdetails['screenshot2']!="Nil"){ ?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT (2)</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot2'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot2']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -226,7 +226,7 @@ else
 <?php if($result_requestdetails['screenshot3']!="Nil"){ ?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT (3)</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot3'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot3']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -234,7 +234,7 @@ else
 <?php if($result_requestdetails['screenshot4']!="Nil"){ ?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT (4)</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot4'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot4']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -242,7 +242,7 @@ else
 <?php if($result_requestdetails['screenshot5']!="Nil"){ ?>
 <div style="margin-top:10px;">
 <label class="form-label"><b>PAYMENT SCREENSHOT (5)</b></label><br/>
-<img src='../<?=$batchname;?>/screenshot/<?=$result_requestdetails['screenshot5'];?>' style='width:300px;'>
+<img src='../<?=$batchname;?>/screenshot/<?=htmlspecialchars((string)($result_requestdetails['screenshot5']), ENT_QUOTES, 'ISO-8859-1', false);?>' style='width:300px;'>
 </br>
 </div>
 <?php } ?>
@@ -267,24 +267,24 @@ else
                                                     </thead>
                                                     <tbody>
 										<?php 
-					$select_productCurrentst="select * from stock_request_items where reqid='$get_req_id_DECODE' order by id asc";
-					$fetch_productCurrentst=mysqli_query($db_conn,$select_productCurrentst);
+					$select_productCurrentst="select * from stock_request_items where reqid=? order by id asc";
+					$fetch_productCurrentst=db_q($db_conn,$select_productCurrentst,[$get_req_id_DECODE]);
 					while($result_productCurrentst=mysqli_fetch_array($fetch_productCurrentst))
 										{
 											$prid=$result_productCurrentst['prid'];
 											//
-											 $select_pramount="select * from products where id='$prid'";
-	 $fetch_pramount=mysqli_query($db_conn,$select_pramount);
+											 $select_pramount="select * from products where id=?";
+	 $fetch_pramount=db_q($db_conn,$select_pramount,[$prid]);
 	 $result_pramount=mysqli_fetch_array($fetch_pramount);
 											
 										?>
         <input type="hidden" name="prid[]" value="<?=$prid; ?>"/>
         <tr>
-        <td><a href="#" class="popup-trigger"><?php echo $result_pramount["productName"];?></a></td>
-		<td><?=$result_productCurrentst['qty'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['amount'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['subtotal'];?></td>
-		<td style="display:none;"><?=$result_productCurrentst['gsttotal'];?> (<?=$result_productCurrentst['gst'];?>%)</td>
+        <td><a href="#" class="popup-trigger"><?php echo htmlspecialchars((string)($result_pramount["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></a></td>
+		<td><?=htmlspecialchars((string)($result_productCurrentst['qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['amount']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['subtotal']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+		<td style="display:none;"><?=htmlspecialchars((string)($result_productCurrentst['gsttotal']), ENT_QUOTES, 'ISO-8859-1', false);?> (<?=htmlspecialchars((string)($result_productCurrentst['gst']), ENT_QUOTES, 'ISO-8859-1', false);?>%)</td>
 		<td align="right" style="display:none;"><?=inr_format($result_productCurrentst['total'], 2);?></td></td>
 		
                                                 </tr>
@@ -330,7 +330,7 @@ $(document).ready(function(){
 												
 		<!------------------------------------------------------------------------------>
 		<!------------------------------------------------------------------------------>
-		<a href="approved_accounts?reqid=<?=$get_req_id;?>">
+		<a href="approved_accounts?reqid=<?=htmlspecialchars((string)($get_req_id), ENT_QUOTES, 'UTF-8', false);?>">
 <button class="btn btn-primary footersubact" type="button" onclick="return confirm('Please make a confirm!');" style="width:100%;">Approved Request</button></a>
 
 

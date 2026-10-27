@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 error_reporting(0);
 
 include("RemoveSpecialChar.php");
@@ -6,7 +6,7 @@ include("RemoveSpecialChar.php");
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $update_id=$_REQUEST['update_id'];
-	$old_icon=$_REQUEST['old_icon'];
+	$old_icon=safe_old_file_param($_REQUEST['old_icon']);
 	
 	$name=str_replace("'","&#39;",$_REQUEST['name']);
 	$name = RemoveSpecialChar($name);
@@ -56,7 +56,7 @@ $insfilename=$old_icon;
 	   $filename=$rand_isd.$small_jpg;
                  $uploaddir='../super_distributor/user_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	   $insfoldername="user_icon/";
 	   $insfilename=$insfoldername.$filename;
 	   if($old_icon!="Nil")
@@ -72,18 +72,18 @@ $insfilename=$old_icon;
 	
 	
 	//update process
-	$update_ss="update super_distributor set user_icon='$insfilename',name='$name',email='$email',
-	address='$address',gstin='$gstin',
-	country_code='$country_code',state_id='$state_id',district_id='$district_id',taluk_id='$taluk_id',
-	pincode_id='$pincode_id',shop_onboard='$shop_onboard' where id='$update_id'";
-	mysqli_query($db_conn,$update_ss);
+	$update_ss="update super_distributor set user_icon=?,name=?,email=?,
+	address=?,gstin=?,
+	country_code=?,state_id=?,district_id=?,taluk_id=?,
+	pincode_id=?,shop_onboard=? where id=?";
+	db_q($db_conn,$update_ss,[$insfilename,$name,$email,$address,$gstin,$country_code,$state_id,$district_id,$taluk_id,$pincode_id,$shop_onboard,$update_id]);
 	
 	//Update target amount
 	$target_amount=$_REQUEST['target_amount'];
 	$sd_id=$_REQUEST['sd_id'];
 	
-	$upadte129="update super_distributor_referral set target_amount='$target_amount' where sd_id='$sd_id'";
-	mysqli_query($db_conn,$upadte129);
+	$upadte129="update super_distributor_referral set target_amount=? where sd_id=?";
+	db_q($db_conn,$upadte129,[$target_amount,$sd_id]);
 	
 	echo "<script>window.location='super_Distributor_manage?updatedSuccess';</script>";
 	exit;

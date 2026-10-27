@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
 error_reporting(0);
@@ -8,12 +8,12 @@ $to_date   = $_REQUEST['todate'] ?? null;
 
 if ($from_date != NULL) {
     // Intra-state inward supplies (received by TP from another user)
-    $q = "SELECT SUM(total) FROM user_invoice WHERE to_user_type='$Login_user_TYPEvl' AND to_user_id='$Login_user_IDvl' AND gst_type='inner' AND date BETWEEN '$from_date' AND '$to_date'";
-    $show_total_intra = mysqli_fetch_array(mysqli_query($db_conn, $q))[0] ?? 0;
+    $q = "SELECT SUM(total) FROM user_invoice WHERE to_user_type=? AND to_user_id=? AND gst_type='inner' AND date BETWEEN ? AND ?";
+    $show_total_intra = mysqli_fetch_array(db_q($db_conn,$q,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
 
     // Inter-state inward supplies
-    $q2 = "SELECT SUM(total) FROM user_invoice WHERE to_user_type='$Login_user_TYPEvl' AND to_user_id='$Login_user_IDvl' AND gst_type='outer' AND date BETWEEN '$from_date' AND '$to_date'";
-    $show_total_inter = mysqli_fetch_array(mysqli_query($db_conn, $q2))[0] ?? 0;
+    $q2 = "SELECT SUM(total) FROM user_invoice WHERE to_user_type=? AND to_user_id=? AND gst_type='outer' AND date BETWEEN ? AND ?";
+    $show_total_inter = mysqli_fetch_array(db_q($db_conn,$q2,[$Login_user_TYPEvl,$Login_user_IDvl,$from_date,$to_date]))[0] ?? 0;
 }
 ?>
 <!DOCTYPE html>
@@ -69,15 +69,15 @@ if ($from_date != NULL) {
                             </div>
                         </div>
                     </div>
-                    <form method="post" enctype="multipart/form-data" action="<?php echo $_SERVER['PHP_SELF']; ?>">
+                    <form method="post" enctype="multipart/form-data" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES); ?>">
                         <div class="overviewcontainar">
                             <div id="searchleftcont">
                                 <label class="form-label">From Date</label>
-                                <input type="date" required name="frdate" value="<?php echo $from_date; ?>" class="form-control">
+                                <input type="date" required name="frdate" value="<?php echo htmlspecialchars((string)($from_date), ENT_QUOTES, 'UTF-8', false); ?>" class="form-control">
                             </div>
                             <div id="searchleftcont">
                                 <label class="form-label">To Date</label>
-                                <input type="date" required name="todate" value="<?php echo $to_date; ?>" class="form-control">
+                                <input type="date" required name="todate" value="<?php echo htmlspecialchars((string)($to_date), ENT_QUOTES, 'UTF-8', false); ?>" class="form-control">
                             </div>
                             <div id="searchbuttoncont">
                                 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>

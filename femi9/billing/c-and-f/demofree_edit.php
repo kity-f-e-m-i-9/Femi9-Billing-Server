@@ -1,9 +1,9 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 
 $tempid=$_REQUEST['tempid'];
 //fetch product details
-$select_product_list="select * from demofreedamage where tempid='$tempid'";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from demofreedamage where tempid=?";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$tempid]);
 $result_product_list=mysqli_fetch_array($fetch_product_list);
 ?>
 <!DOCTYPE html>
@@ -81,7 +81,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
 <?php include("validate-scripts.php");?>                                       
 <form action="demofree_action" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="update_tempid" value="<?php echo $tempid;?>">
+<input type="hidden" name="update_tempid" value="<?php echo htmlspecialchars((string)($tempid), ENT_QUOTES, 'UTF-8', false);?>">
 
                                         <div class="example-container">
                                             <div class="example-content">
@@ -89,7 +89,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
 												
 												<label for="exampleInputEmail1" class="form-label">Category*</label>
                                <select required="" name="category" class="form-control">
-							   <option value="<?=$result_product_list['category'];?>" hidden=""><?=$result_product_list['category'];?></option>
+							   <option value="<?=htmlspecialchars((string)($result_product_list['category']), ENT_QUOTES, 'ISO-8859-1', false);?>" hidden=""><?=htmlspecialchars((string)($result_product_list['category']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <option>Demo</option>
 							   <option>Free</option>
 							   <option>Damage</option>
@@ -99,7 +99,7 @@ $result_product_list=mysqli_fetch_array($fetch_product_list);
 							<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <!--id="bookingDate"-->
 <label class="form-label">Date*</label>
-<input type="date" required="" id="bookingDate" name="date" value="<?php echo $result_product_list['date'];?>" class="form-control">
+<input type="date" required="" id="bookingDate" name="date" value="<?php echo htmlspecialchars((string)($result_product_list['date']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="form-control">
 <br/>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
@@ -112,7 +112,7 @@ flatpickr("#bookingDate", {
 
 
 <label class="form-label">Remarks*</label>
-<textarea required="" name="remarks" onkeypress="restrictSpecialChars(event)" class="form-control"><?php echo $result_product_list['remarks'];?></textarea>
+<textarea required="" name="remarks" onkeypress="restrictSpecialChars(event)" class="form-control"><?php echo htmlspecialchars((string)($result_product_list['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 <br/>
 												
 												

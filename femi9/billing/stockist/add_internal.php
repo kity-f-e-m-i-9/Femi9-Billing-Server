@@ -1,4 +1,4 @@
-<?php /* include("checksession.php"); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; /* include("checksession.php"); 
 include("config.php"); 
 date_default_timezone_set("Asia/Kolkata");
 ?>
@@ -82,8 +82,8 @@ date_default_timezone_set("Asia/Kolkata");
 	 
 	 <?php 
 	 
-$slctcheckstock="select count(*) as numstockcheck from stock where user_type='$Login_user_TYPEvl' and user_id='$Login_user_IDvl'";
-$fetch_ProductsPrice=mysqli_query($db_conn,$slctcheckstock);
+$slctcheckstock="select count(*) as numstockcheck from stock where user_type=? and user_id=?";
+$fetch_ProductsPrice=db_q($db_conn,$slctcheckstock,[$Login_user_TYPEvl,$Login_user_IDvl]);
 $Result_ProductsPrice=mysqli_fetch_array($fetch_ProductsPrice);
 if($Result_ProductsPrice['numstockcheck']!=0)
 {
@@ -128,7 +128,7 @@ xmlhttp.send();}
 							   $fetch_Godown=mysqli_query($db_conn,$select_Godown);
 							   while($result_Godown=mysqli_fetch_array($fetch_Godown))
 							   {?>
-						  <option value="<?=$result_Godown['temp_id'];?>"><?=strtoupper($result_Godown['name']);?>, <?=$result_Godown['mobile_number'];?></option>
+						  <option value="<?=htmlspecialchars((string)($result_Godown['temp_id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_Godown['name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_Godown['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>
@@ -145,7 +145,7 @@ xmlhttp.send();}
 										$fetch_product_list=mysqli_query($db_conn,$select_product_list);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{?>
-<option value="<?=$result_product_list['id'];?>"><?=strtoupper($result_product_list['productName']);?></option>
+<option value="<?=htmlspecialchars((string)($result_product_list['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_product_list['productName'])), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 							   <br/>

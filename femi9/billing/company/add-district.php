@@ -88,7 +88,7 @@ $message_title="District";
 									<?php }?>
   <?php include("validate-scripts.php");?>                                      
 <form action="product-action" method="post" enctype="multipart/form-data">
-	<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+	<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 							   
 <?php function GeraHash($qtd){ $Caracteres = '123456789ABCDEFGHJKLMNPQRSTUVWXYZ'; 
 $QuantidadeCaracteres = strlen($Caracteres); $QuantidadeCaracteres--; $Hash=NULL; 
@@ -111,7 +111,7 @@ $tempID="".$randum_number."/".$temp_date."/".$temp_time."";?>
 							   $fetch_staeList=mysqli_query($db_conn,$select_stateList);
 							   while($result_stateList=mysqli_fetch_array($fetch_staeList))
 							   {?>
-						   <option value="<?php echo $result_stateList['id'];?>"><?php echo $result_stateList['st_name'];?></option>
+						   <option value="<?php echo htmlspecialchars((string)($result_stateList['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?php echo htmlspecialchars((string)($result_stateList['st_name']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 							   <?php }?>
 							   </select>
 												

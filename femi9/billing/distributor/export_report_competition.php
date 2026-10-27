@@ -1,4 +1,4 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 // Start output buffering to prevent headers from being sent prematurely
 ob_start();
 error_reporting(0);
@@ -22,14 +22,14 @@ $csv_content .= "Shop ID, Name, District, Taluk, Available Stock\n";
 
 // Fetching data and formatting into CSV rows
 
-$selectRcd_VLSS1="select * from temp_competerion_stock_report where onboard_userTYPE='$Login_user_TYPEvl' and onboard_userID='$Login_user_IDvl' order by id asc";
+$selectRcd_VLSS1="select * from temp_competerion_stock_report where onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' and onboard_userID='".db_esc($Login_user_IDvl)."' order by id asc";
 										$fetchRcd_VLSS1=mysqli_query($db_conn,$selectRcd_VLSS1);
 										while($resultRcd_VLSS1=mysqli_fetch_array($fetchRcd_VLSS1))
 										{
 											
 										$shop_id=$resultRcd_VLSS1['shop_id'];
 
-										$selectrecords_VLSS1="select * from shop where temp_id='$shop_id'";
+										$selectrecords_VLSS1="select * from shop where temp_id='".db_esc($shop_id)."'";
 										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										
@@ -37,12 +37,12 @@ $selectRcd_VLSS1="select * from temp_competerion_stock_report where onboard_user
 										$district_id_VLSS2=$resultrecords_VLSS1['district_id'];
 										$taluk_id_VLSS2=$resultrecords_VLSS1['taluk_id'];
 
-										$selectrecords_VLSS2="select * from district where state_id='$state_id_VLSS2' and id='$district_id_VLSS2'";
+										$selectrecords_VLSS2="select * from district where state_id='".db_esc($state_id_VLSS2)."' and id='".db_esc($district_id_VLSS2)."'";
 										$fetchrecords_VLSS2=mysqli_query($db_conn,$selectrecords_VLSS2);
 										$resultrecords_VLSS2=mysqli_fetch_array($fetchrecords_VLSS2);
 										$district_name_VLSS2=$resultrecords_VLSS2['dist_name'];
 										
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS2' and dist_id='$district_id_VLSS2' and id='$taluk_id_VLSS2'";
+$selectrecords_VLSS2_taluk="select * from taluk where state_id='".db_esc($state_id_VLSS2)."' and dist_id='".db_esc($district_id_VLSS2)."' and id='".db_esc($taluk_id_VLSS2)."'";
 $fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];

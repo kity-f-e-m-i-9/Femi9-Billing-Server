@@ -739,7 +739,7 @@ $pdfUrl = 'ot_sales_pdf?' . http_build_query([
                                                     <strong><?= inr_format(min($offset + $recordsPerPage, $totalRows), 0) ?></strong>
                                                     of <strong><?= inr_format($totalRows, 0) ?></strong>
                                                     &nbsp;|&nbsp; Page
-                                                    <strong><?= $currentPage ?></strong>
+                                                    <strong><?= htmlspecialchars((string)($currentPage), ENT_QUOTES, 'UTF-8', false) ?></strong>
                                                     of <strong><?= $totalPages ?></strong>
                                                 <?php endif; ?>
                                             </div>

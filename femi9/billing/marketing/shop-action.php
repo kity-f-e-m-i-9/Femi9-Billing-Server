@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; require_once __DIR__ . '/../shared/safe-upload.php'; include("checksession.php");
 include("config.php");
 require_once("include/AssignedLocations.php");
 error_reporting(0);
@@ -76,8 +76,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 	// A genuine location correction for a shop that's really already in the
 	// system goes through the Location Change Request flow instead of a
 	// second "Add Shop", so it stays tied to the one real shop record.
-	$select_dup="select id from ms_shop where LOWER(TRIM(address))=LOWER(TRIM('$address')) and LOWER(TRIM(mobile_number))=LOWER(TRIM('$mobile_number')) and LOWER(TRIM(taluk_name))=LOWER(TRIM('$taluk_name')) and LOWER(TRIM(district_name))=LOWER(TRIM('$district_name')) and LOWER(TRIM(pincode))=LOWER(TRIM('$pincode')) limit 1";
-	$fetch_dup=mysqli_query($db_conn,$select_dup);
+	$select_dup="select id from ms_shop where LOWER(TRIM(address))=LOWER(TRIM(?)) and LOWER(TRIM(mobile_number))=LOWER(TRIM(?)) and LOWER(TRIM(taluk_name))=LOWER(TRIM(?)) and LOWER(TRIM(district_name))=LOWER(TRIM(?)) and LOWER(TRIM(pincode))=LOWER(TRIM(?)) limit 1";
+	$fetch_dup=db_q($db_conn,$select_dup,[$address,$mobile_number,$taluk_name,$district_name,$pincode]);
 	$dupRow=$fetch_dup ? mysqli_fetch_assoc($fetch_dup) : null;
 	if($dupRow)
 	{
@@ -97,18 +97,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 		
                  $uploaddir='shop_icon/';
                  $uploadfile=$uploaddir.$filename;
-	   move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
+	   safe_move_uploaded_file($_FILES['user_icon']['tmp_name'],$uploadfile);
 	}else{$uploadfile="Nil";}
 	
 	
         $sql="insert into ms_shop (ms_id,user_icon,name,state_name,
 		district_name,taluk_name,state_node_id,district_node_id,taluk_node_id,pincode,email,mobile_number,
 		gstin,address,shop_cat,country_code,landline,google_location,latitude,longitude) values
-		('$ms_id','$uploadfile','$name','$state_name','$district_name','$taluk_name',
-		'$state_node_id','$district_node_id','$taluk_node_id',
-		'$pincode','$email','$mobile_number','$gstin','$address','$shop_cat',
-		'$country_code','$landline','$google_location',$latitude_sql,$longitude_sql)";
-		mysqli_query($db_conn,$sql);
+		(?,?,?,?,?,?,
+		?,?,?,
+		?,?,?,?,?,?,
+		?,?,?,$latitude_sql,$longitude_sql)";
+		db_q($db_conn,$sql,[$ms_id,$uploadfile,$name,$state_name,$district_name,$taluk_name,$state_node_id,$district_node_id,$taluk_node_id,$pincode,$email,$mobile_number,$gstin,$address,$shop_cat,$country_code,$landline,$google_location]);
 		
 		echo "<script>window.location='".$viewurl."';</script>";
 	}

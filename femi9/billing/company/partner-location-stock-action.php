@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 ob_start();
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('partner_location');
 include("config.php");
 date_default_timezone_set("Asia/Kolkata");
 

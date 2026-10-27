@@ -1,4 +1,4 @@
-<?php session_start(); error_reporting(0); 
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; session_start(); error_reporting(0); 
 include("include/db-connect.php");
 include("../company/whatsapp-settins.php");
 
@@ -18,7 +18,7 @@ if(isset($_REQUEST['subforgotbutton']))
 $frmobilenumber=$_REQUEST['frmobilenumber'];
 $randumpassword=$_REQUEST['randumpassword'];
 	
-$select_LoGuserDtails="select * from ".$forgottable." where mobile_number='$frmobilenumber'";
+$select_LoGuserDtails="select * from ".$forgottable." where mobile_number='".db_esc($frmobilenumber)."'";
 $fetch_LoGuserDtails=mysqli_query($db_conn,$select_LoGuserDtails);
 $result_LoGuserDtails=mysqli_fetch_array($fetch_LoGuserDtails);
 $mailid=$result_LoGuserDtails['email'];
@@ -81,20 +81,21 @@ $header .= "From: ".$FromEmail."\r\nReply-To: ".$ToEmail."" . "\r\n";
 mail($ToEmail, $subject, $message123, $header);
 //---------------------------Email Coding start------------------------------------------------
 
-$updatepassword="update ".$forgottable." set password='$randumpassword' where mobile_number='$frmobilenumber'";
-mysqli_query($db_conn,$updatepassword);
+// Pending temporary password (30 min): the real password is only replaced if the owner logs in with it.
+require_once __DIR__ . '/../shared/PasswordService.php';
+femi_reset_issue($db_conn, (string)$forgottable, 'id', $result_LoGuserDtails['id'], (string)$frusertype, (string)$frmobilenumber, (string)$randumpassword);
 
-$selectcountrows="select count(*) as numfrpass from forgotpassword where mobilenumber='$frmobilenumber'";
-$fetchcountrows=mysqli_query($db_conn,$selectcountrows);
+$selectcountrows="select count(*) as numfrpass from forgotpassword where mobilenumber=?";
+$fetchcountrows=db_q($db_conn,$selectcountrows,[$frmobilenumber]);
 $resultcountrows=mysqli_fetch_array($fetchcountrows);
 if($resultcountrows['numfrpass']==0)
 {
 	$insertfrpass="insert into forgotpassword (usertype,mobilenumber,reset) 
-	values ('$frusertype','$frmobilenumber','0')";
-	mysqli_query($db_conn,$insertfrpass);
+	values (?,?,'0')";
+	db_q($db_conn,$insertfrpass,[$frusertype,$frmobilenumber]);
 }else{
-	$updatefrpass="update forgotpassword set reset='0' where usertype='$frusertype' and mobilenumber='$frmobilenumber'";
-	mysqli_query($db_conn,$updatefrpass);
+	$updatefrpass="update forgotpassword set reset='0' where usertype=? and mobilenumber=?";
+	db_q($db_conn,$updatefrpass,[$frusertype,$frmobilenumber]);
 }
 
 
@@ -161,11 +162,11 @@ echo "<script>window.location='index.php?mailsentsuccess';</script>";
 			<?php if(isset($_REQUEST['mailsentsuccess'])){?><div class="alert alert-success">Password sent successfully, please check your Whatsapp.</div>
 			<?php }?>
 			<?php include("validate-scripts.php");?>
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 		
 		<?php function GeraHash($qtd){ $Caracteres = '123456789abcd'; 
 $QuantidadeCaracteres = strlen($Caracteres); $QuantidadeCaracteres--; $Hash=NULL; 
-for($x=1;$x<=$qtd;$x++){ $Posicao = rand(0,$QuantidadeCaracteres); $Hash .= substr($Caracteres,$Posicao,1); } 
+for($x=1;$x<=$qtd;$x++){ $Posicao = random_int(0,$QuantidadeCaracteres); $Hash .= substr($Caracteres,$Posicao,1); } 
 return $Hash; } $randum_number=GeraHash(5);
 ?>
 <input type="hidden" name="randumpassword" value="<?=$randum_number;?>">

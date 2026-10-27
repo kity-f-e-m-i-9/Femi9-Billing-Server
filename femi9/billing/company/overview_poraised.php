@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 
@@ -77,7 +77,7 @@ else
 									<tr>
 									<td><?=$Report_LABLE;?></td>
 									<td><a href="Report">&#8592;&nbsp;Go&nbsp;Back</a></td>
-									<td><a href="export_report_undelivery?modelval=<?=$_REQUEST['modelval'];?>&&out1=<?=$_REQUEST['out1'];?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
+									<td><a href="export_report_undelivery?modelval=<?=htmlspecialchars((string)($_REQUEST['modelval']), ENT_QUOTES, 'UTF-8', false);?>&&out1=<?=htmlspecialchars((string)($_REQUEST['out1']), ENT_QUOTES, 'UTF-8', false);?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a></td>
 									</tr>
 									</table>
 									</h2>
@@ -97,7 +97,7 @@ else
 						<a href="#" style="text-decoration:none;">
                                             <div class="widget-stats-content flex-fill">
                                                 <span class="widget-stats-title"><?=$DISPLAY_LABLE;?></span>
-                                                <span class="widget-stats-amount"><?=base64_decode($_REQUEST['out1']);?></span>
+                                                <span class="widget-stats-amount"><?=htmlspecialchars((string)(base64_decode($_REQUEST['out1'])), ENT_QUOTES, 'UTF-8', false);?></span>
                                             </div>
 											</a>
                                         </div>
@@ -158,15 +158,15 @@ $i= $start_from;
 											$state_id_VLSS1=$resultusers134['state_id'];
 											$district_id_VLSS1=$resultusers134['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$reqid=$resultRcd_VLSS1190['reqid'];
 										//
-										$SltTotalQty190="select sum(qty) from stock_request_items where reqid='$reqid'";
-										$fetchTotalQty190=mysqli_query($db_conn,$SltTotalQty190);
+										$SltTotalQty190="select sum(qty) from stock_request_items where reqid=?";
+										$fetchTotalQty190=db_q($db_conn,$SltTotalQty190,[$reqid]);
 										$resultTotalQty190=mysqli_fetch_array($fetchTotalQty190);
 										
 										
@@ -176,8 +176,8 @@ $i= $start_from;
 										 <td><?php echo ++$i; ?></td>
 							<td><?=date("d/m/Y",strtotime($resultRcd_VLSS1190['date']));?></td>
 							<td><?=$resultTotalQty190[0];?></td>
-                            <td><?=$resultusers134['useridtext'];?></td>
-							<td><?=$resultusers134['name'];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers134['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers134['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
                                         </tr>
                                            
@@ -220,21 +220,21 @@ $i= $start_from;
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultusers['taluk_id'];
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
 $reqid=$resultRcd_VLSS1['reqid'];
 										//
-										$SltTotalQty190="select sum(qty) from stock_request_items where reqid='$reqid'";
-										$fetchTotalQty190=mysqli_query($db_conn,$SltTotalQty190);
+										$SltTotalQty190="select sum(qty) from stock_request_items where reqid=?";
+										$fetchTotalQty190=db_q($db_conn,$SltTotalQty190,[$reqid]);
 										$resultTotalQty190=mysqli_fetch_array($fetchTotalQty190);
 										
 										
@@ -244,8 +244,8 @@ $reqid=$resultRcd_VLSS1['reqid'];
 										 <td><?php echo ++$i; ?></td>
 							<td><?=date("d/m/Y",strtotime($resultRcd_VLSS1['date']));?></td>
 							<td><?=$resultTotalQty190[0];?></td>
-                            <td><?=$resultusers['useridtext'];?></td>
-							<td><?=$resultusers['name'];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				
@@ -289,21 +289,21 @@ $reqid=$resultRcd_VLSS1['reqid'];
 											$state_id_VLSS1=$resultusers['state_id'];
 											$district_id_VLSS1=$resultusers['district_id'];
 
-										$selectrecords_VLSS1="select * from district where state_id='$state_id_VLSS1' and id='$district_id_VLSS1'";
-										$fetchrecords_VLSS1=mysqli_query($db_conn,$selectrecords_VLSS1);
+										$selectrecords_VLSS1="select * from district where state_id=? and id=?";
+										$fetchrecords_VLSS1=db_q($db_conn,$selectrecords_VLSS1,[$state_id_VLSS1,$district_id_VLSS1]);
 										$resultrecords_VLSS1=mysqli_fetch_array($fetchrecords_VLSS1);
 										$district_name_VLSS1=$resultrecords_VLSS1['dist_name'];
 										
 										$taluk_id_VLSS2=$resultusers['taluk_id'];
-$selectrecords_VLSS2_taluk="select * from taluk where state_id='$state_id_VLSS1' and dist_id='$district_id_VLSS1' and id='$taluk_id_VLSS2'";
-$fetchrecords_VLSS2_taluk=mysqli_query($db_conn,$selectrecords_VLSS2_taluk);
+$selectrecords_VLSS2_taluk="select * from taluk where state_id=? and dist_id=? and id=?";
+$fetchrecords_VLSS2_taluk=db_q($db_conn,$selectrecords_VLSS2_taluk,[$state_id_VLSS1,$district_id_VLSS1,$taluk_id_VLSS2]);
 $resultrecords_VLSS2_taluk=mysqli_fetch_array($fetchrecords_VLSS2_taluk);
 $taluk_name_VLSS2=$resultrecords_VLSS2_taluk['taluk'];
 										
 $reqid=$resultRcd_VLSS1['reqid'];
 										//
-										$SltTotalQty190="select sum(qty) from stock_request_items where reqid='$reqid'";
-										$fetchTotalQty190=mysqli_query($db_conn,$SltTotalQty190);
+										$SltTotalQty190="select sum(qty) from stock_request_items where reqid=?";
+										$fetchTotalQty190=db_q($db_conn,$SltTotalQty190,[$reqid]);
 										$resultTotalQty190=mysqli_fetch_array($fetchTotalQty190);
 										
 										
@@ -313,8 +313,8 @@ $reqid=$resultRcd_VLSS1['reqid'];
 										 <td><?php echo ++$i; ?></td>
 							<td><?=date("d/m/Y",strtotime($resultRcd_VLSS1['date']));?></td>
 							<td><?=$resultTotalQty190[0];?></td>
-                            <td><?=$resultusers['useridtext'];?></td>
-							<td><?=$resultusers['name'];?></td>
+                            <td><?=htmlspecialchars((string)($resultusers['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+							<td><?=htmlspecialchars((string)($resultusers['name']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 							<td><?=$district_name_VLSS1;?></td>
 							<td><?=$taluk_name_VLSS2;?></td>
 				

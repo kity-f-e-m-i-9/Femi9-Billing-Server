@@ -1,4 +1,4 @@
-<?php include("checksession.php");
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php");
 include("config.php");
 error_reporting(0);
 include("RemoveSpecialChar.php");
@@ -32,8 +32,8 @@ for ($i=0; $i<=$number; $i++)
 	 {
 		 
 		 //count available stock
-	$select_count_AVSTOCK="select * from stock where product_id='$product_id_value' and user_type='$usertype' and user_id='$userid'";
-	$FETCH_count_AVSTOCK=mysqli_query($db_conn,$select_count_AVSTOCK);
+	$select_count_AVSTOCK="select * from stock where product_id=? and user_type=? and user_id=?";
+	$FETCH_count_AVSTOCK=db_q($db_conn,$select_count_AVSTOCK,[$product_id_value,$usertype,$userid]);
 	$RESULT_count_AVSTOCK=mysqli_fetch_array($FETCH_count_AVSTOCK);
 	$AVMstock=$RESULT_count_AVSTOCK['closing_qty'];
 	
@@ -45,27 +45,27 @@ for ($i=0; $i<=$number; $i++)
 	}else{
 		
 	 
-	 $select_count_product="select count(*) as numCountRcds from demofreedamage where tempid='$tempid' and product_id='$product_id_value'";
-	$fetch_count_product=mysqli_query($db_conn,$select_count_product);
+	 $select_count_product="select count(*) as numCountRcds from demofreedamage where tempid=? and product_id=?";
+	$fetch_count_product=db_q($db_conn,$select_count_product,[$tempid,$product_id_value]);
 	$result_count_product=mysqli_fetch_array($fetch_count_product);
 	if($result_count_product['numCountRcds']==0)
 	{
 		//insert input stock
 		$insert_products="insert into demofreedamage 
 		(tempid,date,remarks,product_id,qty,category,usertype,userid) values 
-		('$tempid','$date','$remarks','$product_id_value','$qty_value','$category','$usertype','$userid')";
-		mysqli_query($db_conn,$insert_products);
+		(?,?,?,?,?,?,?,?)";
+		db_q($db_conn,$insert_products,[$tempid,$date,$remarks,$product_id_value,$qty_value,$category,$usertype,$userid]);
 		
 		//STOCK DECREMENT - FROM COMPANY
-		$select_stockDetails="select * from stock where product_id='$product_id_value' and user_type='$usertype' and user_id='$userid'";
-		$fetch_stockDetails=mysqli_query($db_conn,$select_stockDetails);
+		$select_stockDetails="select * from stock where product_id=? and user_type=? and user_id=?";
+		$fetch_stockDetails=db_q($db_conn,$select_stockDetails,[$product_id_value,$usertype,$userid]);
 		$result_stockDetails=mysqli_fetch_array($fetch_stockDetails);
 		
 		$update_Input_stock=$result_stockDetails['sent_qty']+$qty_value;
 		$update_Closing_stock=$result_stockDetails['closing_qty']-$qty_value;
 		
-		$update_stockDetails="update stock set sent_qty='$update_Input_stock',closing_qty='$update_Closing_stock' where product_id='$product_id_value' and user_type='$usertype' and user_id='$userid'";
-		mysqli_query($db_conn,$update_stockDetails);
+		$update_stockDetails="update stock set sent_qty=?,closing_qty=? where product_id=? and user_type=? and user_id=?";
+		db_q($db_conn,$update_stockDetails,[$update_Input_stock,$update_Closing_stock,$product_id_value,$usertype,$userid]);
 		
 	}
 	 }
@@ -94,8 +94,8 @@ $tempid=$_REQUEST['update_tempid'];
 	$remarks = RemoveSpecialChar($_REQUEST['remarks']);
 	$category=$_REQUEST['category'];
 	
-	$UPDATERECORDS="update demofreedamage set category='$category',date='$date',remarks='$remarks' where tempid='$tempid'";
-	mysqli_query($db_conn,$UPDATERECORDS);
+	$UPDATERECORDS="update demofreedamage set category=?,date=?,remarks=? where tempid=?";
+	db_q($db_conn,$UPDATERECORDS,[$category,$date,$remarks,$tempid]);
 	
 	$_SESSION['sucMessage']="Demo/Free/Damage Details Updated Successfully!";
 	echo "<script>window.location='demofree_manage?updatedsuccess';</script>";

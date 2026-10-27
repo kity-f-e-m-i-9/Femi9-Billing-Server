@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0); include("config.php"); require_once("include/PermissionCheck.php"); requirePermission('users_demo');?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0); include("config.php"); require_once("include/PermissionCheck.php"); requirePermission('users_demo');?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -67,7 +67,7 @@ $to_date=date("Y-m-d");
 $from_date = date ("Y-m-d", strtotime("-2 days", strtotime($to_date)));
 						}
 ?>
-<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -133,8 +133,8 @@ $i= $start_from;
 											
 											<tbody>
 <?php
-$select_product_list="select * from demo_awareness where date between '$from_date' and '$to_date' order by date desc";
-$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+$select_product_list="select * from demo_awareness where date between ? and ? order by date desc";
+$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date]);
 while($result_product_list=mysqli_fetch_array($fetch_product_list))
 {
 											
@@ -149,8 +149,8 @@ $fetch_Userdetails=mysqli_query($db_conn,$select_Userdetails);
 $result_Userdetails=mysqli_fetch_array($fetch_Userdetails);
 
 $district_id=$result_Userdetails['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=$result_district['dist_name'];
 
@@ -166,8 +166,8 @@ $fetch_Userdetails=mysqli_query($db_conn,$select_Userdetails);
 $result_Userdetails=mysqli_fetch_array($fetch_Userdetails);
 
 $district_id=$result_Userdetails['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
@@ -175,8 +175,8 @@ $district_name=	$result_district['dist_name'];
 $taluk_id=$result_Userdetails['taluk_id'];
 if($taluk_id!=NULL)
 {
-$select_Taluk12="select * from taluk where id='$taluk_id'";
-$fetch_Taluk12=mysqli_query($db_conn,$select_Taluk12);
+$select_Taluk12="select * from taluk where id=?";
+$fetch_Taluk12=db_q($db_conn,$select_Taluk12,[$taluk_id]);
 $result_Taluk12=mysqli_fetch_array($fetch_Taluk12);
 if($result_Taluk12['taluk']!=NULL){
 $taluk_name=$result_Taluk12['taluk'];}else{$taluk_name="";}
@@ -193,8 +193,8 @@ $fetch_Userdetails=mysqli_query($db_conn,$select_Userdetails);
 $result_Userdetails=mysqli_fetch_array($fetch_Userdetails);
 
 $district_id=$result_Userdetails['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
@@ -202,8 +202,8 @@ $district_name=	$result_district['dist_name'];
 $taluk_id=$result_Userdetails['taluk_id'];
 if($taluk_id!=NULL)
 {
-$select_Taluk12="select * from taluk where id='$taluk_id'";
-$fetch_Taluk12=mysqli_query($db_conn,$select_Taluk12);
+$select_Taluk12="select * from taluk where id=?";
+$fetch_Taluk12=db_q($db_conn,$select_Taluk12,[$taluk_id]);
 $result_Taluk12=mysqli_fetch_array($fetch_Taluk12);
 if($result_Taluk12['taluk']!=NULL){
 $taluk_name=$result_Taluk12['taluk'];}else{$taluk_name="";}
@@ -223,15 +223,15 @@ $taluk_name=$result_Taluk12['taluk'];}else{$taluk_name="";}
                     <tr>
                     <td><?php echo ++$i; ?></td>
 					<td><?=$disusertype;?></td>
-					<td><b><?php echo ucwords($result_Userdetails["name"]);?></b></td>
+					<td><b><?php echo htmlspecialchars((string)(ucwords($result_Userdetails["name"])), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 					<td>D:&nbsp;<?php echo $district_name;?>
 					<br/>T:&nbsp;<?php echo $taluk_name;?>
 					</td>
-					<td><b><?php echo ucwords($result_Userdetails["mobile_number"]);?></b></td>
+					<td><b><?php echo htmlspecialchars((string)(ucwords($result_Userdetails["mobile_number"])), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 					<td><?php echo date("d/m/Y",strtotime($result_product_list['date']));?></td>
-					<td><b><?php echo ucwords($result_product_list["title"]);?></b></td>
+					<td><b><?php echo htmlspecialchars((string)(ucwords($result_product_list["title"])), ENT_QUOTES, 'ISO-8859-1', false);?></b></td>
 					
-					<td><a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>" title="<?=$result_product_list["title"];?>"><img src="<?php echo $imgsrcname;?>" style="width:50px;border-radius:10px;" alt="<?=$result_product_list["title"];?>"></a></td>
+					<td><a data-fslightbox="gallery" href="<?php echo $imgsrcname;?>" title="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>"><img src="<?php echo $imgsrcname;?>" style="width:50px;border-radius:10px;" alt="<?=htmlspecialchars((string)($result_product_list["title"]), ENT_QUOTES, 'ISO-8859-1', false);?>"></a></td>
 					
                                                 </tr>
                                            

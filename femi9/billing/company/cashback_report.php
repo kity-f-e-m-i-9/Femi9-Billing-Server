@@ -1,4 +1,4 @@
-<?php include("checksession.php"); error_reporting(0);?>
+<?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -138,7 +138,7 @@ if($_REQUEST['frdate']!=NULL)
 									</h2>
 									<br/>
 									
-									<form method="post" enctype="multipart/form-data" action="<?=$_SERVER['PHP_SELF'];?>">
+									<form method="post" enctype="multipart/form-data" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>">
 
 							<div class="overviewcontainar">
 							<div id="searchleftcont">
@@ -198,8 +198,8 @@ $i= $start_from;
 											
 											<tbody>
 				<?php 
-				$select_product_list="select * from wallet_monthly_sls_report where commission_type='Cashback' and from_date between '$from_date' and '$to_date' order by id desc";
-				$fetch_product_list=mysqli_query($db_conn,$select_product_list);
+				$select_product_list="select * from wallet_monthly_sls_report where commission_type='Cashback' and from_date between ? and ? order by id desc";
+				$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date]);
 				while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
 
@@ -219,8 +219,8 @@ $result_onbaord_user_records=mysqli_fetch_array($fetch_onbaord_user_records);
 
 //district details		
 $district_id=$result_onbaord_user_records['district_id'];
-$select_distict="select * from district where id='$district_id'";
-$fetch_district=mysqli_query($db_conn,$select_distict);
+$select_distict="select * from district where id=?";
+$fetch_district=db_q($db_conn,$select_distict,[$district_id]);
 $result_district=mysqli_fetch_array($fetch_district);
 $district_name=	$result_district['dist_name'];
 
@@ -231,13 +231,13 @@ if($result_onbaord_user_records['useridtext']!=NULL)
                     <tr>
                     <td><?php echo ++$i; ?></td>
 					<td><?=$WD_user_type;?></td>
-					<td><?=$result_onbaord_user_records['useridtext'];?></td>
+					<td><?=htmlspecialchars((string)($result_onbaord_user_records['useridtext']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					<td>
-					<b><?php echo ucwords($result_onbaord_user_records['name']);?></b><br/>
+					<b><?php echo htmlspecialchars((string)(ucwords($result_onbaord_user_records['name'])), ENT_QUOTES, 'ISO-8859-1', false);?></b><br/>
 					<?php echo $district_name;?>
 					</td>
 					
-					<td><?=$result_onbaord_user_records["country_code"];?>&nbsp;<?=$result_onbaord_user_records["mobile_number"];?></td>
+					<td><?=htmlspecialchars((string)($result_onbaord_user_records["country_code"]), ENT_QUOTES, 'ISO-8859-1', false);?>&nbsp;<?=htmlspecialchars((string)($result_onbaord_user_records["mobile_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 					
 					<td><?=inr_format($result_product_list['total_sls_amount'], 2);?></td>
 					<td>
@@ -252,7 +252,7 @@ if($result_onbaord_user_records['useridtext']!=NULL)
 					</td>
 					
 					<td><?=inr_format($result_product_list['commission_amount'], 2);?></td>
-					<td><div style="width:300px;"><?=$result_product_list['remarks'];?></div></td>
+					<td><div style="width:300px;"><?=htmlspecialchars((string)($result_product_list['remarks']), ENT_QUOTES, 'ISO-8859-1', false);?></div></td>
 					
 					
 					

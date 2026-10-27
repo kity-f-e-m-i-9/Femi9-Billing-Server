@@ -8,7 +8,7 @@
  * uses prepared statements throughout.
  */
 
-include("checksession.php");
+include("checksession.php"); require_once("include/PermissionCheck.php"); requirePermission('territory_partner_edit');
 error_reporting(0);
 
 if (($Login_user_TYPEvl ?? '') !== 'company') {

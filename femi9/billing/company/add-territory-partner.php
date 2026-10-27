@@ -160,7 +160,7 @@ try {
                     </div>
 
                     <form action="territory-partner-action" method="post" enctype="multipart/form-data">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)($_SESSION['csrf_token']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
                         <input type="hidden" name="action" value="insert-territory-partner">
 
                     <div class="row">

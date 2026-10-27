@@ -1,17 +1,17 @@
-<?php
+<?php require_once __DIR__ . '/../shared/db-helpers.php';
 
 //-------------------------------------Super Stockist------------------------------
 //---------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------
 //Today
-$select_count_ss_today="select count(*) as numss from super_stockiest where valid_from='$today_date'";
+$select_count_ss_today="select count(*) as numss from super_stockiest where valid_from='".db_esc($today_date)."'";
 $fetch_count_ss_today=mysqli_query($db_conn,$select_count_ss_today);
 $result_count_ss_today=mysqli_fetch_array($fetch_count_ss_today);
 if($result_count_ss_today['numss']!=NULL){$countss_today=$result_count_ss_today['numss'];}
 else{$countss_today="0";}
 
 //This Month
-$select_count_ss_month="select count(*) as numssmonth from super_stockiest where valid_from between '$start_date' and '$endDate'";
+$select_count_ss_month="select count(*) as numssmonth from super_stockiest where valid_from between '".db_esc($start_date)."' and '".db_esc($endDate)."'";
 $fetch_count_ss_month=mysqli_query($db_conn,$select_count_ss_month);
 $result_count_ss_month=mysqli_fetch_array($fetch_count_ss_month);
 if($result_count_ss_month['numssmonth']!=NULL){$countss_month=$result_count_ss_month['numssmonth'];}
@@ -30,14 +30,14 @@ else{$countss_Overall="0";}
 //---------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------
 //Today
-$select_count_stock_today="select count(*) as numss from stockiest where valid_from='$today_date'";
+$select_count_stock_today="select count(*) as numss from stockiest where valid_from='".db_esc($today_date)."'";
 $fetch_count_stock_today=mysqli_query($db_conn,$select_count_stock_today);
 $result_count_stock_today=mysqli_fetch_array($fetch_count_stock_today);
 if($result_count_stock_today['numss']!=NULL){$count_stock_today=$result_count_stock_today['numss'];}
 else{$count_stock_today="0";}
 
 //This Month
-$select_count_stock_month="select count(*) as numssmonth from stockiest where valid_from between '$start_date' and '$endDate'";
+$select_count_stock_month="select count(*) as numssmonth from stockiest where valid_from between '".db_esc($start_date)."' and '".db_esc($endDate)."'";
 $fetch_count_stock_month=mysqli_query($db_conn,$select_count_stock_month);
 $result_count_stock_month=mysqli_fetch_array($fetch_count_stock_month);
 if($result_count_stock_month['numssmonth']!=NULL){$count_stock_month=$result_count_stock_month['numssmonth'];}
@@ -56,14 +56,14 @@ else{$countst_Overall="0";}
 //---------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------
 //Today
-$select_count_distributor_today="select count(*) as numss from distributor where valid_from='$today_date'";
+$select_count_distributor_today="select count(*) as numss from distributor where valid_from='".db_esc($today_date)."'";
 $fetch_count_distributor_today=mysqli_query($db_conn,$select_count_distributor_today);
 $result_count_distributor_today=mysqli_fetch_array($fetch_count_distributor_today);
 if($result_count_distributor_today['numss']!=NULL){$count_distributor_today=$result_count_distributor_today['numss'];}
 else{$count_distributor_today="0";}
 
 //This Month
-$select_count_distributor_month="select count(*) as numssmonth from distributor where valid_from between '$start_date' and '$endDate'";
+$select_count_distributor_month="select count(*) as numssmonth from distributor where valid_from between '".db_esc($start_date)."' and '".db_esc($endDate)."'";
 $fetch_count_distributor_month=mysqli_query($db_conn,$select_count_distributor_month);
 $result_count_distributor_month=mysqli_fetch_array($fetch_count_distributor_month);
 if($result_count_distributor_month['numssmonth']!=NULL){$count_distributor_month=$result_count_distributor_month['numssmonth'];}
@@ -80,14 +80,14 @@ else{$countdt_Overall="0";}
 //---------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------
 //Today
-$select_count_shop_today="select count(*) as numss from shop where valid_from='$today_date'";
+$select_count_shop_today="select count(*) as numss from shop where valid_from='".db_esc($today_date)."'";
 $fetch_count_shop_today=mysqli_query($db_conn,$select_count_shop_today);
 $result_count_shop_today=mysqli_fetch_array($fetch_count_shop_today);
 if($result_count_shop_today['numss']!=NULL){$count_shop_today=$result_count_shop_today['numss'];}
 else{$count_shop_today="0";}
 
 //This Month
-$select_count_shop_month="select count(*) as numssmonth from shop where valid_from between '$start_date' and '$endDate'";
+$select_count_shop_month="select count(*) as numssmonth from shop where valid_from between '".db_esc($start_date)."' and '".db_esc($endDate)."'";
 $fetch_count_shop_month=mysqli_query($db_conn,$select_count_shop_month);
 $result_count_shop_month=mysqli_fetch_array($fetch_count_shop_month);
 if($result_count_shop_month['numssmonth']!=NULL){$count_shop_month=$result_count_shop_month['numssmonth'];}
@@ -104,14 +104,14 @@ else{$countshp_Overall="0";}
 //---------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------
 //Today
-$select_count_outlet_today="select count(*) as numss from outlet where valid_from='$today_date'";
+$select_count_outlet_today="select count(*) as numss from outlet where valid_from='".db_esc($today_date)."'";
 $fetch_count_outlet_today=mysqli_query($db_conn,$select_count_outlet_today);
 $result_count_outlet_today=mysqli_fetch_array($fetch_count_outlet_today);
 if($result_count_outlet_today['numss']!=NULL){$count_outlet_today=$result_count_outlet_today['numss'];}
 else{$count_outlet_today="0";}
 
 //This Month
-$select_count_outlet_month="select count(*) as numssmonth from outlet where valid_from between '$start_date' and '$endDate'";
+$select_count_outlet_month="select count(*) as numssmonth from outlet where valid_from between '".db_esc($start_date)."' and '".db_esc($endDate)."'";
 $fetch_count_outlet_month=mysqli_query($db_conn,$select_count_outlet_month);
 $result_count_outlet_month=mysqli_fetch_array($fetch_count_outlet_month);
 if($result_count_outlet_month['numssmonth']!=NULL){$count_outlet_month=$result_count_outlet_month['numssmonth'];}
@@ -130,14 +130,14 @@ else{$countotl_Overall="0";}
 //---------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------
 //Today
-$select_count_SD_today="select count(*) as numss from super_distributor where valid_from='$today_date'";
+$select_count_SD_today="select count(*) as numss from super_distributor where valid_from='".db_esc($today_date)."'";
 $fetch_count_SD_today=mysqli_query($db_conn,$select_count_SD_today);
 $result_count_SD_today=mysqli_fetch_array($fetch_count_SD_today);
 if($result_count_SD_today['numss']!=NULL){$count_SD_today=$result_count_SD_today['numss'];}
 else{$count_SD_today="0";}
 
 //This Month
-$select_count_SD_month="select count(*) as numssmonth from super_distributor where valid_from between '$start_date' and '$endDate'";
+$select_count_SD_month="select count(*) as numssmonth from super_distributor where valid_from between '".db_esc($start_date)."' and '".db_esc($endDate)."'";
 $fetch_count_SD_month=mysqli_query($db_conn,$select_count_SD_month);
 $result_count_SD_month=mysqli_fetch_array($fetch_count_SD_month);
 if($result_count_SD_month['numssmonth']!=NULL){$count_SD_month=$result_count_SD_month['numssmonth'];}

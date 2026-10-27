@@ -386,9 +386,9 @@ $qparam = urlencode($search ?? '');
                                                     <input type="hidden" name="todate"      value="<?=$to_date;?>">
                                                     <input type="hidden" name="district_id" value="<?=$selected_district;?>">
                                                     <input type="hidden" name="taluk_id"    value="<?=$selected_taluk;?>">
-                                                    <input type="hidden" name="seller_type" value="<?=$selected_seller_type;?>">
+                                                    <input type="hidden" name="seller_type" value="<?=htmlspecialchars((string)($selected_seller_type), ENT_QUOTES, 'UTF-8', false);?>">
                                                     <input type="hidden" name="stockist_category" value="<?=$selected_stockist_category;?>">
-                                                    <input type="hidden" name="amount_range" value="<?=$selected_amount_range;?>">
+                                                    <input type="hidden" name="amount_range" value="<?=htmlspecialchars((string)($selected_amount_range), ENT_QUOTES, 'UTF-8', false);?>">
                                                     <input type="hidden" name="q"           value="<?=htmlspecialchars($search, ENT_QUOTES);?>">
                                                     <button type="submit" class="btn btn-success btn-sm">
                                                       Export
@@ -421,7 +421,7 @@ $qparam = urlencode($search ?? '');
                                         <h5 class="card-title">Advanced Filters</h5>
                                     </div>
                                     <div class="card-body">
-                                        <form method="post" action="<?=$_SERVER['PHP_SELF'];?>" id="filterForm">
+                                        <form method="post" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" id="filterForm">
                                             <input type="hidden" name="state_id" value="<?=$selected_state_id;?>"/>
                                             
                                             <!-- Row 1: Date and Location Filters -->
@@ -448,7 +448,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($dist = $dist_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_district == $dist['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$dist['id'].'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($dist['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($dist['dist_name']).'</option>';
                                                             }
                                                             $stmt_dist->close();
                                                         }
@@ -469,7 +469,7 @@ $qparam = urlencode($search ?? '');
                                                             
                                                             while($taluk = $taluk_result->fetch_assoc()) {
                                                                 $selected_attr = ($selected_taluk == $taluk['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$taluk['id'].'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($taluk['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($taluk['taluk']).'</option>';
                                                             }
                                                             $stmt_taluk->close();
                                                         }
@@ -498,7 +498,7 @@ $qparam = urlencode($search ?? '');
                                                         if($cat_result) {
                                                             while($cat = mysqli_fetch_assoc($cat_result)) {
                                                                 $selected_attr = ($selected_stockist_category == $cat['id']) ? 'selected' : '';
-                                                                echo '<option value="'.$cat['id'].'" '.$selected_attr.'>'.htmlspecialchars($cat['catname']).'</option>';
+                                                                echo '<option value="'.htmlspecialchars((string)($cat['id']), ENT_QUOTES, 'ISO-8859-1', false).'" '.$selected_attr.'>'.htmlspecialchars($cat['catname']).'</option>';
                                                             }
                                                         }
                                                         ?>
@@ -598,15 +598,15 @@ $qparam = urlencode($search ?? '');
                                     <div class="card-header py-3 bg-white border-0">
                                         <div class="d-flex align-items-center justify-content-between">
                                             <!-- LEFT: Show entries -->
-                                            <form method="post" action="<?=$_SERVER['PHP_SELF'];?>" class="d-flex align-items-center gap-2">
+                                            <form method="post" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" class="d-flex align-items-center gap-2">
                                                 <input type="hidden" name="state_id" value="<?=$selected_state_id;?>">
                                                 <input type="hidden" name="frdate" value="<?=$from_date;?>">
                                                 <input type="hidden" name="todate" value="<?=$to_date;?>">
                                                 <input type="hidden" name="district_id" value="<?=$selected_district;?>">
                                                 <input type="hidden" name="taluk_id" value="<?=$selected_taluk;?>">
-                                                <input type="hidden" name="seller_type" value="<?=$selected_seller_type;?>">
+                                                <input type="hidden" name="seller_type" value="<?=htmlspecialchars((string)($selected_seller_type), ENT_QUOTES, 'UTF-8', false);?>">
                                                 <input type="hidden" name="stockist_category" value="<?=$selected_stockist_category;?>">
-                                                <input type="hidden" name="amount_range" value="<?=$selected_amount_range;?>">
+                                                <input type="hidden" name="amount_range" value="<?=htmlspecialchars((string)($selected_amount_range), ENT_QUOTES, 'UTF-8', false);?>">
                                                 <input type="hidden" name="page" value="1">
                                                 <input type="hidden" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>">
 
@@ -621,7 +621,7 @@ $qparam = urlencode($search ?? '');
 
                                             <!-- RIGHT: Universal search + page info -->
                                             <div class="d-flex align-items-center gap-3">
-                                              <form method="get" action="<?=$_SERVER['PHP_SELF'];?>" id="searchForm" class="d-flex align-items-center gap-2">
+                                              <form method="get" action="<?=htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES);?>" id="searchForm" class="d-flex align-items-center gap-2">
                                                 <input type="hidden" name="page" value="1">
                                                 <input type="text"
                                                        name="q"
