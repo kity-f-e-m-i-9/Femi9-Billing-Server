@@ -564,6 +564,29 @@ function _dcWrapTextLines(string $fontFile, float $size, string $text, int $maxW
     $lines = [];
     $current = '';
     foreach ($words as $word) {
+        // A single word that alone is wider than maxWidth (a long place name
+        // with no spaces, e.g. a Firka name) would otherwise sail straight
+        // past the card's right edge — word-wrapping alone can't help since
+        // there's no space to break on, so fall back to a hard character
+        // break for just that word.
+        $wordBbox = imagettfbbox($size, 0, $fontFile, $word);
+        if (($wordBbox[2] - $wordBbox[0]) > $maxWidth) {
+            if ($current !== '') { $lines[] = $current; $current = ''; }
+            $chunk = '';
+            foreach (preg_split('//u', $word, -1, PREG_SPLIT_NO_EMPTY) as $ch) {
+                $testChunk = $chunk . $ch;
+                $chunkBbox = imagettfbbox($size, 0, $fontFile, $testChunk);
+                if (($chunkBbox[2] - $chunkBbox[0]) > $maxWidth && $chunk !== '') {
+                    $lines[] = $chunk;
+                    $chunk = $ch;
+                } else {
+                    $chunk = $testChunk;
+                }
+            }
+            $current = $chunk;
+            continue;
+        }
+
         $test = $current === '' ? $word : ($current . ' ' . $word);
         $bbox = imagettfbbox($size, 0, $fontFile, $test);
         if (($bbox[2] - $bbox[0]) > $maxWidth && $current !== '') {
