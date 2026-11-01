@@ -57,6 +57,13 @@ function getRawTargetAchievedStats($db_conn, array $ids, string $fromDate, strin
     // per person (matches manage_order_product.php's distinct-invoice-ids
     // approach); summing the invoice's own line items (rather than its
     // header total) is what lets Diaper lines be excluded per-item.
+    // No COLLATE cast on the join below (tp_orders.invoiced_inv_id,
+    // user_invoice.inv_id and user_invoice_items.inv_id already all share
+    // utf8mb4_general_ci — confirmed via SHOW FULL COLUMNS) — a COLLATE
+    // clause on a join column, even a no-op one matching the column's own
+    // collation, stops MySQL using its index (EXPLAIN showed a full table
+    // scan of user_invoice_items — ~180k rows — turning this into a 9s+
+    // query; removing it brought the same query under 0.2s).
     $fromEsc = $db_conn->real_escape_string($fromDate);
     $toEsc   = $db_conn->real_escape_string($toDate);
     $resA = $db_conn->query("
@@ -69,7 +76,7 @@ function getRawTargetAchievedStats($db_conn, array $ids, string $fromDate, strin
               AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
               AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
         ) x
-        JOIN user_invoice_items uii ON uii.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
+        JOIN user_invoice_items uii ON uii.inv_id = x.invoiced_inv_id
         JOIN products p ON p.id = uii.pr_id
         WHERE COALESCE(p.category,'') != 'diaper'
         GROUP BY x.ms_id
@@ -77,6 +84,104 @@ function getRawTargetAchievedStats($db_conn, array $ids, string $fromDate, strin
     if ($resA) {
         while ($r = $resA->fetch_assoc()) {
             $stats[(int)$r['ms_id']]['achieved'] = (float)$r['achieved'];
+        }
+    }
+
+    return $stats;
+}
+
+// Day-by-day version of getRawTargetAchievedStats()'s "Achieved" (Napkin-
+// only, Get-Order-converted sales) — same join, grouped by the invoice's own
+// date (ui.date) as well as ms_id, instead of summed into one period total.
+// Used to find the exact date a person's cumulative Napkin sales first
+// reached their Target Amount ("Target Completed Date" — SM-wise/DM-wise
+// requirement #4), which needs the running total day by day, not just the
+// period's grand total.
+function getRawAchievedDailyByMsId($db_conn, array $ids, string $fromDate, string $toDate): array {
+    $out = [];
+    foreach ($ids as $id) { $out[(int)$id] = []; }
+    if (empty($ids)) return $out;
+
+    $idList = implode(',', array_map('intval', $ids));
+    $fromEsc = $db_conn->real_escape_string($fromDate);
+    $toEsc   = $db_conn->real_escape_string($toDate);
+    $res = $db_conn->query("
+        SELECT x.ms_id, ui.date AS inv_date, COALESCE(SUM(uii.total), 0) AS achieved
+        FROM (
+            SELECT DISTINCT o.ms_id, t.invoiced_inv_id
+            FROM ms_orders o
+            JOIN tp_orders t ON t.order_id = o.order_id
+            WHERE o.ms_id IN ($idList) AND o.new_order = 'yes'
+              AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
+              AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
+        ) x
+        JOIN user_invoice ui ON ui.inv_id = x.invoiced_inv_id
+        JOIN user_invoice_items uii ON uii.inv_id = x.invoiced_inv_id
+        JOIN products p ON p.id = uii.pr_id
+        WHERE COALESCE(p.category,'') != 'diaper'
+        GROUP BY x.ms_id, ui.date
+        ORDER BY ui.date ASC
+    ");
+    if ($res) {
+        while ($r = $res->fetch_assoc()) {
+            $id = (int)$r['ms_id'];
+            if (!isset($out[$id])) { continue; }
+            $out[$id][$r['inv_date']] = (float)$r['achieved'];
+        }
+    }
+    return $out;
+}
+
+// First date (within [$fromDate, $toDate]) on which $msId's cumulative
+// Napkin-only achieved sales reached $target — null if never reached in
+// range. $dailyByMsId is getRawAchievedDailyByMsId()'s own output (passed
+// in rather than re-queried, so a caller checking several people reuses one
+// batched query).
+function getTargetCompletedDate(array $dailyByMsId, int $msId, float $target): ?string {
+    if ($target <= 0) { return null; }
+    $days = $dailyByMsId[$msId] ?? [];
+    ksort($days);
+    $running = 0.0;
+    foreach ($days as $date => $amt) {
+        $running += $amt;
+        if ($running >= $target) { return $date; }
+    }
+    return null;
+}
+
+// Same "Achieved" definition as getRawTargetAchievedStats() above (Get
+// Order-sourced, converted-to-invoice, Napkin-only sales in the date range),
+// just grouped by the fulfilling TP (tp_orders.tp_id) instead of by the
+// Marketing Staff member who placed the order — for a per-TP Target/
+// Achieved/Balance table. Target isn't computed here; callers already have
+// each TP's own target (e.g. dashboard.php's $tpRoster) from elsewhere.
+function getTpOrderAchievedStats($db_conn, array $tpIds, string $fromDate, string $toDate): array {
+    $stats = [];
+    foreach ($tpIds as $id) { $stats[(int)$id] = 0.0; }
+    if (empty($tpIds)) return $stats;
+
+    $idList = implode(',', array_map('intval', $tpIds));
+    $fromEsc = $db_conn->real_escape_string($fromDate);
+    $toEsc   = $db_conn->real_escape_string($toDate);
+
+    $resA = $db_conn->query("
+        SELECT x.tp_id, COALESCE(SUM(uii.total), 0) AS achieved
+        FROM (
+            SELECT DISTINCT t.tp_id, t.invoiced_inv_id
+            FROM tp_orders t
+            JOIN ms_orders o ON o.order_id = t.order_id
+            WHERE t.tp_id IN ($idList) AND o.new_order = 'yes'
+              AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
+              AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
+        ) x
+        JOIN user_invoice_items uii ON uii.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
+        JOIN products p ON p.id = uii.pr_id
+        WHERE COALESCE(p.category,'') != 'diaper'
+        GROUP BY x.tp_id
+    ");
+    if ($resA) {
+        while ($r = $resA->fetch_assoc()) {
+            $stats[(int)$r['tp_id']] = (float)$r['achieved'];
         }
     }
 

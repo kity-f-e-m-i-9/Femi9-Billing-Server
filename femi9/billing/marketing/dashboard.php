@@ -85,57 +85,23 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to))   { $to   = date('Y-m-d'); }
 $embed = !empty($_GET['embed']);
 
 $scopeIds       = array_column($scopeNodes, 'id');
-$districtStats  = getMsNodeTargetAndFirkaStats($db_conn, $scopeIds);
-$vacantFirkas   = getMsNodeVacantFirkas($db_conn, $scopeIds, $districtLabel);
-$allTpIds       = getMsNodeTpIds($db_conn, $scopeIds, true);
-
-$invoicedAmount = 0.0;
-$invoiceRows    = [];
-if (!empty($allTpIds)) {
-    $idList = implode(',', $allTpIds);
-
-    $stmtInv = $db_conn->prepare(
-        "SELECT COALESCE(SUM(total),0) AS amt FROM user_invoice
-         WHERE from_user_type='territory_partner' AND from_user_id IN ($idList)
-           AND `date` BETWEEN ? AND ?"
-    );
-    $stmtInv->bind_param('ss', $from, $to);
-    $stmtInv->execute();
-    $invoicedAmount = (float)($stmtInv->get_result()->fetch_assoc()['amt'] ?? 0);
-    $stmtInv->close();
-
-    // Per-TP target = sum of target_amount of every Firka that TP is assigned to.
-    $stmtRows = $db_conn->prepare(
-        "SELECT ui.inv_id, ui.inv_number, ui.date, ui.total, ui.to_user_id,
-                tp.id AS tp_pk, tp.name AS tp_name, tp.tp_id AS tp_code, tp.mobile AS tp_mobile,
-                COALESCE(NULLIF(tp.assigned_district,''), tp.branch_district) AS tp_district,
-                COALESCE((
-                    SELECT SUM(pln.target_amount) FROM territory_partner_locations tpl
-                    JOIN partner_location_nodes pln ON pln.id = tpl.location_id
-                    WHERE tpl.territory_partner_id = tp.id
-                ), 0) AS tp_target,
-                s.name AS shop_name
-         FROM user_invoice ui
-         JOIN territory_partners tp ON tp.id = ui.from_user_id
-         LEFT JOIN shop s ON s.temp_id = ui.to_user_id
-         WHERE ui.from_user_type='territory_partner' AND ui.from_user_id IN ($idList)
-           AND ui.`date` BETWEEN ? AND ?
-         ORDER BY ui.date DESC, ui.inv_number DESC"
-    );
-    $stmtRows->bind_param('ss', $from, $to);
-    $stmtRows->execute();
-    $invoiceRows = $stmtRows->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmtRows->close();
-}
-
-$balanceTarget = max($districtStats['district_total_target'] - $invoicedAmount, 0);
 
 // ── District Managers under this person — clickable list, each showing their
 // own assigned district(s) + target/achieved/balance for the same period.
 // "DM" = whichever marketing_team_levels row has "District" in its name, same
 // convention ms-team-view.php uses for the "District" label under a branch.
+// Computed BEFORE the top summary cards below so their scope can be widened
+// to the whole team (see $teamScopeIds) — an ASM/SM is often assigned no
+// district of their own, or a narrower one than their DMs' combined
+// districts, which used to make this page's own "District Total Target" /
+// "Your TPs' Invoice Amount" cards read LOWER than the sum of the DM rows
+// directly underneath them (reported 2026-10-31: ASM showed 15,65,000 total
+// target while their 5 DMs' own rows summed to 27,70,000) — confusing since
+// a roll-up total should never be smaller than its own parts.
 require_once __DIR__ . '/../company/include/TeamTargetRollup.php';
 $myDms = [];
+$teamScopeIds = [];
+$dmTpIdsById = [];
 $_staffRows = $db_conn->query("
     SELECT ms.id, ms.ms_name, ms.manager_id, tl.level_name
     FROM marketing_staff ms
@@ -177,19 +143,516 @@ if (!empty($_dmCandidates)) {
         $_dmDistrictNames = array_column($_dmScopeNodes, 'name');
         $_dmDistrictLabel = !empty($_dmDistrictNames) ? implode(', ', $_dmDistrictNames) : 'No District Assigned';
         $_dmScopeIds = array_column($_dmScopeNodes, 'id');
+        $teamScopeIds = array_merge($teamScopeIds, $_dmScopeIds);
         $_t = !empty($_dmScopeIds) ? getMsNodeTargetAndFirkaStats($db_conn, $_dmScopeIds)['district_total_target'] : 0.0;
         $_a = $_dmTargetStats[$_dmId]['achieved'] ?? 0.0;
+
+        // "Your TPs' Invoice Amount" for just this DM's own district — same
+        // figure/query as the top-level $invoicedAmount card above, just
+        // scoped to this one DM's TPs instead of every TP in the whole team.
+        // Broader than "Achieved" above (which only counts Get-Order-sourced,
+        // Napkin-only sales): this is every shop invoice any of this DM's TPs
+        // raised in the period, same as what the DM sees on their own
+        // dashboard's "Your TPs' Invoice Amount" card.
+        $_dmTpIds = !empty($_dmScopeIds) ? getMsNodeTpIds($db_conn, $_dmScopeIds, true) : [];
+        $dmTpIdsById[$_dmId] = $_dmTpIds;
+        $_dmInvoiced = 0.0;
+        if (!empty($_dmTpIds)) {
+            $_dmIdList = implode(',', $_dmTpIds);
+            $_stmtDmInv = $db_conn->prepare(
+                "SELECT COALESCE(SUM(total),0) AS amt FROM user_invoice
+                 WHERE from_user_type='territory_partner' AND from_user_id IN ($_dmIdList)
+                   AND `date` BETWEEN ? AND ?"
+            );
+            $_stmtDmInv->bind_param('ss', $from, $to);
+            $_stmtDmInv->execute();
+            $_dmInvoiced = (float)($_stmtDmInv->get_result()->fetch_assoc()['amt'] ?? 0);
+            $_stmtDmInv->close();
+        }
+
+        // Achieve Total = Achieved (this DM's own Get Order-converted sales)
+        // + TP Invoice Amount (every shop invoice this DM's TPs raised) —
+        // Balance is Target minus that combined total.
+        $_achieveTotal = $_a + $_dmInvoiced;
+
         $myDms[] = [
-            'id'       => $_dmId,
-            'name'     => $_dm['ms_name'],
-            'district' => $_dmDistrictLabel,
-            'target'   => $_t,
-            'achieved' => $_a,
-            'balance'  => max($_t - $_a, 0),
+            'id'                => $_dmId,
+            'name'              => $_dm['ms_name'],
+            'district'          => $_dmDistrictLabel,
+            'target'            => $_t,
+            'achieved'          => $_a,
+            'balance'           => max($_t - $_a, 0),
+            'tp_invoice_amount' => $_dmInvoiced,
+            'achieve_total'     => $_achieveTotal,
+            'total_balance'     => max($_t - $_achieveTotal, 0),
         ];
     }
     usort($myDms, fn($a, $b) => strcmp($a['name'], $b['name']));
 }
+
+// Scope used for this page's own top summary cards: the person's own direct
+// assignment PLUS every DM-below-them's own assignment, deduped — so a
+// manager's "District Total Target" / "Your TPs' Invoice Amount" / "Balance"
+// always cover at least as much as the DM rows shown below them. Falls back
+// to the own-only scope for an actual DM (no one below them, $myDms empty),
+// unchanged from before.
+$statsScopeIds = !empty($myDms) ? array_values(array_unique(array_merge($scopeIds, $teamScopeIds))) : $scopeIds;
+
+// ── TP Invoice Amount for districts with NO DM assigned — this ASM/SM's own
+// assigned district(s)/division(s) ($scopeIds) that none of their DMs below
+// ($teamScopeIds) actually cover. Shown alongside the DM table so the TP
+// Invoice Amount for shops in an unstaffed district is visible by name, not
+// silently folded into the top summary cards only.
+$noDmDistrictRows = [];
+if (!empty($myDms)) {
+    $noDmNodeIds = array_values(array_diff($scopeIds, $teamScopeIds));
+    $scopeNodeNameById = array_column($scopeNodes, 'name', 'id');
+    foreach ($noDmNodeIds as $_nodeId) {
+        $_nodeTpIds = getMsNodeTpIds($db_conn, [$_nodeId], true);
+        $_nodeInvoiced = 0.0;
+        if (!empty($_nodeTpIds)) {
+            $_nodeIdList = implode(',', $_nodeTpIds);
+            $_stmtNodeInv = $db_conn->prepare(
+                "SELECT COALESCE(SUM(total),0) AS amt FROM user_invoice
+                 WHERE from_user_type='territory_partner' AND from_user_id IN ($_nodeIdList)
+                   AND `date` BETWEEN ? AND ?"
+            );
+            $_stmtNodeInv->bind_param('ss', $from, $to);
+            $_stmtNodeInv->execute();
+            $_nodeInvoiced = (float)($_stmtNodeInv->get_result()->fetch_assoc()['amt'] ?? 0);
+            $_stmtNodeInv->close();
+        }
+        $noDmDistrictRows[] = [
+            'district'    => $scopeNodeNameById[$_nodeId] ?? ('#' . $_nodeId),
+            'tp_invoice'  => $_nodeInvoiced,
+        ];
+    }
+    usort($noDmDistrictRows, fn($a, $b) => strcmp($a['district'], $b['district']));
+}
+
+// ── Zone-wise Target Rollup — ASM/SM view only (any login with DMs below
+// them). "Zone" is the company-wide District grouping from Manage Zones
+// (partner_zones / partner_zone_districts — same table salesbdm's Zone
+// field and marketing's own "Fill from Zone" picker already read). For
+// every zone that contains at least one of this team's own districts, the
+// zone's Target rolls up EVERY district that belongs to that zone — not
+// just the ones a DM happens to be covering right now — so a zone still
+// shows a real target even if part of it currently has no DM assigned
+// (target is a property of the zone's districts, not of staffing).
+// Achieved / TP Invoice Amount, by contrast, stay scoped to this team's own
+// $myDms rows (same "Achieved"/"TP Invoice Amount" figures already shown
+// per-DM above) — whichever of this team's DMs' own districts fall inside
+// that zone.
+require_once __DIR__ . '/../company/include/PartnerZones.php';
+$zoneRollup = [];
+$calendarWeeks = [];
+$_daysInMonth = 0;
+if (!empty($myDms)) {
+    // Calendar-accurate Mon–Sun weeks for the month $from falls in: the
+    // first week runs from the 1st through its first Sunday (whatever
+    // weekday the 1st lands on), middle weeks are full Mon–Sun, and the
+    // last week is clipped to the month's last day instead of being padded
+    // out to a full 7 days (e.g. a month ending on a Thursday gives a
+    // Mon–Thu final week, not Mon–Sun). Shared by both the Zone weekly
+    // breakdown below and each DM's own weekly breakdown in the Target vs
+    // Achieved table.
+    $_monthFirst = new DateTime(date('Y-m-01', strtotime($from)));
+    $_monthLast  = (clone $_monthFirst)->modify('last day of this month');
+    $_daysInMonth = (int)$_monthLast->format('d');
+    $_cursor = clone $_monthFirst;
+    while ($_cursor <= $_monthLast) {
+        $_weekStart = clone $_cursor;
+        $_dow = (int)$_weekStart->format('N'); // 1=Mon .. 7=Sun
+        $_weekEnd = (clone $_weekStart)->modify('+' . (7 - $_dow) . ' days');
+        if ($_weekEnd > $_monthLast) { $_weekEnd = clone $_monthLast; }
+        $calendarWeeks[] = ['start' => $_weekStart->format('Y-m-d'), 'end' => $_weekEnd->format('Y-m-d')];
+        $_cursor = (clone $_weekEnd)->modify('+1 day');
+    }
+}
+if (!empty($myDms) && !empty($teamScopeIds)) {
+    ensurePartnerZonesTables($db_conn);
+    $teamScopeIdList = implode(',', array_map('intval', array_unique($teamScopeIds)));
+    $resZ = $db_conn->query("
+        SELECT DISTINCT z.id, z.name
+        FROM partner_zone_districts zd
+        JOIN partner_zones z ON z.id = zd.zone_id
+        WHERE zd.district_node_id IN ($teamScopeIdList)
+        ORDER BY z.name ASC
+    ");
+    $teamZones = $resZ ? $resZ->fetch_all(MYSQLI_ASSOC) : [];
+
+    foreach ($teamZones as $z) {
+        $zoneId = (int)$z['id'];
+        $zoneDistrictIds = getZoneDistrictNodeIds($db_conn, $zoneId);
+        $zoneStats = !empty($zoneDistrictIds) ? getMsNodeTargetAndFirkaStats($db_conn, $zoneDistrictIds) : ['district_total_target' => 0.0];
+        $zoneTarget = (float)$zoneStats['district_total_target'];
+        $zoneMonthlyPerDay = $_daysInMonth > 0 ? $zoneTarget / $_daysInMonth : 0.0;
+
+        $zoneDistrictNames = array_map(fn($n) => mb_strtolower(trim($n)), getZoneDistrictNames($db_conn, $zoneId));
+        $zoneAchieved = 0.0;
+        $zoneTpInvoiced = 0.0;
+        foreach ($myDms as $_dm) {
+            foreach (explode(', ', $_dm['district']) as $_dn) {
+                if (in_array(mb_strtolower(trim($_dn)), $zoneDistrictNames, true)) {
+                    $zoneAchieved   += $_dm['achieved'];
+                    $zoneTpInvoiced += $_dm['tp_invoice_amount'];
+                    break;
+                }
+            }
+        }
+        $zoneAchieveTotal = $zoneAchieved + $zoneTpInvoiced;
+        $zoneOverageAmt = $zoneAchieveTotal - $zoneTarget;
+        $zoneOveragePct = $zoneTarget > 0 ? ($zoneAchieveTotal / $zoneTarget) * 100 : 0.0;
+
+        $zoneWeeks = [];
+        foreach ($calendarWeeks as $_wk) {
+            $_wkDays = (int)floor((strtotime($_wk['end']) - strtotime($_wk['start'])) / 86400) + 1;
+            $zoneWeeks[] = [
+                'start'  => $_wk['start'],
+                'end'    => $_wk['end'],
+                'target' => $zoneMonthlyPerDay * $_wkDays,
+            ];
+        }
+
+        $zoneRollup[] = [
+            'name'          => $z['name'],
+            'target'        => $zoneTarget,
+            'achieved'      => $zoneAchieved,
+            'tp_invoice'    => $zoneTpInvoiced,
+            'achieve_total' => $zoneAchieveTotal,
+            'overage_amt'   => $zoneOverageAmt,
+            'overage_pct'   => $zoneOveragePct,
+            'weeks'         => $zoneWeeks,
+        ];
+    }
+}
+
+// ── Daily Visit Compliance (35 shop visits/day, 20 of them Get Order) ──────
+// For an ASM/SM, each DM's own day-by-day numbers are rolled up into a
+// compliance summary (days meeting each target out of the days in range,
+// plus the daily average) and attached onto that DM's own $myDms row — read
+// in the "My District Managers" detail chip below. For an actual DM (no one
+// below them), the full day-by-day table itself is shown instead.
+require_once __DIR__ . '/../shared/MsDailyVisitReport.php';
+$myOwnVisitDays = [];
+if (!empty($myDms)) {
+    foreach ($myDms as &$_dmRef) {
+        $_dayStats = getMsDailyVisitDaySummary($db_conn, $from, $to, (int)$_dmRef['id']);
+        $_totalDays = count($_dayStats);
+        $_visitMetDays = count(array_filter($_dayStats, fn($d) => $d['visit_target_met']));
+        $_getOrderMetDays = count(array_filter($_dayStats, fn($d) => $d['get_order_target_met']));
+        $_dmRef['visit_total_days']      = $_totalDays;
+        $_dmRef['visit_met_days']        = $_visitMetDays;
+        $_dmRef['get_order_met_days']    = $_getOrderMetDays;
+        $_dmRef['avg_visits_per_day']    = $_totalDays > 0 ? array_sum(array_column($_dayStats, 'total_visits')) / $_totalDays : 0.0;
+        $_dmRef['avg_get_order_per_day'] = $_totalDays > 0 ? array_sum(array_column($_dayStats, 'get_order_visits')) / $_totalDays : 0.0;
+        $_dmRef['new_shop_visits']       = array_sum(array_column($_dayStats, 'new_visits'));
+        $_dmRef['existing_shop_visits']  = array_sum(array_column($_dayStats, 'existing_visits'));
+        $_dmRef['visit_days']            = $_dayStats;
+    }
+    unset($_dmRef);
+} else {
+    $myOwnVisitDays = getMsDailyVisitDaySummary($db_conn, $from, $to, $msId);
+}
+
+$districtStats  = getMsNodeTargetAndFirkaStats($db_conn, $statsScopeIds);
+
+// ── Target Completed Date — the date Napkin-only (no Diaper) cumulative
+// achieved sales first reached the Target Amount for the selected period.
+// One batched day-by-day query for every ms_id on this page (the team's own
+// DMs, or just this person if they ARE the DM), then each person's own
+// completion date is found by walking their own running total against
+// their own target.
+$_targetCompletionMsIds = !empty($myDms) ? array_column($myDms, 'id') : [$msId];
+$dailyAchievedByMsId = getRawAchievedDailyByMsId($db_conn, $_targetCompletionMsIds, $from, $to);
+if (!empty($myDms)) {
+    foreach ($myDms as &$_dmRef2) {
+        $_dmRef2['target_completed_date'] = getTargetCompletedDate($dailyAchievedByMsId, (int)$_dmRef2['id'], (float)$_dmRef2['target']);
+    }
+    unset($_dmRef2);
+    $myOwnTargetCompletedDate = null;
+} else {
+    $myOwnTargetCompletedDate = getTargetCompletedDate($dailyAchievedByMsId, $msId, (float)$districtStats['district_total_target']);
+}
+
+// ── Per-DM Weekly Breakdown (Target, Achieved, TP Invoice, Total) — each
+// week's Target is this DM's own Target Amount prorated by days in that
+// week; Achieved comes from $dailyAchievedByMsId (already fetched above,
+// same Napkin-only Get-Order-converted definition as the "Achieved" column)
+// summed into whichever week each invoice date falls in; TP Invoice Amount
+// is a fresh day-by-day query per DM (reusing $dmTpIdsById from the DM-
+// build loop above) summed the same way. Shown via the "Weekly" button/
+// modal on each DM's row, and rolled up into $teamWeeklyBreakdown for the
+// "ASM Weekly Target Amount" button covering the whole team.
+$teamWeeklyBreakdown = [];
+if (!empty($myDms)) {
+    foreach ($calendarWeeks as $_wk) {
+        $teamWeeklyBreakdown[] = ['start' => $_wk['start'], 'end' => $_wk['end'], 'target' => 0.0, 'achieved' => 0.0, 'tp_invoice' => 0.0, 'total' => 0.0];
+    }
+    foreach ($myDms as &$_dmWeekRef) {
+        $_dmPerDay = $_daysInMonth > 0 ? $_dmWeekRef['target'] / $_daysInMonth : 0.0;
+        $_dmAchievedByDate = $dailyAchievedByMsId[(int)$_dmWeekRef['id']] ?? [];
+
+        $_dmTpInvByDate = [];
+        $_dmTpIdsForWeekly = $dmTpIdsById[(int)$_dmWeekRef['id']] ?? [];
+        if (!empty($_dmTpIdsForWeekly)) {
+            $_dmTpIdList = implode(',', $_dmTpIdsForWeekly);
+            $_resDmInvDaily = $db_conn->query("
+                SELECT `date`, COALESCE(SUM(total),0) AS amt FROM user_invoice
+                WHERE from_user_type='territory_partner' AND from_user_id IN ($_dmTpIdList)
+                  AND `date` BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
+                GROUP BY `date`
+            ");
+            while ($_r = $_resDmInvDaily->fetch_assoc()) { $_dmTpInvByDate[$_r['date']] = (float)$_r['amt']; }
+        }
+
+        $_dmWeeks = [];
+        foreach ($calendarWeeks as $_wkIdx => $_wk) {
+            $_wkDays = (int)floor((strtotime($_wk['end']) - strtotime($_wk['start'])) / 86400) + 1;
+            $_wkTarget = $_dmPerDay * $_wkDays;
+
+            $_wkAchieved = 0.0;
+            foreach ($_dmAchievedByDate as $_d => $_amt) {
+                if ($_d >= $_wk['start'] && $_d <= $_wk['end']) { $_wkAchieved += $_amt; }
+            }
+            $_wkInvoiced = 0.0;
+            foreach ($_dmTpInvByDate as $_d => $_amt) {
+                if ($_d >= $_wk['start'] && $_d <= $_wk['end']) { $_wkInvoiced += $_amt; }
+            }
+            $_wkTotal = $_wkAchieved + $_wkInvoiced;
+
+            $_dmWeeks[] = ['start' => $_wk['start'], 'end' => $_wk['end'], 'target' => $_wkTarget, 'achieved' => $_wkAchieved, 'tp_invoice' => $_wkInvoiced, 'total' => $_wkTotal];
+
+            $teamWeeklyBreakdown[$_wkIdx]['target']     += $_wkTarget;
+            $teamWeeklyBreakdown[$_wkIdx]['achieved']   += $_wkAchieved;
+            $teamWeeklyBreakdown[$_wkIdx]['tp_invoice'] += $_wkInvoiced;
+            $teamWeeklyBreakdown[$_wkIdx]['total']      += $_wkTotal;
+        }
+        $_dmWeekRef['weeks'] = $_dmWeeks;
+    }
+    unset($_dmWeekRef);
+
+    // Fold in TP Invoice Amount for districts with NO DM assigned
+    // ($noDmNodeIds, computed above) — the ASM Weekly Target Amount modal's
+    // TP Invoice Amount otherwise only covered DM-assigned districts, same
+    // gap the "TP Invoice Amount — No DM Assigned" tab exists to surface
+    // separately; this folds that same money into the team's own weekly
+    // total too, so the weekly Total isn't silently short.
+    if (!empty($noDmNodeIds)) {
+        $_noDmTpIds = getMsNodeTpIds($db_conn, $noDmNodeIds, true);
+        if (!empty($_noDmTpIds)) {
+            $_noDmTpIdList = implode(',', $_noDmTpIds);
+            $_resNoDmInvDaily = $db_conn->query("
+                SELECT `date`, COALESCE(SUM(total),0) AS amt FROM user_invoice
+                WHERE from_user_type='territory_partner' AND from_user_id IN ($_noDmTpIdList)
+                  AND `date` BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
+                GROUP BY `date`
+            ");
+            $_noDmInvByDate = [];
+            while ($_r = $_resNoDmInvDaily->fetch_assoc()) { $_noDmInvByDate[$_r['date']] = (float)$_r['amt']; }
+
+            foreach ($calendarWeeks as $_wkIdx => $_wk) {
+                $_wkNoDmInvoiced = 0.0;
+                foreach ($_noDmInvByDate as $_d => $_amt) {
+                    if ($_d >= $_wk['start'] && $_d <= $_wk['end']) { $_wkNoDmInvoiced += $_amt; }
+                }
+                $teamWeeklyBreakdown[$_wkIdx]['tp_invoice'] += $_wkNoDmInvoiced;
+                $teamWeeklyBreakdown[$_wkIdx]['total']      += $_wkNoDmInvoiced;
+            }
+        }
+    }
+}
+
+// ── New Shop Onboarding (Target: 50 new shops per district) ────────────────
+// Shops this team added (ms_shop.created_at) within the selected period,
+// grouped by district — same "New Shop" definition company/ms-team-shop-
+// view.php and manage_order_product.php's own "New Shop" card already use.
+$teamMsIdsForShops = !empty($myDms) ? array_merge([$msId], array_column($myDms, 'id')) : [$msId];
+$newShopByDistrict = [];
+if (!empty($teamMsIdsForShops)) {
+    $_msIdList = implode(',', array_map('intval', $teamMsIdsForShops));
+    $resNewShop = $db_conn->query("
+        SELECT COALESCE(dn.name, s.district_name, 'Unassigned') AS district, COUNT(*) AS c
+        FROM ms_shop s
+        LEFT JOIN partner_location_nodes dn ON dn.id = s.district_node_id
+        WHERE s.ms_id IN ($_msIdList) AND DATE(s.created_at) BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
+        GROUP BY district
+        ORDER BY district ASC
+    ");
+    while ($_nr = $resNewShop->fetch_assoc()) {
+        $newShopByDistrict[] = ['district' => $_nr['district'], 'count' => (int)$_nr['c'], 'met' => (int)$_nr['c'] >= 50];
+    }
+}
+
+// ── Shop Category Split (supermarket, beauty parlour, etc.) ────────────────
+// Shops this team added (ms_shop.created_at) within the selected period,
+// grouped by shop_category — shop_cat already stores the category id from
+// add_ss.php's own "Category" dropdown, no new field needed. Same period
+// scoping as New Shop Onboarding above, so both cards agree on "this
+// period"'s shops.
+$shopCategorySplit = [];
+if (!empty($teamMsIdsForShops)) {
+    $_msIdList2 = implode(',', array_map('intval', $teamMsIdsForShops));
+    $resShopCat = $db_conn->query("
+        SELECT COALESCE(sc.catlable, 'Uncategorized') AS category, COUNT(*) AS c
+        FROM ms_shop s
+        LEFT JOIN shop_category sc ON sc.id = s.shop_cat
+        WHERE s.ms_id IN ($_msIdList2) AND DATE(s.created_at) BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
+        GROUP BY category
+        ORDER BY c DESC
+    ");
+    while ($_scr = $resShopCat->fetch_assoc()) {
+        $shopCategorySplit[] = ['category' => $_scr['category'], 'count' => (int)$_scr['c']];
+    }
+}
+
+// ── Napkin vs Diaper — Orders & Shops ───────────────────────────────────────
+// Every visit (Get Order or No Order) this team logged in the period,
+// classified Napkin vs Diaper. A Get Order's category comes from its own
+// product line(s) — products.category (Napkin if anything other than
+// 'diaper', same convention used throughout this app) — "Mixed" if a
+// single order has both. A No Order visit has no product line at all, so
+// it uses order_category, the category the DM explicitly picks on the No
+// Order form now (added for this requirement) — older rows from before
+// that pick existed fall back to "Unspecified".
+$napkinDiaperSplit = null;
+if (!empty($teamMsIdsForShops)) {
+    // Self-migrating — same guard as order_action.php's own (that one only
+    // runs when a No Order is actually submitted, so a fresh deploy with no
+    // No-Order submissions yet would otherwise hit this SELECT before the
+    // column exists).
+    $_catCol2 = $db_conn->query("SHOW COLUMNS FROM ms_orders LIKE 'order_category'");
+    if ($_catCol2 && $_catCol2->num_rows === 0) {
+        $db_conn->query("ALTER TABLE ms_orders ADD COLUMN order_category ENUM('napkin','diaper') NULL DEFAULT NULL AFTER new_order");
+    }
+    $_msIdList3 = implode(',', array_map('intval', $teamMsIdsForShops));
+    $resCat = $db_conn->query("
+        SELECT o.order_id, o.shop_id, o.new_order, o.order_category,
+               GROUP_CONCAT(DISTINCT CASE WHEN p.category = 'diaper' THEN 'diaper' ELSE 'napkin' END) AS line_cats
+        FROM ms_orders o
+        LEFT JOIN products p ON p.id = o.pr_id
+        WHERE o.ms_id IN ($_msIdList3) AND o.order_date BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
+        GROUP BY o.order_id, o.shop_id, o.new_order, o.order_category
+    ");
+    $_napkinOrderIds = []; $_diaperOrderIds = []; $_mixedOrderIds = []; $_unspecOrderIds = [];
+    $_napkinShopIds  = []; $_diaperShopIds  = [];
+    while ($r = $resCat->fetch_assoc()) {
+        if ($r['new_order'] === 'yes') {
+            $_cats = $r['line_cats'] ? explode(',', $r['line_cats']) : [];
+            if (count($_cats) === 1 && $_cats[0] === 'diaper')      { $_cat = 'diaper'; }
+            elseif (count($_cats) === 1 && $_cats[0] === 'napkin')  { $_cat = 'napkin'; }
+            elseif (count($_cats) > 1)                              { $_cat = 'mixed'; }
+            else                                                     { $_cat = 'unspecified'; }
+        } else {
+            $_cat = $r['order_category'] ?: 'unspecified';
+        }
+        if ($_cat === 'napkin') { $_napkinOrderIds[$r['order_id']] = true; $_napkinShopIds[$r['shop_id']] = true; }
+        elseif ($_cat === 'diaper') { $_diaperOrderIds[$r['order_id']] = true; $_diaperShopIds[$r['shop_id']] = true; }
+        elseif ($_cat === 'mixed') { $_mixedOrderIds[$r['order_id']] = true; $_napkinShopIds[$r['shop_id']] = true; $_diaperShopIds[$r['shop_id']] = true; }
+        else { $_unspecOrderIds[$r['order_id']] = true; }
+    }
+    $napkinDiaperSplit = [
+        'napkin_orders'      => count($_napkinOrderIds),
+        'napkin_shops'       => count($_napkinShopIds),
+        'diaper_orders'      => count($_diaperOrderIds),
+        'diaper_shops'       => count($_diaperShopIds),
+        'mixed_orders'       => count($_mixedOrderIds),
+        'unspecified_orders' => count($_unspecOrderIds),
+    ];
+}
+
+$vacantFirkas   = getMsNodeVacantFirkas($db_conn, $statsScopeIds, $districtLabel);
+$allTpIds       = getMsNodeTpIds($db_conn, $statsScopeIds, true);
+
+$invoicedAmount = 0.0;
+$invoiceRows    = [];
+if (!empty($allTpIds)) {
+    $idList = implode(',', $allTpIds);
+
+    $stmtInv = $db_conn->prepare(
+        "SELECT COALESCE(SUM(total),0) AS amt FROM user_invoice
+         WHERE from_user_type='territory_partner' AND from_user_id IN ($idList)
+           AND `date` BETWEEN ? AND ?"
+    );
+    $stmtInv->bind_param('ss', $from, $to);
+    $stmtInv->execute();
+    $invoicedAmount = (float)($stmtInv->get_result()->fetch_assoc()['amt'] ?? 0);
+    $stmtInv->close();
+
+    // Per-TP target = sum of target_amount of every Firka that TP is assigned
+    // to — computed as its own GROUP BY query (one row per TP) instead of a
+    // correlated subquery inside the main SELECT below: a correlated
+    // subquery re-runs once per output ROW (every invoice, not every TP),
+    // which turned this into a full scan of territory_partner_locations for
+    // each of several hundred invoices and took 5-7s; the grouped query
+    // below runs once regardless of how many invoices there are.
+    $tpTargetMap = [];
+    $resTpTarget = $db_conn->query(
+        "SELECT tpl.territory_partner_id AS tp_id, SUM(pln.target_amount) AS tgt
+         FROM territory_partner_locations tpl
+         JOIN partner_location_nodes pln ON pln.id = tpl.location_id
+         WHERE tpl.territory_partner_id IN ($idList)
+         GROUP BY tpl.territory_partner_id"
+    );
+    while ($_tr = $resTpTarget->fetch_assoc()) { $tpTargetMap[(int)$_tr['tp_id']] = (float)$_tr['tgt']; }
+
+    $stmtRows = $db_conn->prepare(
+        "SELECT ui.inv_id, ui.inv_number, ui.date, ui.total, ui.to_user_id,
+                tp.id AS tp_pk, tp.name AS tp_name, tp.tp_id AS tp_code, tp.mobile AS tp_mobile,
+                COALESCE(NULLIF(tp.assigned_district,''), tp.branch_district) AS tp_district,
+                s.name AS shop_name
+         FROM user_invoice ui
+         JOIN territory_partners tp ON tp.id = ui.from_user_id
+         LEFT JOIN shop s ON s.temp_id = ui.to_user_id
+         WHERE ui.from_user_type='territory_partner' AND ui.from_user_id IN ($idList)
+           AND ui.`date` BETWEEN ? AND ?
+         ORDER BY ui.date DESC, ui.inv_number DESC"
+    );
+    $stmtRows->bind_param('ss', $from, $to);
+    $stmtRows->execute();
+    $invoiceRows = $stmtRows->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmtRows->close();
+    foreach ($invoiceRows as &$_invRow) {
+        $_invRow['tp_target'] = $tpTargetMap[(int)$_invRow['tp_pk']] ?? 0.0;
+    }
+    unset($_invRow);
+}
+
+// Get Order Amount (Napkin-only, Get-Order-converted sales) for this page's
+// own scope — same "Achieved" definition as $myDms rows / TeamTargetRollup.
+// For an ASM/SM, summed straight from the team's own DM achieved figures
+// already computed above; for an actual DM (no one below them) computed
+// fresh for their own ms_id.
+if (!empty($myDms)) {
+    $ownGetOrderAchieved = array_sum(array_column($myDms, 'achieved'));
+} else {
+    $_ownAchievedStats = getRawTargetAchievedStats($db_conn, [$msId], $from, $to);
+    $ownGetOrderAchieved = (float)($_ownAchievedStats[$msId]['achieved'] ?? 0);
+}
+
+// Per-district Get Order Amount — same breakdown as $districtTargetTotals
+// below, so the top cards' district filter can add TP Invoice Amount + Get
+// Order Amount consistently whichever district is picked.
+$districtAchievedTotals = [];
+if (!empty($myDms)) {
+    foreach ($myDms as $_dm) {
+        foreach (explode(', ', $_dm['district']) as $_dn) {
+            $_dn = trim($_dn);
+            if ($_dn === '' || $_dn === 'No District Assigned') { continue; }
+            $districtAchievedTotals[$_dn] = ($districtAchievedTotals[$_dn] ?? 0) + $_dm['achieved'];
+        }
+    }
+} else {
+    foreach ($districtNames as $_dn) {
+        $districtAchievedTotals[$_dn] = $ownGetOrderAchieved;
+    }
+}
+
+// "Your TPs' Invoice Amount" card now shows TP Invoice Amount + Get Order
+// Amount combined (the Total the DM/ASM/SM actually achieved), with
+// Balance computed against that combined total instead of invoice-only.
+$totalAchieveAmount = $invoicedAmount + $ownGetOrderAchieved;
+$balanceTarget = max($districtStats['district_total_target'] - $totalAchieveAmount, 0);
 
 // TP roster for the tabs — All / Active / Inactive. Scoped to this person's
 // OWN assigned district(s) for a DM, but for an ASM/SM (who may have no
@@ -264,6 +727,51 @@ if (!empty($teamTpIds)) {
 }
 $activeTpRoster   = array_values(array_filter($tpRoster, fn($r) => $r['is_active']));
 $inactiveTpRoster = array_values(array_filter($tpRoster, fn($r) => !$r['is_active']));
+
+// ── Return % — per invoice, how much of its amount came back as a return,
+// with invoice date, TP name, District + Firka (SM-wise/DM-wise requirement
+// #11). user_return_stock.invnumber actually holds user_invoice.inv_id (not
+// inv_number, despite the column name — confirmed against live data, same
+// convention company/asm-dm-order-conversion-export.php and mis-report.php
+// already rely on). Repeats the whole return's total on every line item, so
+// dedupe by returnid before summing.
+$tpFirkaById = array_column($tpRoster, 'firka', 'id');
+$returnByInv = [];
+if (!empty($invoiceRows)) {
+    $_invIdsForReturn = array_column($invoiceRows, 'inv_id');
+    $_idList3 = "'" . implode("','", array_map(fn($v) => $db_conn->real_escape_string($v), $_invIdsForReturn)) . "'";
+    $resReturn = $db_conn->query("
+        SELECT invnumber, returnid, MAX(total) AS total
+        FROM user_return_stock
+        WHERE invnumber IN ($_idList3) AND deleted_at IS NULL
+        GROUP BY invnumber, returnid
+    ");
+    while ($rr = $resReturn->fetch_assoc()) {
+        $returnByInv[$rr['invnumber']] = ($returnByInv[$rr['invnumber']] ?? 0) + (float)$rr['total'];
+    }
+}
+
+$returnPctRows = [];
+$returnPctTotalInv = 0.0;
+$returnPctTotalReturned = 0.0;
+foreach ($invoiceRows as $_ir) {
+    $returnPctTotalInv += (float)$_ir['total'];
+    $_returned = $returnByInv[$_ir['inv_id']] ?? 0.0;
+    if ($_returned <= 0) { continue; }
+    $returnPctTotalReturned += $_returned;
+    $_pct = $_ir['total'] > 0 ? ($_returned / $_ir['total']) * 100 : 0.0;
+    $returnPctRows[] = [
+        'date'          => $_ir['date'],
+        'inv_number'    => $_ir['inv_number'],
+        'tp_name'       => $_ir['tp_name'],
+        'district'      => $_ir['tp_district'],
+        'firka'         => $tpFirkaById[$_ir['tp_pk']] ?? '',
+        'invoice_total' => (float)$_ir['total'],
+        'returned'      => $_returned,
+        'pct'           => $_pct,
+    ];
+}
+$returnPctOverall = $returnPctTotalInv > 0 ? ($returnPctTotalReturned / $returnPctTotalInv) * 100 : 0.0;
 
 // Per-district target total (sum of each TP's own target, once per TP) —
 // feeds the top stat cards when the Shop Invoices district filter narrows
@@ -521,8 +1029,8 @@ ksort($districtTpCounts);
                             <div class="col-12 col-md-6 col-xl-4">
                                 <div class="stat-card green">
                                     <div>
-                                        <h3 id="statInvoiceAmount">&#8377;<?php echo inr_format($invoicedAmount, 0); ?></h3>
-                                        <p>Your TPs' Invoice Amount</p>
+                                        <h3 id="statInvoiceAmount">&#8377;<?php echo inr_format($totalAchieveAmount, 0); ?></h3>
+                                        <p title="TP Invoice Amount + Get Order Amount">Your TPs' Invoice + Get Order Amount</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">receipt_long</i></div>
                                 </div>
@@ -536,7 +1044,411 @@ ksort($districtTpCounts);
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">trending_up</i></div>
                                 </div>
                             </div>
+                            <?php if (empty($myDms)): ?>
+                            <div class="col-12 col-md-6 col-xl-4">
+                                <div class="stat-card purple">
+                                    <div>
+                                        <h3><?php echo !empty($myOwnTargetCompletedDate) ? date('d M Y', strtotime($myOwnTargetCompletedDate)) : 'Not yet'; ?></h3>
+                                        <p title="Date your cumulative Napkin-only (no Diaper) sales first reached your Target Amount">Target Completed Date</p>
+                                    </div>
+                                    <div class="stat-icon-wrap"><i class="material-icons-outlined">event_available</i></div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
                         </div>
+
+                        <?php if (!empty($myOwnVisitDays)): ?>
+                        <?php
+                        $_vdTotalDays = count($myOwnVisitDays);
+                        $_vdVisitMetDays = count(array_filter($myOwnVisitDays, fn($d) => $d['visit_target_met']));
+                        $_vdGetOrderMetDays = count(array_filter($myOwnVisitDays, fn($d) => $d['get_order_target_met']));
+                        $_vdAvgVisits = $_vdTotalDays > 0 ? array_sum(array_column($myOwnVisitDays, 'total_visits')) / $_vdTotalDays : 0.0;
+                        $_vdAvgGetOrder = $_vdTotalDays > 0 ? array_sum(array_column($myOwnVisitDays, 'get_order_visits')) / $_vdTotalDays : 0.0;
+                        ?>
+                        <!-- Daily Visit Compliance (35 shop / 20 Get Order) — solo DM only -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="main-card">
+                                    <div class="main-card-header">
+                                        <div class="main-card-header-left">
+                                            <div class="header-icon-box"><i class="material-icons-outlined">fact_check</i></div>
+                                            <div>
+                                                <p class="header-title">Daily Visit Compliance</p>
+                                                <p class="header-sub">Target: 35 shop visits/day, 20 of them Get Order</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="padding:14px 20px;">
+                                        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+                                            <span style="background:<?php echo $_vdVisitMetDays >= $_vdTotalDays && $_vdTotalDays > 0 ? '#d1fae5' : '#fee2e2'; ?>;color:<?php echo $_vdVisitMetDays >= $_vdTotalDays && $_vdTotalDays > 0 ? '#065f46' : '#991b1b'; ?>;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;">35-Visit Days Met: <?php echo $_vdVisitMetDays; ?>/<?php echo $_vdTotalDays; ?> (avg <?php echo number_format($_vdAvgVisits, 1); ?>/day)</span>
+                                            <span style="background:<?php echo $_vdGetOrderMetDays >= $_vdTotalDays && $_vdTotalDays > 0 ? '#d1fae5' : '#fee2e2'; ?>;color:<?php echo $_vdGetOrderMetDays >= $_vdTotalDays && $_vdTotalDays > 0 ? '#065f46' : '#991b1b'; ?>;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;">20-Get Order Days Met: <?php echo $_vdGetOrderMetDays; ?>/<?php echo $_vdTotalDays; ?> (avg <?php echo number_format($_vdAvgGetOrder, 1); ?>/day)</span>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="var t=document.getElementById('visitComplianceDetail'); var open=t.style.display!=='none'; t.style.display=open?'none':'block'; this.textContent=open?'View Day-wise Details':'Hide Day-wise Details';">View Day-wise Details</button>
+                                        </div>
+                                        <div id="visitComplianceDetail" style="display:none;">
+                                        <div style="overflow-x:auto;">
+                                        <table class="table table-sm table-hover" style="min-width:640px;">
+                                            <thead>
+                                                <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                    <th>Date</th>
+                                                    <th class="text-end">Total Visits</th>
+                                                    <th class="text-end">New</th>
+                                                    <th class="text-end">Existing</th>
+                                                    <th class="text-end">Get Order Visits</th>
+                                                    <th class="text-end">Napkin Shops</th>
+                                                    <th class="text-end">Diaper Shops</th>
+                                                    <th class="text-center">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="visitComplianceTbody">
+                                                <?php foreach ($myOwnVisitDays as $_vd): ?>
+                                                <tr>
+                                                    <td><?php echo date('d M Y', strtotime($_vd['date'])); ?></td>
+                                                    <td class="text-end"><?php echo (int)$_vd['total_visits']; ?> / 35</td>
+                                                    <td class="text-end"><?php echo (int)$_vd['new_visits']; ?></td>
+                                                    <td class="text-end"><?php echo (int)$_vd['existing_visits']; ?></td>
+                                                    <td class="text-end"><?php echo (int)$_vd['get_order_visits']; ?> / 20</td>
+                                                    <td class="text-end"><?php echo (int)$_vd['napkin_shops']; ?></td>
+                                                    <td class="text-end"><?php echo (int)$_vd['diaper_shops']; ?></td>
+                                                    <td class="text-center">
+                                                        <?php if ($_vd['visit_target_met'] && $_vd['get_order_target_met']): ?>
+                                                        <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">Met</span>
+                                                        <?php else: ?>
+                                                        <span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">Not Met</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                            <tfoot>
+                                                <?php
+                                                $_vdTot = ['total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0];
+                                                foreach ($myOwnVisitDays as $_vd) {
+                                                    $_vdTot['total_visits']     += $_vd['total_visits'];
+                                                    $_vdTot['new_visits']       += $_vd['new_visits'];
+                                                    $_vdTot['existing_visits']  += $_vd['existing_visits'];
+                                                    $_vdTot['get_order_visits'] += $_vd['get_order_visits'];
+                                                    $_vdTot['napkin_shops']     += $_vd['napkin_shops'];
+                                                    $_vdTot['diaper_shops']     += $_vd['diaper_shops'];
+                                                }
+                                                ?>
+                                                <tr style="font-weight:600;border-top:2px solid #e5e7eb;">
+                                                    <td>Total</td>
+                                                    <td class="text-end"><?php echo (int)$_vdTot['total_visits']; ?></td>
+                                                    <td class="text-end"><?php echo (int)$_vdTot['new_visits']; ?></td>
+                                                    <td class="text-end"><?php echo (int)$_vdTot['existing_visits']; ?></td>
+                                                    <td class="text-end"><?php echo (int)$_vdTot['get_order_visits']; ?></td>
+                                                    <td class="text-end"><?php echo (int)$_vdTot['napkin_shops']; ?></td>
+                                                    <td class="text-end"><?php echo (int)$_vdTot['diaper_shops']; ?></td>
+                                                    <td></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                        </div>
+                                        <div id="visitCompliancePager" class="mis-pagination" style="margin-top:10px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <script>
+                        if (typeof femi9PaginateVisitTable !== 'function') {
+                            // 7-rows-per-page client-side pagination for a Daily Visit Compliance
+                            // table (31 day rows otherwise all render at once) — rows are already
+                            // in the page's HTML (no AJAX), this just hides all but the current
+                            // page's <tr>s and draws Prev/page-number/Next controls. Defined here
+                            // too (guarded) since a solo DM never reaches the "My District
+                            // Managers" block below where this same function is otherwise defined.
+                            function femi9PaginateVisitTable(tbodyId, pagerId, pageSize) {
+                                var tbody = document.getElementById(tbodyId);
+                                var pager = document.getElementById(pagerId);
+                                if (!tbody || !pager) return;
+                                var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+                                if (!rows.length) return;
+                                var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+                                var currentPage = 1;
+
+                                function render() {
+                                    var start = (currentPage - 1) * pageSize;
+                                    rows.forEach(function (row, i) {
+                                        row.style.display = (i >= start && i < start + pageSize) ? '' : 'none';
+                                    });
+                                    var html = '<span class="mis-pg-info">' + (start + 1) + '–' + Math.min(start + pageSize, rows.length) + ' of ' + rows.length + '</span>';
+                                    html += '<button type="button" data-pg="prev"' + (currentPage === 1 ? ' disabled' : '') + '>Prev</button>';
+                                    var winSize = 5;
+                                    var winStart = Math.max(1, currentPage - Math.floor(winSize / 2));
+                                    var winEnd = Math.min(totalPages, winStart + winSize - 1);
+                                    winStart = Math.max(1, winEnd - winSize + 1);
+                                    for (var p = winStart; p <= winEnd; p++) {
+                                        html += '<button type="button" data-pg="' + p + '" class="' + (p === currentPage ? 'active' : '') + '">' + p + '</button>';
+                                    }
+                                    html += '<button type="button" data-pg="next"' + (currentPage === totalPages ? ' disabled' : '') + '>Next</button>';
+                                    pager.innerHTML = html;
+                                }
+                                pager.addEventListener('click', function (e) {
+                                    var btn = e.target.closest('button[data-pg]');
+                                    if (!btn) return;
+                                    var pg = btn.getAttribute('data-pg');
+                                    if (pg === 'prev') currentPage = Math.max(1, currentPage - 1);
+                                    else if (pg === 'next') currentPage = Math.min(totalPages, currentPage + 1);
+                                    else currentPage = parseInt(pg, 10);
+                                    render();
+                                });
+                                render();
+                            }
+                        }
+                        femi9PaginateVisitTable('visitComplianceTbody', 'visitCompliancePager', 7);
+                        </script>
+                        <?php endif; ?>
+
+                        <?php if (!empty($newShopByDistrict)): ?>
+                        <!-- New Shop Onboarding (Target: 50/district) -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="main-card">
+                                    <div class="main-card-header">
+                                        <div class="main-card-header-left">
+                                            <div class="header-icon-box"><i class="material-icons-outlined">storefront</i></div>
+                                            <div>
+                                                <p class="header-title">New Shop Onboarding</p>
+                                                <p class="header-sub">Target: 50 new shops per district, this period</p>
+                                            </div>
+                                        </div>
+                                        <?php if (!empty($shopCategorySplit)): ?>
+                                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#shopCategorySplitModal">Shop Category Split</button>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#shopCategoryWiseModal">Shop Category Wise</button>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div style="padding:14px 20px;">
+                                        <div style="overflow-x:auto;">
+                                        <table class="table table-sm table-hover" style="min-width:400px;">
+                                            <thead>
+                                                <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                    <th>District</th>
+                                                    <th class="text-end">New Shops</th>
+                                                    <th class="text-center">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($newShopByDistrict as $_ns): ?>
+                                                <tr>
+                                                    <td><?php echo htmlspecialchars($_ns['district']); ?></td>
+                                                    <td class="text-end"><?php echo (int)$_ns['count']; ?> / 50</td>
+                                                    <td class="text-center">
+                                                        <?php if ($_ns['met']): ?>
+                                                        <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">Met</span>
+                                                        <?php else: ?>
+                                                        <span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">Not Met</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($shopCategorySplit)): ?>
+                        <!-- Shop Category Split — pills summary, in a modal off New Shop Onboarding's header -->
+                        <div class="modal fade" id="shopCategorySplitModal" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-scrollable modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Shop Category Split</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p style="margin:0 0 10px;font-size:12.5px;color:#6b7280;">Shops onboarded this period, by category</p>
+                                        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                                            <?php foreach ($shopCategorySplit as $_sc): ?>
+                                            <span style="background:#eef2ff;color:#3730a3;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;"><?php echo htmlspecialchars($_sc['category']); ?>: <?php echo (int)$_sc['count']; ?></span>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Shop Category Wise — pick a category + date range, list the actual shops -->
+                        <div class="modal fade" id="shopCategoryWiseModal" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-scrollable modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Shop Category Wise</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px;">
+                                            <div>
+                                                <label class="form-label" style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Category</label>
+                                                <select id="scwCategory" class="form-control form-control-sm" style="width:220px;">
+                                                    <?php foreach ($shopCategorySplit as $_sc): ?>
+                                                    <option value="<?php echo htmlspecialchars($_sc['category']); ?>"><?php echo htmlspecialchars($_sc['category']); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="form-label" style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">From</label>
+                                                <input type="date" id="scwFrom" class="form-control form-control-sm" value="<?php echo htmlspecialchars($from); ?>">
+                                            </div>
+                                            <div>
+                                                <label class="form-label" style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">To</label>
+                                                <input type="date" id="scwTo" class="form-control form-control-sm" value="<?php echo htmlspecialchars($to); ?>">
+                                            </div>
+                                            <div>
+                                                <button type="button" id="scwFilterBtn" class="btn btn-sm btn-primary">Filter</button>
+                                            </div>
+                                        </div>
+                                        <div style="overflow-x:auto;">
+                                        <table class="table table-sm table-hover">
+                                            <thead>
+                                                <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                    <th>Shop Name</th>
+                                                    <th>Mobile</th>
+                                                    <th>District</th>
+                                                    <th>Taluk</th>
+                                                    <th>Onboarded</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="scwTbody">
+                                                <tr><td colspan="5" class="text-center text-muted">Pick a category and click Filter.</td></tr>
+                                            </tbody>
+                                        </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <script>
+                        (function () {
+                            var scwModal = document.getElementById('shopCategoryWiseModal');
+                            if (!scwModal) return;
+                            var scwTbody = document.getElementById('scwTbody');
+                            var scwCategory = document.getElementById('scwCategory');
+                            var scwFrom = document.getElementById('scwFrom');
+                            var scwTo = document.getElementById('scwTo');
+                            var scwEsc = document.createElement('div');
+                            function scwH(s) { scwEsc.textContent = (s == null ? '' : s); return scwEsc.innerHTML; }
+                            function scwLoad() {
+                                scwTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Loading…</td></tr>';
+                                var qs = 'category=' + encodeURIComponent(scwCategory.value) + '&from=' + encodeURIComponent(scwFrom.value) + '&to=' + encodeURIComponent(scwTo.value);
+                                fetch('get-shop-category-list.php?' + qs)
+                                    .then(function (r) { return r.json(); })
+                                    .then(function (rows) {
+                                        if (!rows || !rows.length) {
+                                            scwTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No shops in this category/date range.</td></tr>';
+                                            return;
+                                        }
+                                        var html = '';
+                                        rows.forEach(function (r) {
+                                            html += '<tr>' +
+                                                '<td>' + scwH(r.name) + '</td>' +
+                                                '<td>' + scwH(r.mobile) + '</td>' +
+                                                '<td>' + scwH(r.district) + '</td>' +
+                                                '<td>' + scwH(r.taluk) + '</td>' +
+                                                '<td>' + scwH(r.date) + '</td>' +
+                                                '</tr>';
+                                        });
+                                        scwTbody.innerHTML = html;
+                                    })
+                                    .catch(function () {
+                                        scwTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Could not load — try again.</td></tr>';
+                                    });
+                            }
+                            document.getElementById('scwFilterBtn').addEventListener('click', scwLoad);
+                            scwModal.addEventListener('shown.bs.modal', scwLoad);
+                        })();
+                        </script>
+                        <?php endif; ?>
+
+                        <?php if (!empty($napkinDiaperSplit)): ?>
+                        <!-- Napkin vs Diaper — Orders & Shops -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="main-card">
+                                    <div class="main-card-header">
+                                        <div class="main-card-header-left">
+                                            <div class="header-icon-box"><i class="material-icons-outlined">inventory_2</i></div>
+                                            <div>
+                                                <p class="header-title">Napkin vs Diaper — Orders &amp; Shops</p>
+                                                <p class="header-sub">Get Order + No Order visits, this period</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="padding:14px 20px;">
+                                        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                                            <span style="background:#dcfce7;color:#15803d;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;">Napkin Orders: <?php echo (int)$napkinDiaperSplit['napkin_orders']; ?></span>
+                                            <span style="background:#dcfce7;color:#15803d;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;">Napkin Shops: <?php echo (int)$napkinDiaperSplit['napkin_shops']; ?></span>
+                                            <span style="background:#fef3c7;color:#92400e;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;">Diaper Orders: <?php echo (int)$napkinDiaperSplit['diaper_orders']; ?></span>
+                                            <span style="background:#fef3c7;color:#92400e;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;">Diaper Shops: <?php echo (int)$napkinDiaperSplit['diaper_shops']; ?></span>
+                                            <?php if ($napkinDiaperSplit['mixed_orders'] > 0): ?>
+                                            <span style="background:#e5e7eb;color:#374151;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;" title="One Get Order with both Napkin and Diaper products in it">Mixed Orders: <?php echo (int)$napkinDiaperSplit['mixed_orders']; ?></span>
+                                            <?php endif; ?>
+                                            <?php if ($napkinDiaperSplit['unspecified_orders'] > 0): ?>
+                                            <span style="background:#e5e7eb;color:#374151;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;" title="No Order visits logged before the Napkin/Diaper choice was added">Unspecified: <?php echo (int)$napkinDiaperSplit['unspecified_orders']; ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($returnPctRows)): ?>
+                        <!-- Return % — invoices with a return in this period -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="main-card">
+                                    <div class="main-card-header">
+                                        <div class="main-card-header-left">
+                                            <div class="header-icon-box"><i class="material-icons-outlined">assignment_return</i></div>
+                                            <div>
+                                                <p class="header-title">Return %</p>
+                                                <p class="header-sub">Overall: &#8377;<?php echo inr_format($returnPctTotalReturned, 0); ?> returned of &#8377;<?php echo inr_format($returnPctTotalInv, 0); ?> invoiced (<?php echo number_format($returnPctOverall, 1); ?>%)</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="padding:14px 20px;">
+                                        <div style="overflow-x:auto;">
+                                        <table class="table table-sm table-hover" style="min-width:760px;">
+                                            <thead>
+                                                <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                    <th>Invoice Date</th>
+                                                    <th>Invoice #</th>
+                                                    <th>TP Name</th>
+                                                    <th>District</th>
+                                                    <th>Firka</th>
+                                                    <th class="text-end">Invoice Amount</th>
+                                                    <th class="text-end">Returned Amount</th>
+                                                    <th class="text-end">Return %</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($returnPctRows as $_rp): ?>
+                                                <tr>
+                                                    <td><?php echo date('d M Y', strtotime($_rp['date'])); ?></td>
+                                                    <td><?php echo htmlspecialchars($_rp['inv_number']); ?></td>
+                                                    <td><?php echo htmlspecialchars($_rp['tp_name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($_rp['district']); ?></td>
+                                                    <td><?php echo htmlspecialchars($_rp['firka']); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_rp['invoice_total'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_rp['returned'], 0); ?></td>
+                                                    <td class="text-end" style="font-weight:600;color:<?php echo $_rp['pct'] >= 25 ? '#dc2626' : '#b45309'; ?>;"><?php echo number_format($_rp['pct'], 1); ?>%</td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
 
                         <?php if (!empty($myDms)): ?>
                         <!-- District Managers under this person -->
@@ -567,8 +1479,73 @@ ksort($districtTpCounts);
                                             <p style="margin:0 0 10px;font-size:12.5px;color:#6b7280;">District: <b style="color:#374151;"><?php echo htmlspecialchars($_dm['district']); ?></b></p>
                                             <div style="display:flex;flex-wrap:wrap;gap:8px;">
                                                 <span class="chain-pill" style="background:#eee;color:#333;padding:5px 12px;border-radius:14px;font-size:12.5px;">Target: &#8377;<?php echo inr_format($_dm['target'], 0); ?></span>
-                                                <span class="chain-pill" style="background:#eee;color:#333;padding:5px 12px;border-radius:14px;font-size:12.5px;">Achieved: &#8377;<?php echo inr_format($_dm['achieved'], 0); ?></span>
+                                                <span class="chain-pill" style="background:#eee;color:#333;padding:5px 12px;border-radius:14px;font-size:12.5px;" title="Get Order-sourced, Napkin-only sales converted by this DM">Achieved: &#8377;<?php echo inr_format($_dm['achieved'], 0); ?></span>
+                                                <span class="chain-pill" style="background:#d1fae5;color:#065f46;padding:5px 12px;border-radius:14px;font-size:12.5px;font-weight:700;" title="Every shop invoice raised by this DM's TPs in the period — same as this DM's own dashboard card">TP Invoice Amount: &#8377;<?php echo inr_format($_dm['tp_invoice_amount'], 0); ?></span>
                                                 <span class="chain-pill" style="background:#eee;color:#333;padding:5px 12px;border-radius:14px;font-size:12.5px;">Balance: &#8377;<?php echo inr_format($_dm['balance'], 0); ?></span>
+                                            </div>
+                                            <div style="margin-top:10px;">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="var t=document.getElementById('dmVisitDetail<?php echo $_i; ?>'); var open=t.style.display!=='none'; t.style.display=open?'none':'block'; this.textContent=open?'View Daily Visit Compliance':'Hide Daily Visit Compliance';">View Daily Visit Compliance</button>
+                                                <div id="dmVisitDetail<?php echo $_i; ?>" style="display:none;margin-top:10px;">
+                                                    <p style="margin:0 0 8px;font-size:12px;color:#6b7280;">Target: 35 shop visits/day, 20 of them Get Order</p>
+                                                    <div style="overflow-x:auto;">
+                                                    <table class="table table-sm table-hover" style="min-width:640px;">
+                                                        <thead>
+                                                            <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                                <th>Date</th>
+                                                                <th class="text-end">Total Visits</th>
+                                                                <th class="text-end">New</th>
+                                                                <th class="text-end">Existing</th>
+                                                                <th class="text-end">Get Order Visits</th>
+                                                                <th class="text-end">Napkin Shops</th>
+                                                                <th class="text-end">Diaper Shops</th>
+                                                                <th class="text-center">Status</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="dmVisitTbody<?php echo $_i; ?>">
+                                                            <?php
+                                                            $_dmVdTot = ['total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0];
+                                                            foreach (($_dm['visit_days'] ?? []) as $_vd):
+                                                                $_dmVdTot['total_visits']     += $_vd['total_visits'];
+                                                                $_dmVdTot['new_visits']       += $_vd['new_visits'];
+                                                                $_dmVdTot['existing_visits']  += $_vd['existing_visits'];
+                                                                $_dmVdTot['get_order_visits'] += $_vd['get_order_visits'];
+                                                                $_dmVdTot['napkin_shops']     += $_vd['napkin_shops'];
+                                                                $_dmVdTot['diaper_shops']     += $_vd['diaper_shops'];
+                                                            ?>
+                                                            <tr>
+                                                                <td><?php echo date('d M Y', strtotime($_vd['date'])); ?></td>
+                                                                <td class="text-end"><?php echo (int)$_vd['total_visits']; ?> / 35</td>
+                                                                <td class="text-end"><?php echo (int)$_vd['new_visits']; ?></td>
+                                                                <td class="text-end"><?php echo (int)$_vd['existing_visits']; ?></td>
+                                                                <td class="text-end"><?php echo (int)$_vd['get_order_visits']; ?> / 20</td>
+                                                                <td class="text-end"><?php echo (int)$_vd['napkin_shops']; ?></td>
+                                                                <td class="text-end"><?php echo (int)$_vd['diaper_shops']; ?></td>
+                                                                <td class="text-center">
+                                                                    <?php if ($_vd['visit_target_met'] && $_vd['get_order_target_met']): ?>
+                                                                    <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">Met</span>
+                                                                    <?php else: ?>
+                                                                    <span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">Not Met</span>
+                                                                    <?php endif; ?>
+                                                                </td>
+                                                            </tr>
+                                                            <?php endforeach; ?>
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr style="font-weight:600;border-top:2px solid #e5e7eb;">
+                                                                <td>Total</td>
+                                                                <td class="text-end"><?php echo (int)$_dmVdTot['total_visits']; ?></td>
+                                                                <td class="text-end"><?php echo (int)$_dmVdTot['new_visits']; ?></td>
+                                                                <td class="text-end"><?php echo (int)$_dmVdTot['existing_visits']; ?></td>
+                                                                <td class="text-end"><?php echo (int)$_dmVdTot['get_order_visits']; ?></td>
+                                                                <td class="text-end"><?php echo (int)$_dmVdTot['napkin_shops']; ?></td>
+                                                                <td class="text-end"><?php echo (int)$_dmVdTot['diaper_shops']; ?></td>
+                                                                <td></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                    </div>
+                                                    <div id="dmVisitPager<?php echo $_i; ?>" class="mis-pagination" style="margin-top:10px;"></div>
+                                                </div>
                                             </div>
                                         </div>
                                         <?php endforeach; ?>
@@ -585,7 +1562,360 @@ ksort($districtTpCounts);
                                 });
                             });
                         });
+
+                        // 7-rows-per-page client-side pagination for a Daily Visit Compliance
+                        // table (31 day rows otherwise all render at once) — rows are already
+                        // in the page's HTML (no AJAX), this just hides all but the current
+                        // page's <tr>s and draws Prev/page-number/Next controls.
+                        function femi9PaginateVisitTable(tbodyId, pagerId, pageSize) {
+                            var tbody = document.getElementById(tbodyId);
+                            var pager = document.getElementById(pagerId);
+                            if (!tbody || !pager) return;
+                            var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+                            if (!rows.length) return;
+                            var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+                            var currentPage = 1;
+
+                            function render() {
+                                var start = (currentPage - 1) * pageSize;
+                                rows.forEach(function (row, i) {
+                                    row.style.display = (i >= start && i < start + pageSize) ? '' : 'none';
+                                });
+                                var html = '<span class="mis-pg-info">' + (start + 1) + '–' + Math.min(start + pageSize, rows.length) + ' of ' + rows.length + '</span>';
+                                html += '<button type="button" data-pg="prev"' + (currentPage === 1 ? ' disabled' : '') + '>Prev</button>';
+                                var winSize = 5;
+                                var winStart = Math.max(1, currentPage - Math.floor(winSize / 2));
+                                var winEnd = Math.min(totalPages, winStart + winSize - 1);
+                                winStart = Math.max(1, winEnd - winSize + 1);
+                                for (var p = winStart; p <= winEnd; p++) {
+                                    html += '<button type="button" data-pg="' + p + '" class="' + (p === currentPage ? 'active' : '') + '">' + p + '</button>';
+                                }
+                                html += '<button type="button" data-pg="next"' + (currentPage === totalPages ? ' disabled' : '') + '>Next</button>';
+                                pager.innerHTML = html;
+                            }
+                            pager.addEventListener('click', function (e) {
+                                var btn = e.target.closest('button[data-pg]');
+                                if (!btn) return;
+                                var pg = btn.getAttribute('data-pg');
+                                if (pg === 'prev') currentPage = Math.max(1, currentPage - 1);
+                                else if (pg === 'next') currentPage = Math.min(totalPages, currentPage + 1);
+                                else currentPage = parseInt(pg, 10);
+                                render();
+                            });
+                            render();
+                        }
+                        <?php foreach ($myDms as $_i => $_dm): ?>
+                        femi9PaginateVisitTable('dmVisitTbody<?php echo $_i; ?>', 'dmVisitPager<?php echo $_i; ?>', 7);
+                        <?php endforeach; ?>
                         </script>
+                        <?php endif; ?>
+
+                        <?php if (!empty($myDms)): ?>
+                        <!-- Target vs Achieved — DM level, with a tab for No-DM districts -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="main-card">
+                                    <div class="main-card-header">
+                                        <div class="main-card-header-left">
+                                            <div class="header-icon-box"><i class="material-icons-outlined">insights</i></div>
+                                            <div>
+                                                <p class="header-title">Target vs Achieved</p>
+                                                <p class="header-sub">District Manager level</p>
+                                            </div>
+                                        </div>
+                                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                            <?php if (!empty($noDmDistrictRows)): ?>
+                                            <button type="button" class="dash-tab-btn active" data-tab-target="dmTargetTab" style="padding:7px 14px;border-radius:8px;border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:600;cursor:pointer;">Target vs Achieved</button>
+                                            <button type="button" class="dash-tab-btn" data-tab-target="noDmTab" style="padding:7px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer;">TP Invoice Amount — No DM Assigned</button>
+                                            <?php endif; ?>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#teamWeeklyModal">ASM Weekly Target Amount</button>
+                                        </div>
+                                    </div>
+                                    <div id="dmTargetTab" style="padding:14px 20px;">
+                                        <div style="overflow-x:auto;">
+                                        <table class="table table-sm table-hover" style="min-width:760px;">
+                                            <thead>
+                                                <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                    <th>DM</th>
+                                                    <th class="text-end">Target Amount</th>
+                                                    <th class="text-end" title="This DM's own Get Order-converted, Napkin-only sales">Achieved</th>
+                                                    <th class="text-end" title="Every shop invoice this DM's TPs raised in the period">TP Invoice Amount</th>
+                                                    <th class="text-end" title="Achieved + TP Invoice Amount">Achieve Total</th>
+                                                    <th class="text-end" title="Target Amount − Achieve Total">Balance</th>
+                                                    <th class="text-center" title="Date this DM's cumulative Napkin-only (no Diaper) sales first reached their Target Amount">Target Completed Date</th>
+                                                    <th class="text-center">Weekly</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php
+                                                $_dmTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice_amount' => 0, 'achieve_total' => 0, 'total_balance' => 0];
+                                                foreach ($myDms as $_dmIdx => $_dmRow):
+                                                    $_dmTotal['target'] += $_dmRow['target'];
+                                                    $_dmTotal['achieved'] += $_dmRow['achieved'];
+                                                    $_dmTotal['tp_invoice_amount'] += $_dmRow['tp_invoice_amount'];
+                                                    $_dmTotal['achieve_total'] += $_dmRow['achieve_total'];
+                                                    $_dmTotal['total_balance'] += $_dmRow['total_balance'];
+                                                ?>
+                                                <tr>
+                                                    <td><?php echo htmlspecialchars($_dmRow['name']); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmRow['target'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmRow['achieved'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmRow['tp_invoice_amount'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmRow['achieve_total'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmRow['total_balance'], 0); ?></td>
+                                                    <td class="text-center">
+                                                        <?php if (!empty($_dmRow['target_completed_date'])): ?>
+                                                        <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;"><?php echo date('d M Y', strtotime($_dmRow['target_completed_date'])); ?></span>
+                                                        <?php else: ?>
+                                                        <span style="color:#9ca3af;font-size:12.5px;">Not yet</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#dmWeeklyModal<?php echo $_dmIdx; ?>">Weekly</button>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                            <tfoot>
+                                                <tr style="font-weight:600;border-top:2px solid #e5e7eb;">
+                                                    <td>Total</td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['target'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['achieved'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['tp_invoice_amount'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['achieve_total'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['total_balance'], 0); ?></td>
+                                                    <td></td>
+                                                    <td></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                        </div>
+                                    </div>
+
+                                    <div class="modal fade" id="teamWeeklyModal" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">ASM Weekly Target Amount — Whole Team</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div style="overflow-x:auto;">
+                                                    <table class="table table-sm">
+                                                        <thead>
+                                                            <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                                <th>Week</th>
+                                                                <th class="text-end">Target Amount</th>
+                                                                <th class="text-end" title="Sum of every DM's own Get Order-converted, Napkin-only sales">Achieved</th>
+                                                                <th class="text-end" title="Sum of every shop invoice this team's TPs raised">TP Invoice Amount</th>
+                                                                <th class="text-end" title="Achieved + TP Invoice Amount">Total</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <?php
+                                                            $_teamWkTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice' => 0, 'total' => 0];
+                                                            foreach ($teamWeeklyBreakdown as $_wk):
+                                                                $_teamWkTotal['target']     += $_wk['target'];
+                                                                $_teamWkTotal['achieved']   += $_wk['achieved'];
+                                                                $_teamWkTotal['tp_invoice'] += $_wk['tp_invoice'];
+                                                                $_teamWkTotal['total']      += $_wk['total'];
+                                                            ?>
+                                                            <tr>
+                                                                <td><?php echo date('d M', strtotime($_wk['start'])); ?> &ndash; <?php echo date('d M', strtotime($_wk['end'])); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_wk['target'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_wk['achieved'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_wk['tp_invoice'], 0); ?></td>
+                                                                <td class="text-end" style="font-weight:600;">&#8377;<?php echo inr_format($_wk['total'], 0); ?></td>
+                                                            </tr>
+                                                            <?php endforeach; ?>
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr style="font-weight:700;border-top:2px solid #e5e7eb;">
+                                                                <td>Total</td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_teamWkTotal['target'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_teamWkTotal['achieved'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_teamWkTotal['tp_invoice'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_teamWkTotal['total'], 0); ?></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <?php foreach ($myDms as $_dmIdx => $_dmRow): ?>
+                                    <div class="modal fade" id="dmWeeklyModal<?php echo $_dmIdx; ?>" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title"><?php echo htmlspecialchars($_dmRow['name']); ?> — Weekly Target</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div style="overflow-x:auto;">
+                                                    <table class="table table-sm">
+                                                        <thead>
+                                                            <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                                <th>Week</th>
+                                                                <th class="text-end">Target Amount</th>
+                                                                <th class="text-end" title="This DM's own Get Order-converted, Napkin-only sales">Achieved</th>
+                                                                <th class="text-end" title="Every shop invoice this DM's TPs raised">TP Invoice Amount</th>
+                                                                <th class="text-end" title="Achieved + TP Invoice Amount">Total</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <?php
+                                                            $_dmWkTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice' => 0, 'total' => 0];
+                                                            foreach (($_dmRow['weeks'] ?? []) as $_wk):
+                                                                $_dmWkTotal['target']     += $_wk['target'];
+                                                                $_dmWkTotal['achieved']   += $_wk['achieved'];
+                                                                $_dmWkTotal['tp_invoice'] += $_wk['tp_invoice'];
+                                                                $_dmWkTotal['total']      += $_wk['total'];
+                                                            ?>
+                                                            <tr>
+                                                                <td><?php echo date('d M', strtotime($_wk['start'])); ?> &ndash; <?php echo date('d M', strtotime($_wk['end'])); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_wk['target'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_wk['achieved'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_wk['tp_invoice'], 0); ?></td>
+                                                                <td class="text-end" style="font-weight:600;">&#8377;<?php echo inr_format($_wk['total'], 0); ?></td>
+                                                            </tr>
+                                                            <?php endforeach; ?>
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr style="font-weight:700;border-top:2px solid #e5e7eb;">
+                                                                <td>Total</td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_dmWkTotal['target'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_dmWkTotal['achieved'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_dmWkTotal['tp_invoice'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_dmWkTotal['total'], 0); ?></td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                    <?php if (!empty($noDmDistrictRows)): ?>
+                                    <div id="noDmTab" style="padding:14px 20px;display:none;">
+                                        <p style="margin:0 0 10px;font-size:12.5px;color:#6b7280;">Your own assigned district(s) that none of your DMs currently cover</p>
+                                        <div style="overflow-x:auto;">
+                                        <table class="table table-sm table-hover" style="min-width:400px;">
+                                            <thead>
+                                                <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                    <th>District</th>
+                                                    <th class="text-end">TP Invoice Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php $_noDmTotal = 0; foreach ($noDmDistrictRows as $_row): $_noDmTotal += $_row['tp_invoice']; ?>
+                                                <tr>
+                                                    <td><?php echo htmlspecialchars($_row['district']); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_row['tp_invoice'], 0); ?></td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                            <tfoot>
+                                                <tr style="font-weight:600;border-top:2px solid #e5e7eb;">
+                                                    <td>Total</td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_noDmTotal, 0); ?></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                        </div>
+                                    </div>
+                                    <script>
+                                    document.querySelectorAll('.dash-tab-btn').forEach(function(btn) {
+                                        btn.addEventListener('click', function() {
+                                            document.querySelectorAll('.dash-tab-btn').forEach(function(b) {
+                                                b.classList.remove('active');
+                                                b.style.background = '#fff';
+                                                b.style.color = '#374151';
+                                                b.style.borderColor = '#e5e7eb';
+                                            });
+                                            this.classList.add('active');
+                                            this.style.background = '#eef2ff';
+                                            this.style.color = '#3730a3';
+                                            this.style.borderColor = '#c7d2fe';
+                                            document.getElementById('dmTargetTab').style.display = (this.getAttribute('data-tab-target') === 'dmTargetTab') ? 'block' : 'none';
+                                            document.getElementById('noDmTab').style.display = (this.getAttribute('data-tab-target') === 'noDmTab') ? 'block' : 'none';
+                                        });
+                                    });
+                                    </script>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($zoneRollup)): ?>
+                        <!-- Zone-wise Target Rollup — ASM/SM view -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="main-card">
+                                    <div class="main-card-header">
+                                        <div class="main-card-header-left">
+                                            <div class="header-icon-box"><i class="material-icons-outlined">map</i></div>
+                                            <div>
+                                                <p class="header-title">Zone-wise Target</p>
+                                                <p class="header-sub">Every zone covering this team's districts — target covers the whole zone, even districts with no DM assigned</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="padding:14px 20px;">
+                                        <?php foreach ($zoneRollup as $_zoneIdx => $_zone): ?>
+                                        <div style="margin-bottom:18px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+                                            <div style="padding:10px 14px;background:#f9fafb;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                                                <strong><?php echo htmlspecialchars($_zone['name']); ?></strong>
+                                                <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                                                    Target: &#8377;<?php echo inr_format($_zone['target'], 0); ?>
+                                                    &nbsp;|&nbsp; Achieve Total: &#8377;<?php echo inr_format($_zone['achieve_total'], 0); ?>
+                                                    &nbsp;|&nbsp; <?php echo $_zone['overage_amt'] >= 0 ? 'Over' : 'Under'; ?> Target:
+                                                    <span style="font-weight:600;color:<?php echo $_zone['overage_amt'] >= 0 ? '#16a34a' : '#dc2626'; ?>;">
+                                                        &#8377;<?php echo inr_format(abs($_zone['overage_amt']), 0); ?>
+                                                        (<?php echo number_format($_zone['overage_pct'], 1); ?>%)
+                                                    </span>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#zoneWeeklyModal<?php echo $_zoneIdx; ?>">Weekly</button>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="modal fade" id="zoneWeeklyModal<?php echo $_zoneIdx; ?>" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-scrollable">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title"><?php echo htmlspecialchars($_zone['name']); ?> — Weekly Target</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <table class="table table-sm">
+                                                            <thead>
+                                                                <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                                    <th>Week</th>
+                                                                    <th class="text-end">Target Amount</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <?php foreach ($_zone['weeks'] as $_wk): ?>
+                                                                <tr>
+                                                                    <td><?php echo date('d M', strtotime($_wk['start'])); ?> &ndash; <?php echo date('d M', strtotime($_wk['end'])); ?></td>
+                                                                    <td class="text-end">&#8377;<?php echo inr_format($_wk['target'], 0); ?></td>
+                                                                </tr>
+                                                                <?php endforeach; ?>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <?php endif; ?>
 
                         <!-- Shop Invoices (full width) -->
@@ -605,7 +1935,7 @@ ksort($districtTpCounts);
                                             <span style="color:#9ca3af;">to</span>
                                             <input type="date" name="to" value="<?php echo htmlspecialchars($to); ?>">
                                             <button type="submit" class="btn btn-sm btn-primary">Filter</button>
-                                            <a class="btn btn-sm btn-success" href="export-shop-invoices-xlsx.php?from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?>">
+                                            <a class="btn btn-sm btn-success" id="shopInvExportLink" href="export-shop-invoices-xlsx.php?from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?>">
                                                 <i class="material-icons-outlined" style="font-size:15px;vertical-align:text-bottom;">file_download</i> Export
                                             </a>
                                         </form>
@@ -669,6 +1999,8 @@ ksort($districtTpCounts);
 
                             var districtTargetTotals = <?php echo json_encode($districtTargetTotals); ?>;
                             var overallTarget = <?php echo (float)$districtStats['district_total_target']; ?>;
+                            var districtAchievedTotals = <?php echo json_encode($districtAchievedTotals); ?>;
+                            var overallAchieved = <?php echo (float)$ownGetOrderAchieved; ?>;
 
                             var escDiv = document.createElement('div');
                             function esc(s) { escDiv.textContent = (s == null ? '' : s); return escDiv.innerHTML; }
@@ -690,9 +2022,11 @@ ksort($districtTpCounts);
                                 if (!targetEl || !invoiceEl || !balanceEl) return;
                                 var target = currentDistrict === 'all' ? overallTarget : (districtTargetTotals[currentDistrict] || 0);
                                 var invoiced = districtOnlyRows(currentDistrict).reduce(function (sum, r) { return sum + (r.total || 0); }, 0);
-                                var balance = Math.max(0, target - invoiced);
+                                var getOrderAmt = currentDistrict === 'all' ? overallAchieved : (districtAchievedTotals[currentDistrict] || 0);
+                                var totalAmt = invoiced + getOrderAmt;
+                                var balance = Math.max(0, target - totalAmt);
                                 targetEl.innerHTML = money(target);
-                                invoiceEl.innerHTML = money(invoiced);
+                                invoiceEl.innerHTML = money(totalAmt);
                                 balanceEl.innerHTML = money(balance);
                             }
 
@@ -764,14 +2098,31 @@ ksort($districtTpCounts);
                                 render();
                             });
 
+                            // Keeps the Export link's district in sync with the on-screen
+                            // dropdown — otherwise the export always totalled every
+                            // assigned district regardless of what's selected here,
+                            // mismatching the visible "Your TPs' Invoice Amount" card.
+                            var shopInvExportLink = document.getElementById('shopInvExportLink');
+                            var shopInvExportBaseHref = shopInvExportLink ? shopInvExportLink.getAttribute('href') : null;
+                            function updateShopInvExportHref() {
+                                if (!shopInvExportLink || !shopInvExportBaseHref) return;
+                                var href = shopInvExportBaseHref;
+                                if (currentDistrict && currentDistrict !== 'all') {
+                                    href += '&district=' + encodeURIComponent(currentDistrict);
+                                }
+                                shopInvExportLink.setAttribute('href', href);
+                            }
+
                             var shopInvDistrictFilter = document.getElementById('shopInvDistrictFilter');
                             if (shopInvDistrictFilter) {
                                 shopInvDistrictFilter.addEventListener('change', function () {
                                     currentDistrict = this.value;
                                     currentPage = 1;
+                                    updateShopInvExportHref();
                                     render();
                                 });
                             }
+                            updateShopInvExportHref();
 
                             render();
                         })();
@@ -1221,6 +2572,5 @@ ksort($districtTpCounts);
     <script src="../../assets/plugins/apexcharts/apexcharts.min.js"></script>
     <script src="../../assets/js/main.min.js"></script>
     <script src="../../assets/js/custom.js"></script>
-    <script src="../../assets/js/pages/dashboard.js"></script>
 </body>
 </html>

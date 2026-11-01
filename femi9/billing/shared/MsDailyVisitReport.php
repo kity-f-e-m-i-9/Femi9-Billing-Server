@@ -54,9 +54,17 @@ function getMsDailyVisitRows(mysqli $db_conn, string $from, string $to, array $o
     if ($districtId > 0) { $where[] = 's.district_node_id = ?'; $types .= 'i'; $params[] = $districtId; }
     $whereSql = implode(' AND ', $where);
 
+    // order_category is self-migrating (added by order_action.php when a No
+    // Order is first submitted) — guard so this shared query never runs
+    // before that column exists on a fresh deploy.
+    $_catCol = $db_conn->query("SHOW COLUMNS FROM ms_orders LIKE 'order_category'");
+    if ($_catCol && $_catCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE ms_orders ADD COLUMN order_category ENUM('napkin','diaper') NULL DEFAULT NULL AFTER new_order");
+    }
+
     $sql = "
         SELECT
-            o.order_id, o.order_date, o.shop_id, o.tp_id, o.new_order, o.pr_id, o.qty, o.discount_percentage,
+            o.order_id, o.order_date, o.shop_id, o.tp_id, o.new_order, o.order_category, o.pr_id, o.qty, o.discount_percentage,
             s.name AS shop_name, s.district_name, s.taluk_name,
             p.outlet_price, p.category,
             tp.name AS tp_name
@@ -161,7 +169,7 @@ function getMsDailyVisitRows(mysqli $db_conn, string $from, string $to, array $o
             }
 
             $visits[$oid] = [
-                'date' => $r['order_date'], 'shop_name' => $r['shop_name'],
+                'date' => $r['order_date'], 'shop_id' => $shopId, 'shop_name' => $r['shop_name'],
                 'district' => $r['district_name'] ?: '—', 'taluk' => $taluk ?: '—',
                 'tp_name' => $tpName, 'firka' => $firka,
                 'is_new' => $isNew,
@@ -171,6 +179,12 @@ function getMsDailyVisitRows(mysqli $db_conn, string $from, string $to, array $o
                 // callers can split/filter the two instead of always
                 // showing every no-order visit inline in the main table.
                 'visit_type' => $r['new_order'] === 'yes' ? 'order' : 'no_order',
+                // No-Order visits have no product line to derive a category
+                // from, so they carry the category the DM picked on the No
+                // Order form instead (order_category) — a Get Order's own
+                // 'category' below (napkin/diaper/mixed) is computed from
+                // its actual product lines once all of them are seen.
+                'no_order_category' => $r['order_category'] ?: 'unspecified',
                 'napkin_value' => 0.0, 'diaper_value' => 0.0,
             ];
             $order[] = $oid;
@@ -190,7 +204,67 @@ function getMsDailyVisitRows(mysqli $db_conn, string $from, string $to, array $o
     foreach ($order as $oid) {
         $v = $visits[$oid];
         $v['total_value'] = $v['napkin_value'] + $v['diaper_value'];
+        // Napkin/Diaper/Mixed/Unspecified — a Get Order's category comes
+        // from its own product line(s); a No Order visit has none, so it
+        // falls back to 'no_order_category' set above.
+        if ($v['visit_type'] === 'order') {
+            if ($v['napkin_value'] > 0 && $v['diaper_value'] > 0) { $v['category'] = 'mixed'; }
+            elseif ($v['napkin_value'] > 0) { $v['category'] = 'napkin'; }
+            elseif ($v['diaper_value'] > 0) { $v['category'] = 'diaper'; }
+            else { $v['category'] = 'unspecified'; }
+        } else {
+            $v['category'] = $v['no_order_category'];
+        }
+        unset($v['no_order_category']);
         $out[] = $v;
+    }
+    return $out;
+}
+
+// Day-by-day visit-count summary for the 35-shop / 20-Get-Order daily target
+// (SM-wise / DM-wise requirement #5) — one row per calendar day in the
+// range (days with zero visits still appear, with all counts 0, so a DM
+// can't dodge the daily target just by having no ms_orders rows that day),
+// built on top of getMsDailyVisitRows()'s per-visit rows grouped by date.
+// "Get Order visit" = visit_type 'order' (an actual product line was
+// submitted that visit, matching the DM-wise requirement's "20 get order
+// shop" wording) — a 'no_order' visit still counts toward the 35 total but
+// not toward the 20.
+function getMsDailyVisitDaySummary(mysqli $db_conn, string $from, string $to, int $msId): array {
+    $rows = getMsDailyVisitRows($db_conn, $from, $to, ['ms_id' => $msId]);
+    $byDate = [];
+    $napkinShopsByDate = []; $diaperShopsByDate = [];
+    foreach ($rows as $r) {
+        $d = $r['date'];
+        if (!isset($byDate[$d])) {
+            $byDate[$d] = ['date' => $d, 'total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0];
+        }
+        $byDate[$d]['total_visits']++;
+        if ($r['is_new']) { $byDate[$d]['new_visits']++; } else { $byDate[$d]['existing_visits']++; }
+        if ($r['visit_type'] === 'order') { $byDate[$d]['get_order_visits']++; }
+
+        // Napkin/Diaper shop counts — a shop visited more than once the
+        // same day for the same category still counts once (distinct shop
+        // per day per category), a 'mixed' visit counts toward both.
+        if ($r['category'] === 'napkin' || $r['category'] === 'mixed') { $napkinShopsByDate[$d][$r['shop_id']] = true; }
+        if ($r['category'] === 'diaper' || $r['category'] === 'mixed') { $diaperShopsByDate[$d][$r['shop_id']] = true; }
+    }
+    foreach ($byDate as $d => &$row) {
+        $row['napkin_shops'] = count($napkinShopsByDate[$d] ?? []);
+        $row['diaper_shops'] = count($diaperShopsByDate[$d] ?? []);
+    }
+    unset($row);
+
+    $out = [];
+    $cursor = new DateTime($from);
+    $end = new DateTime($to);
+    while ($cursor <= $end) {
+        $d = $cursor->format('Y-m-d');
+        $row = $byDate[$d] ?? ['date' => $d, 'total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0];
+        $row['visit_target_met'] = $row['total_visits'] >= 35;
+        $row['get_order_target_met'] = $row['get_order_visits'] >= 20;
+        $out[] = $row;
+        $cursor->modify('+1 day');
     }
     return $out;
 }

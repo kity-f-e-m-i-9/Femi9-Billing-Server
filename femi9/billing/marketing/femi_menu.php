@@ -104,6 +104,10 @@ if($LoginPasswordCheck=="12345678")
                         <a href="my-daily-visit-report"><i class="material-icons-two-tone">fact_check</i>My Daily Visit Report</a>
                     </li>
 
+					<li>
+                        <a href="awareness-campaign"><i class="material-icons-two-tone">campaign</i>Awareness Campaign</a>
+                    </li>
+
 					<?php if ($hasTeamMN): ?>
 					<li>
                         <a href="my-team"><i class="material-icons-two-tone">groups</i>My Team</a>

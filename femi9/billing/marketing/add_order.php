@@ -10,6 +10,21 @@ require_once("include/AssignedLocations.php");
 // district their shop history happens to touch) — same source as add_ss.php.
 $assignedDistricts = getMsAssignedDistricts($db_conn, (int)$markeingSTFID);
 
+// Company-approved per-DM exemption from Get Order's 100m-from-shop check
+// (see ms_edit.php's checkbox and order_action_get.php's own matching
+// server-side check) — read here too so the client-side confirm() below
+// doesn't block this DM before the form ever reaches the server.
+$skipLocationCheckForThisDm = false;
+if (!empty($markeingSTFID)) {
+    $chkSkipCol = mysqli_query($db_conn, "SHOW COLUMNS FROM marketing_staff LIKE 'skip_location_check'");
+    if ($chkSkipCol && mysqli_num_rows($chkSkipCol) > 0) {
+        $msidForSkip = mysqli_real_escape_string($db_conn, $markeingSTFID);
+        $skipRes = mysqli_query($db_conn, "SELECT skip_location_check FROM marketing_staff WHERE id='$msidForSkip' LIMIT 1");
+        $skipRow = $skipRes ? mysqli_fetch_assoc($skipRes) : null;
+        $skipLocationCheckForThisDm = $skipRow && (int)$skipRow['skip_location_check'] === 1;
+    }
+}
+
 // Firka (depth 6) options per taluk, and which TP (if any) is assigned to
 // each firka — territory_partner_locations is the TP side's own location
 // assignment, same table used by territory-partner/geo_layers.php. Picking
@@ -118,12 +133,23 @@ if (!empty($markeingSTFID)) {
 // ── Products — fetched once, used in GET ORDER form ───────────────────────────
 // Neksomo-sourced products (temp_id LIKE 'NKS-%') are excluded from selection
 // here, same convention as the shop/customer/TP invoice "add product" dropdowns.
-// deleted_at IS NULL excludes Inactive products — without this, a DM could
-// still raise a Get Order for a product the company already deactivated in
-// Manage Products (confirmed happening: "Combo pack" was deactivated
-// 2026-08-31 but still showed up here and got ordered on 2026-09-09).
+//
+// Filtered on visible_in_get_order, NOT deleted_at (Active/Inactive). Get
+// Order isn't fulfilled from company stock — a TP sources it from their own
+// existing stock, or buys it elsewhere and hands it over — so a product the
+// company marked Inactive (stopped manufacturing/selling it) can still be a
+// valid thing to raise a Get Order for. visible_in_get_order is a separate,
+// independent per-product toggle on the Edit Product page precisely for
+// this (see db_migrations/2026_10_29_products_visible_in_get_order.sql).
+// Self-migrating guard, same pattern as packs_per_cover elsewhere.
+$_vgoCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'visible_in_get_order'");
+if ($_vgoCol && $_vgoCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN visible_in_get_order TINYINT(1) NOT NULL DEFAULT 1 AFTER deleted_at");
+    $db_conn->query("UPDATE products SET visible_in_get_order = IF(deleted_at IS NULL, 1, 0)");
+}
+
 $productList = [];
-$r = mysqli_query($db_conn, "SELECT id, productName, outlet_price FROM products WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
+$r = mysqli_query($db_conn, "SELECT id, productName, outlet_price, category FROM products WHERE visible_in_get_order = 1 AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY productName ASC");
 while ($p = mysqli_fetch_assoc($r)) $productList[] = $p;
 
 // ── Active TPs — used to populate the "Assign To TP" dropdown, filtered
@@ -285,6 +311,14 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <input type="text" disabled value="<?=date("d-m-Y", strtotime($order_date))?>" class="form-control">
                                                     <br/>
 
+                                                    <label class="form-label">Category*</label>
+                                                    <div class="btn-group d-block mb-2" role="group" id="noOrderCategoryFilter">
+                                                        <input type="radio" class="btn-check" name="order_category" id="noOrderCatNapkin" value="napkin" checked>
+                                                        <label class="btn btn-outline-primary" for="noOrderCatNapkin">Napkin</label>
+                                                        <input type="radio" class="btn-check" name="order_category" id="noOrderCatDiaper" value="diaper">
+                                                        <label class="btn btn-outline-primary" for="noOrderCatDiaper">Diaper</label>
+                                                    </div>
+
                                                     <label class="form-label">Reason*</label>
                                                     <textarea name="noorder_reason" onkeypress="restrictSpecialChars(event)" class="form-control" required></textarea>
                                                     <br/>
@@ -316,6 +350,13 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <?php if (!$dmHasActiveTp): ?>
                                                     <div style="margin-bottom:14px; font-size:12px; color:#374151; background:#f3f4f6; padding:8px 12px; border-radius:6px;">No active TP covers your assigned area — this order will be handled directly by the company.</div>
                                                     <?php endif; ?>
+
+                                                    <label class="form-label">Category*</label>
+                                                    <div class="btn-group mb-2 d-block" role="group" id="productCategoryFilter">
+                                                        <button type="button" class="btn btn-outline-primary active" data-cat="napkin">Napkin</button>
+                                                        <button type="button" class="btn btn-outline-primary" data-cat="diaper">Diaper</button>
+                                                    </div>
+                                                    <br/>
 
                                                     <div id="tpAssignBlock" style="<?=$dmHasActiveTp ? '' : 'display:none;'?>">
                                                     <label class="form-label">District Filter</label>
@@ -438,7 +479,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                                 <select required name="pr_id[]" class="form-control product-select order-pr-select" onchange="recalcOrderLine(this)">
                                                                     <option value="" hidden>Select Product</option>
                                                                     <?php foreach($productList as $p): ?>
-                                                                    <option value="<?=$p['id']?>" data-price="<?=htmlspecialchars($p['outlet_price'])?>"><?=htmlspecialchars($p['productName'])?></option>
+                                                                    <option value="<?=$p['id']?>" data-price="<?=htmlspecialchars($p['outlet_price'])?>" data-category="<?=($p['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin'?>"><?=htmlspecialchars($p['productName'])?></option>
                                                                     <?php endforeach; ?>
                                                                 </select>
                                                             </td>
@@ -515,6 +556,37 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         $scope.find('select.product-select').select2({ placeholder: 'Search product…', width: '100%' });
     }
 
+    // Napkin/Diaper category filter — disables non-matching <option>s so
+    // Select2's own results list (which reads live from the underlying
+    // <select>'s options each time it opens) simply skips them, same as it
+    // already skips any other disabled option. Clears a row's selection if
+    // its currently-picked product falls outside the newly chosen category.
+    var activeProductCategory = 'napkin';
+    function applyProductCategoryFilter($scope) {
+        $scope.find('select.product-select').each(function () {
+            var $sel = $(this);
+            var changedSelection = false;
+            $sel.find('option').each(function () {
+                var cat = this.getAttribute('data-category');
+                if (!cat) { return; } // the "Select Product" placeholder option
+                var show = (cat === activeProductCategory);
+                this.disabled = !show;
+                if (!show && this.selected) { this.selected = false; changedSelection = true; }
+            });
+            if (changedSelection) {
+                $sel.val('').trigger('change');
+                var row = $sel.closest('tr')[0];
+                if (row) { recalcOrderLine(row.querySelector('.order-qty')); }
+            }
+        });
+    }
+    $(document).on('click', '#productCategoryFilter button', function () {
+        activeProductCategory = this.getAttribute('data-cat');
+        $('#productCategoryFilter button').removeClass('active');
+        $(this).addClass('active');
+        applyProductCategoryFilter($('#dataTable'));
+    });
+
     // Row 0 is the header labels row — the actual template to clone is row 1.
     function addRow(tableID) {
         var table    = document.getElementById(tableID);
@@ -529,6 +601,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                     : table.rows[1].cells[i].innerHTML;
             }
             initProductSearch($(row));
+            applyProductCategoryFilter($(row));
             recalcOrderLine(row.querySelector('.order-qty'));
         } else {
             alert("Maximum allowed record is 100.");
@@ -546,6 +619,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
             productCellTemplate = tbl.rows[1].cells[productCellIndex].innerHTML;
         }
         initProductSearch($('#dataTable'));
+        applyProductCategoryFilter($('#dataTable'));
     });
 
     function deleteRow(tableID) {
@@ -936,7 +1010,9 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         // no-location shop always falls through to the plain confirm() here;
         // the server may still reject it if its address can't be geocoded.
         var GET_ORDER_MAX_METERS = 100;
+        var SKIP_LOCATION_CHECK = <?php echo $skipLocationCheckForThisDm ? 'true' : 'false'; ?>;
         window.confirmGetOrderSubmit = function confirmGetOrderSubmit() {
+            if (SKIP_LOCATION_CHECK) { return confirm('Please confirm'); }
             if (capturedLat === null || capturedLng === null) {
                 alert('Could not get your current location. Please enable location access and try again — Get Order requires you to be at the shop.');
                 return false;

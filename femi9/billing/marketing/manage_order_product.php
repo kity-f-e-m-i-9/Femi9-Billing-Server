@@ -210,12 +210,14 @@ $voidedCount = 0; $voidedValue = 0; $voidedInvIds = [];
 if (!empty($invoiceIds)) {
     $idList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $invoiceIds)) . "'";
 
-    $resVal = $db_conn->query("SELECT inv_id, total, status, deleted_at FROM user_invoice WHERE inv_id IN ($idList)");
-    $invTotals = []; $invStatus = []; $invDeletedAt = [];
+    $resVal = $db_conn->query("SELECT inv_id, total, status, deleted_at, date, created_at FROM user_invoice WHERE inv_id IN ($idList)");
+    $invTotals = []; $invStatus = []; $invDeletedAt = []; $invDate = []; $invCreatedAt = [];
     while ($vr = mysqli_fetch_assoc($resVal)) {
         $invTotals[$vr['inv_id']] = (float)$vr['total'];
         $invStatus[$vr['inv_id']] = $vr['status'];
         $invDeletedAt[$vr['inv_id']] = $vr['deleted_at'];
+        $invDate[$vr['inv_id']] = $vr['date'];
+        $invCreatedAt[$vr['inv_id']] = $vr['created_at'];
         $totalInvoiceValue += (float)$vr['total'];
     }
 
@@ -298,10 +300,12 @@ $voidedProducts = getProductBreakdownForInvoices($db_conn, $voidedInvIds);
 
 $allProducts = [];
 $productPriceMap = [];
-$resAllProd = $db_conn->query("SELECT id, productName, outlet_price FROM products ORDER BY id ASC");
+$productCategoryMap = [];
+$resAllProd = $db_conn->query("SELECT id, productName, outlet_price, category FROM products ORDER BY id ASC");
 while ($apr = mysqli_fetch_assoc($resAllProd)) {
     $allProducts[] = $apr;
     $productPriceMap[(int)$apr['id']] = (float)$apr['outlet_price'];
+    $productCategoryMap[(int)$apr['id']] = ($apr['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin';
 }
 
 // One row per order line (shop_id/date/etc repeat per line, qty is per pr_id) —
@@ -873,6 +877,35 @@ if (!$tpRow) {
     if (!empty($diffParts)) { $detailLines[] = "<div class='tp-status-diff'>" . htmlspecialchars(implode(', ', $diffParts)) . "</div>"; }
 
     $viewDetailsLink = "<div class='tp-status-link'><a href='order-invoice-status.php?order_id=" . urlencode($orderid) . "' target='_blank'>View Details &rarr;</a></div>";
+
+    // Days between the DM placing this Get Order and the TP converting it
+    // to an invoice — answers "how many days did this order take to convert".
+    $invDateVal = $invDate[$invId] ?? null;
+    if (!empty($invDateVal) && !empty($result_product_list['order_date'])) {
+        $daysToConvert = (int)floor((strtotime($invDateVal) - strtotime($result_product_list['order_date'])) / 86400);
+        if ($daysToConvert < 0) { $daysToConvert = 0; }
+        $detailLines[] = "<div class='tp-status-pending'>Converted in " . $daysToConvert . " day" . ($daysToConvert == 1 ? '' : 's') . "</div>";
+    }
+
+    // 48-hour TP delivery SLA — Napkin-only Get Orders (requirement: Diaper
+    // orders aren't covered by this SLA). ms_orders.order_date has no time
+    // component (just the business date), so the order is treated as placed
+    // at that date's midnight — the most conservative reading, since the DM
+    // could have placed it any time that day. user_invoice.created_at is the
+    // exact moment the TP actually converted it, so the hour count is exact
+    // on that end.
+    $_orderProductsForSla = $qtyMap[$orderid] ?? [];
+    $_isNapkinOnlyOrder = !empty($_orderProductsForSla);
+    foreach ($_orderProductsForSla as $_prId => $_qty) {
+        if (($productCategoryMap[(int)$_prId] ?? 'napkin') !== 'napkin') { $_isNapkinOnlyOrder = false; break; }
+    }
+    $_invCreatedAtVal = $invCreatedAt[$invId] ?? null;
+    if ($_isNapkinOnlyOrder && !empty($_invCreatedAtVal) && !empty($result_product_list['order_date'])) {
+        $_hoursToConvert = (strtotime($_invCreatedAtVal) - strtotime($result_product_list['order_date'])) / 3600;
+        if ($_hoursToConvert < 0) { $_hoursToConvert = 0; }
+        $_slaMet = $_hoursToConvert <= 48;
+        $detailLines[] = "<div class='tp-status-pending'>48hr Delivery SLA: <span style='color:" . ($_slaMet ? '#16a34a' : '#dc2626') . ";font-weight:600;'>" . ($_slaMet ? 'Met' : 'Missed') . "</span> (" . round($_hoursToConvert) . "h)</div>";
+    }
 
     if ($invStatusVal === 'cancelled') {
         $headerBadge = "<span class='badge badge-style-bordered badge-danger'>Voided</span>";
