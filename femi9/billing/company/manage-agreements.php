@@ -680,6 +680,7 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                 <table class="table table-sm table-hover" id="agreementSignersTable" style="display:none;">
                     <thead>
                         <tr>
+                            <th style="width:30px;"><input type="checkbox" id="agreementSignersSelectAll" title="Select all on this page"></th>
                             <th>Name</th>
                             <th>ID</th>
                             <th>Company</th>
@@ -689,18 +690,37 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     <tbody id="agreementSignersTbody"></tbody>
                 </table>
             </div>
-            <div class="modal-footer justify-content-between">
-                <span class="text-muted" id="agreementSignersCount" style="font-size:12.5px;"></span>
-                <nav><ul class="pagination pagination-sm mb-0" id="agreementSignersPagination"></ul></nav>
+            <div class="modal-footer flex-column align-items-stretch">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <span class="text-muted" id="agreementSignersCount" style="font-size:12.5px;"></span>
+                    <nav><ul class="pagination pagination-sm mb-0" id="agreementSignersPagination"></ul></nav>
+                </div>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span class="text-muted" id="agreementSignersSelectedCount" style="font-size:12.5px;">0 selected</span>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="agreementSignersClearSelection" onclick="agreementSignersClearSelection();">Clear selection</button>
+                        <button type="button" class="btn btn-sm" style="background:#7c3aed;color:#fff;" id="agreementSignersDownloadCards" onclick="agreementSignersBulkDownload('digi-cards');" disabled>Download Digi Cards (ZIP)</button>
+                        <button type="button" class="btn btn-sm btn-primary" id="agreementSignersDownloadDocs" onclick="agreementSignersBulkDownload('documents');" disabled>Download Documents (ZIP)</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+<form method="post" id="agreementSignersBulkForm" target="_blank" style="display:none;"></form>
+<script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
+<script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
 <script>
     var agreementSignersState = { type: 'cp', status: 'signed', page: 1 };
+    // Keyed by id so a selection made on page 1 survives navigating to page
+    // 2 and back -- a plain "select all" checkbox alone would only ever see
+    // whatever 20 rows happen to be on screen at the moment it's read.
+    var agreementSignersSelected = {};
 
     function openAgreementSignersModal(type, status) {
         agreementSignersState = { type: type, status: status, page: 1 };
+        agreementSignersSelected = {};
+        agreementSignersUpdateSelectionUI();
         var modalEl = document.getElementById('agreementSignersModal');
         // This page's Bootstrap build is v5.0.0-beta3 -- Modal.getOrCreateInstance()
         // was only added in 5.2, so it's not a function here and threw silently
@@ -712,17 +732,38 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
         loadAgreementSignersPage();
     }
 
+    function agreementSignersClearSelection() {
+        agreementSignersSelected = {};
+        $('.agreement-signer-check').prop('checked', false);
+        $('#agreementSignersSelectAll').prop('checked', false);
+        agreementSignersUpdateSelectionUI();
+    }
+
+    function agreementSignersUpdateSelectionUI() {
+        var count = Object.keys(agreementSignersSelected).length;
+        $('#agreementSignersSelectedCount').text(count + ' selected');
+        $('#agreementSignersDownloadDocs').prop('disabled', count === 0);
+        // Digi Cards only exist for already-signed partners -- hide that
+        // button entirely on the Pending list instead of letting someone
+        // select 20 pending rows and download a ZIP that's just an
+        // explanation file.
+        var showCards = agreementSignersState.status === 'signed';
+        $('#agreementSignersDownloadCards').toggle(showCards).prop('disabled', count === 0 || !showCards);
+    }
+
     function loadAgreementSignersPage() {
         var typeLabel = agreementSignersState.type === 'cp' ? 'Channel Partner' : 'Territory Partner';
         var statusLabel = agreementSignersState.status === 'signed' ? 'Signed' : 'Pending';
         document.getElementById('agreementSignersModalTitle').textContent = typeLabel + 's — ' + statusLabel;
         document.getElementById('agreementSignersDateCol').textContent = agreementSignersState.status === 'signed' ? 'Signed On' : 'Status';
+        agreementSignersUpdateSelectionUI();
 
         var $loading = $('#agreementSignersLoading'), $empty = $('#agreementSignersEmpty'), $table = $('#agreementSignersTable');
         $table.hide(); $empty.hide(); $loading.show();
         $('#agreementSignersTbody').empty();
         $('#agreementSignersPagination').empty();
         $('#agreementSignersCount').text('');
+        $('#agreementSignersSelectAll').prop('checked', false);
 
         $.getJSON('agreement-signers-list.php', { type: agreementSignersState.type, status: agreementSignersState.status, page: agreementSignersState.page })
             .done(function (data) {
@@ -734,8 +775,10 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     var dateCell = agreementSignersState.status === 'signed'
                         ? (r.signed_at || '-')
                         : '<span class="badge bg-secondary">Not signed yet</span>';
+                    var checked = agreementSignersSelected.hasOwnProperty(r.id) ? ' checked' : '';
                     $tbody.append(
                         '<tr>' +
+                        '<td><input type="checkbox" class="agreement-signer-check" data-id="' + r.id + '" data-name="' + $('<div>').text(r.name || '').html() + '" data-code="' + $('<div>').text(r.code || '').html() + '"' + checked + '></td>' +
                         '<td><a href="' + r.edit_url + '">' + $('<div>').text(r.name || '-').html() + '</a></td>' +
                         '<td>' + $('<div>').text(r.code || '-').html() + '</td>' +
                         '<td>' + $('<div>').text(r.company_name || '-').html() + '</td>' +
@@ -744,6 +787,10 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                     );
                 });
                 $table.show();
+                if (Object.keys(agreementSignersSelected).length) {
+                    var allChecked = data.rows.every(function (r) { return agreementSignersSelected.hasOwnProperty(r.id); });
+                    $('#agreementSignersSelectAll').prop('checked', allChecked);
+                }
 
                 $('#agreementSignersCount').text('Showing ' + ((data.page - 1) * data.per_page + 1) + '-' + Math.min(data.page * data.per_page, data.total) + ' of ' + data.total);
 
@@ -761,10 +808,54 @@ function fv($val) { return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, '
                 $empty.text('Failed to load — please try again.').show();
             });
     }
+
+    $(document).on('change', '.agreement-signer-check', function () {
+        var id = $(this).data('id');
+        if (this.checked) {
+            agreementSignersSelected[id] = { name: $(this).data('name'), code: $(this).data('code') };
+        } else {
+            delete agreementSignersSelected[id];
+        }
+        agreementSignersUpdateSelectionUI();
+    });
+
+    $(document).on('change', '#agreementSignersSelectAll', function () {
+        var checkThis = this.checked;
+        $('.agreement-signer-check').each(function () {
+            $(this).prop('checked', checkThis);
+            var id = $(this).data('id');
+            if (checkThis) {
+                agreementSignersSelected[id] = { name: $(this).data('name'), code: $(this).data('code') };
+            } else {
+                delete agreementSignersSelected[id];
+            }
+        });
+        agreementSignersUpdateSelectionUI();
+    });
+
+    // Clicking anywhere else in the row also toggles its checkbox -- only the
+    // Name link (navigates to that partner's page) and the checkbox itself
+    // (handled above) are excluded.
+    $(document).on('click', '#agreementSignersTbody td', function (e) {
+        if ($(e.target).is('input, a')) return;
+        var $cb = $(this).closest('tr').find('.agreement-signer-check');
+        $cb.prop('checked', !$cb.prop('checked')).trigger('change');
+    });
+
+    function agreementSignersBulkDownload(kind) {
+        var ids = Object.keys(agreementSignersSelected);
+        if (!ids.length) return;
+        var action = kind === 'digi-cards' ? 'bulk-download-digi-cards.php' : 'bulk-download-agreements.php';
+        var $form = $('#agreementSignersBulkForm');
+        $form.attr('action', action).empty();
+        $form.append($('<input>').attr({ type: 'hidden', name: 'type', value: agreementSignersState.type }));
+        ids.forEach(function (id) {
+            $form.append($('<input>').attr({ type: 'hidden', name: 'ids[]', value: id }));
+        });
+        $form[0].submit();
+    }
 </script>
 
-<script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
-<script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
 <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>

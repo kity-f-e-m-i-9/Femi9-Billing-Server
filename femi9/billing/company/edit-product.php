@@ -17,6 +17,13 @@ if ($_ppcCol && $_ppcCol->num_rows === 0) {
     $db_conn->query("ALTER TABLE products ADD COLUMN packs_per_cover INT UNSIGNED NULL AFTER packs_per_carton");
 }
 
+// Self-migrating: see db_migrations/2026_10_29_products_visible_in_get_order.sql
+$_vgoCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'visible_in_get_order'");
+if ($_vgoCol && $_vgoCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN visible_in_get_order TINYINT(1) NOT NULL DEFAULT 1 AFTER deleted_at");
+    $db_conn->query("UPDATE products SET visible_in_get_order = IF(deleted_at IS NULL, 1, 0)");
+}
+
 //fetch product details
 $select_product_list="select * from products where id=? and (temp_id not like 'NKS-%' or temp_id is null)";
 										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
@@ -117,6 +124,13 @@ $select_product_list="select * from products where id=? and (temp_id not like 'N
                                                 <select name="status" class="form-control" required>
                                                     <option value="active" <?php echo $_prodIsActive?'selected':''; ?>>Active</option>
                                                     <option value="inactive" <?php echo !$_prodIsActive?'selected':''; ?>>Inactive</option>
+                                                </select>
+
+												<?php $_prodVisibleInGetOrder = !isset($result_product_list["visible_in_get_order"]) || (int)$result_product_list["visible_in_get_order"] === 1; ?>
+												<label for="exampleInputEmail1" class="form-label">Visible in Get Order <small class="text-muted">(controls only Marketing Staff's Get Order product list — separate from Active/Inactive above, since Get Order is fulfilled from a TP's stock or sourced elsewhere, not from company stock)</small></label>
+                                                <select name="visible_in_get_order" class="form-control" required>
+                                                    <option value="yes" <?php echo $_prodVisibleInGetOrder?'selected':''; ?>>Visible</option>
+                                                    <option value="no" <?php echo !$_prodVisibleInGetOrder?'selected':''; ?>>Not Visible</option>
                                                 </select>
 
 												<label for="exampleInputEmail1" class="form-label">Pieces per Pack <small class="text-muted">(optional)</small></label>

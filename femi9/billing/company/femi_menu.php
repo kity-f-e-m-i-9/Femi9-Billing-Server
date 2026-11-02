@@ -736,6 +736,8 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="ms-shop-coverage-report">New Shop Coverage</a></li>
 							<li><a href="sm-asm-tp-monthly-sales-export">District TP Monthly Sales</a></li>
 							<li><a href="ms_expenses">Expenses Report</a></li>
+							<li><a href="manage-daily-assign-district-tps">Daily Assign District TPs</a></li>
+							<li><a href="daily-assign-report">Daily Assign Report</a></li>
                         </ul>
                     </li>
 
@@ -755,6 +757,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                             </li>
                             <li><a href="manage-district-notes">District Notes</a></li>
                             <li><a href="location-change-requests">Location Change Requests</a></li>
+                            <li><a href="salesbdm-tp-coverage-export">TP Coverage Export (per BDM)</a></li>
                         </ul>
                     </li>
 					
@@ -1247,6 +1250,8 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 							<li><a href="ms_noorders">No Orders Report</a></li>
 							<li><a href="ms-shop-coverage-report">New Shop Coverage</a></li>
 							<li><a href="sm-asm-tp-monthly-sales-export">District TP Monthly Sales</a></li>
+							<li><a href="manage-daily-assign-district-tps">Daily Assign District TPs</a></li>
+							<li><a href="daily-assign-report">Daily Assign Report</a></li>
                         </ul>
                     </li>
 					<?php }?>
@@ -1267,6 +1272,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                             </li>
                             <li><a href="manage-district-notes">District Notes</a></li>
                             <li><a href="location-change-requests">Location Change Requests</a></li>
+                            <li><a href="salesbdm-tp-coverage-export">TP Coverage Export (per BDM)</a></li>
                         </ul>
                     </li>
 					<?php }?>

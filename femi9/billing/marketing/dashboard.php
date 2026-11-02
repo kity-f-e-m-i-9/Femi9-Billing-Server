@@ -315,6 +315,7 @@ if (!empty($myDms) && !empty($teamScopeIds)) {
         }
 
         $zoneRollup[] = [
+            'zone_id'       => $zoneId,
             'name'          => $z['name'],
             'target'        => $zoneTarget,
             'achieved'      => $zoneAchieved,
@@ -461,26 +462,115 @@ if (!empty($myDms)) {
             }
         }
     }
+
+    // ── Get Order Return Amount — how much of what each DM's own Get Orders
+    // converted into (invoice-wise, not just the Napkin portion) came back
+    // as a return. Same user_return_stock.invnumber-actually-holds-inv_id
+    // convention as the Return % card. One batched query across every DM's
+    // Get-Order invoice ids instead of a query per DM.
+    $_getOrderInvIdsByMs = getGetOrderInvoiceIdsByMsId($db_conn, array_column($myDms, 'id'), $from, $to);
+    $_allGetOrderInvIds = [];
+    foreach ($_getOrderInvIdsByMs as $_ids) { $_allGetOrderInvIds = array_merge($_allGetOrderInvIds, $_ids); }
+    $_allGetOrderInvIds = array_values(array_unique($_allGetOrderInvIds));
+    $_getOrderReturnByInv = [];
+    if (!empty($_allGetOrderInvIds)) {
+        $_invIdList = "'" . implode("','", array_map(fn($v) => $db_conn->real_escape_string($v), $_allGetOrderInvIds)) . "'";
+        $_resGoReturn = $db_conn->query("
+            SELECT invnumber, returnid, MAX(total) AS total
+            FROM user_return_stock
+            WHERE invnumber IN ($_invIdList) AND deleted_at IS NULL
+            GROUP BY invnumber, returnid
+        ");
+        while ($_r = $_resGoReturn->fetch_assoc()) {
+            $_getOrderReturnByInv[$_r['invnumber']] = ($_getOrderReturnByInv[$_r['invnumber']] ?? 0) + (float)$_r['total'];
+        }
+    }
+    foreach ($myDms as &$_dmReturnRef) {
+        $_dmInvIds = $_getOrderInvIdsByMs[(int)$_dmReturnRef['id']] ?? [];
+        $_dmReturnAmt = 0.0;
+        foreach ($_dmInvIds as $_invId) { $_dmReturnAmt += $_getOrderReturnByInv[$_invId] ?? 0.0; }
+        $_dmReturnRef['get_order_return_amt'] = $_dmReturnAmt;
+    }
+    unset($_dmReturnRef);
+
+    // Fold each DM's own Get Order Return amount (just computed above) into
+    // the zone it belongs to — same district-name matching $zoneAchieved /
+    // $zoneTpInvoiced already used when $zoneRollup was first built, done as
+    // a second pass here since 'get_order_return_amt' doesn't exist on
+    // $myDms until this point.
+    if (!empty($zoneRollup)) {
+        foreach ($zoneRollup as &$_zoneReturnRef) {
+            $_zoneDistrictNamesForReturn = array_map(fn($n) => mb_strtolower(trim($n)), getZoneDistrictNames($db_conn, (int)$_zoneReturnRef['zone_id']));
+            $_zoneReturnAmt = 0.0;
+            foreach ($myDms as $_dm) {
+                foreach (explode(', ', $_dm['district']) as $_dn) {
+                    if (in_array(mb_strtolower(trim($_dn)), $_zoneDistrictNamesForReturn, true)) {
+                        $_zoneReturnAmt += $_dm['get_order_return_amt'] ?? 0.0;
+                        break;
+                    }
+                }
+            }
+            $_zoneReturnRef['return_amt'] = $_zoneReturnAmt;
+        }
+        unset($_zoneReturnRef);
+    }
 }
 
 // ── New Shop Onboarding (Target: 50 new shops per district) ────────────────
-// Shops this team added (ms_shop.created_at) within the selected period,
-// grouped by district — same "New Shop" definition company/ms-team-shop-
-// view.php and manage_order_product.php's own "New Shop" card already use.
+// Two separate onboarding sources, merged: shops this team's DMs added
+// themselves (ms_shop.created_at), and shops this team's own TPs added
+// directly (shop.created_at — a column this feature added; existing rows
+// from before that migration have no created_at and are NOT counted here,
+// since there's no way to know when they were actually added). A `shop` row
+// with source_ms_shop_id set is that SAME ms_shop lead promoted into a real
+// billing record, not a second new shop, so it's excluded to avoid double-
+// counting the one DM-onboarded shop twice.
 $teamMsIdsForShops = !empty($myDms) ? array_merge([$msId], array_column($myDms, 'id')) : [$msId];
 $newShopByDistrict = [];
 if (!empty($teamMsIdsForShops)) {
     $_msIdList = implode(',', array_map('intval', $teamMsIdsForShops));
-    $resNewShop = $db_conn->query("
+    $_fromEsc = $db_conn->real_escape_string($from);
+    $_toEsc = $db_conn->real_escape_string($to);
+    $_newShopCounts = [];
+
+    $resNewShopDm = $db_conn->query("
         SELECT COALESCE(dn.name, s.district_name, 'Unassigned') AS district, COUNT(*) AS c
         FROM ms_shop s
         LEFT JOIN partner_location_nodes dn ON dn.id = s.district_node_id
-        WHERE s.ms_id IN ($_msIdList) AND DATE(s.created_at) BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
+        WHERE s.ms_id IN ($_msIdList) AND DATE(s.created_at) BETWEEN '$_fromEsc' AND '$_toEsc'
         GROUP BY district
-        ORDER BY district ASC
     ");
-    while ($_nr = $resNewShop->fetch_assoc()) {
-        $newShopByDistrict[] = ['district' => $_nr['district'], 'count' => (int)$_nr['c'], 'met' => (int)$_nr['c'] >= 50];
+    while ($_nr = $resNewShopDm->fetch_assoc()) {
+        $_newShopCounts[$_nr['district']] = ($_newShopCounts[$_nr['district']] ?? 0) + (int)$_nr['c'];
+    }
+
+    if (!empty($statsScopeIds)) {
+        // Self-migrating — same guard as shop-action.php's own (that one
+        // only runs when a TP actually adds a shop, so a fresh deploy with
+        // no new TP shop yet would otherwise hit this SELECT before the
+        // column exists).
+        $_shopCreatedAtCol = $db_conn->query("SHOW COLUMNS FROM shop LIKE 'created_at'");
+        if ($_shopCreatedAtCol && $_shopCreatedAtCol->num_rows === 0) {
+            $db_conn->query("ALTER TABLE shop ADD COLUMN created_at TIMESTAMP NULL DEFAULT NULL");
+        }
+        $_scopeIdList = implode(',', array_map('intval', $statsScopeIds));
+        $resNewShopTp = $db_conn->query("
+            SELECT COALESCE(dn.name, 'Unassigned') AS district, COUNT(*) AS c
+            FROM shop s
+            LEFT JOIN partner_location_nodes dn ON dn.id = s.district_id
+            WHERE s.district_id IN ($_scopeIdList) AND s.source_ms_shop_id IS NULL
+              AND s.deleted_at IS NULL AND s.created_at IS NOT NULL
+              AND DATE(s.created_at) BETWEEN '$_fromEsc' AND '$_toEsc'
+            GROUP BY district
+        ");
+        while ($_nr = $resNewShopTp->fetch_assoc()) {
+            $_newShopCounts[$_nr['district']] = ($_newShopCounts[$_nr['district']] ?? 0) + (int)$_nr['c'];
+        }
+    }
+
+    ksort($_newShopCounts);
+    foreach ($_newShopCounts as $_district => $_count) {
+        $newShopByDistrict[] = ['district' => $_district, 'count' => $_count, 'met' => $_count >= 50];
     }
 }
 
@@ -772,6 +862,31 @@ foreach ($invoiceRows as $_ir) {
     ];
 }
 $returnPctOverall = $returnPctTotalInv > 0 ? ($returnPctTotalReturned / $returnPctTotalInv) * 100 : 0.0;
+
+// ── TP Return (per DM) — return amount against EVERY shop invoice this DM's
+// own TPs raised (the broader "TP Invoice Amount" column), not just the
+// narrower "Get Order Return" above (invoices that specifically came from
+// this DM's own Get Orders). Built from $invoiceRows/$returnByInv already
+// fetched for the Return % card above — no extra query needed, just
+// attributed per DM via $dmTpIdsById (tp_pk -> which DM owns that TP).
+if (!empty($myDms)) {
+    $_tpIdToDmId = [];
+    foreach ($dmTpIdsById as $_dmIdForTp => $_tpIdsForDm) {
+        foreach ($_tpIdsForDm as $_tpId) { $_tpIdToDmId[(int)$_tpId] = (int)$_dmIdForTp; }
+    }
+    $_tpReturnByDm = [];
+    foreach ($invoiceRows as $_ir) {
+        $_dmIdForInv = $_tpIdToDmId[(int)$_ir['tp_pk']] ?? null;
+        if ($_dmIdForInv === null) { continue; }
+        $_returnedForInv = $returnByInv[$_ir['inv_id']] ?? 0.0;
+        if ($_returnedForInv <= 0) { continue; }
+        $_tpReturnByDm[$_dmIdForInv] = ($_tpReturnByDm[$_dmIdForInv] ?? 0) + $_returnedForInv;
+    }
+    foreach ($myDms as &$_dmTpReturnRef) {
+        $_dmTpReturnRef['tp_return_amt'] = $_tpReturnByDm[(int)$_dmTpReturnRef['id']] ?? 0.0;
+    }
+    unset($_dmTpReturnRef);
+}
 
 // Per-district target total (sum of each TP's own target, once per TP) —
 // feeds the top stat cards when the Shop Invoices district filter narrows
@@ -1221,6 +1336,10 @@ ksort($districtTpCounts);
                                         <?php endif; ?>
                                     </div>
                                     <div style="padding:14px 20px;">
+                                        <div style="display:inline-flex;align-items:center;gap:10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px 18px;margin-bottom:14px;">
+                                            <span style="font-size:22px;font-weight:700;color:#3730a3;"><?php echo (int)array_sum(array_column($newShopByDistrict, 'count')); ?></span>
+                                            <span style="font-size:12.5px;color:#4338ca;font-weight:600;">Total New Shops Onboarded<br>(all districts, this period)</span>
+                                        </div>
                                         <div style="overflow-x:auto;">
                                         <table class="table table-sm table-hover" style="min-width:400px;">
                                             <thead>
@@ -1231,7 +1350,7 @@ ksort($districtTpCounts);
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <?php foreach ($newShopByDistrict as $_ns): ?>
+                                                <?php $_newShopGrandTotal = 0; foreach ($newShopByDistrict as $_ns): $_newShopGrandTotal += $_ns['count']; ?>
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($_ns['district']); ?></td>
                                                     <td class="text-end"><?php echo (int)$_ns['count']; ?> / 50</td>
@@ -1245,6 +1364,13 @@ ksort($districtTpCounts);
                                                 </tr>
                                                 <?php endforeach; ?>
                                             </tbody>
+                                            <tfoot>
+                                                <tr style="font-weight:700;border-top:2px solid #e5e7eb;">
+                                                    <td>Total (all districts)</td>
+                                                    <td class="text-end"><?php echo (int)$_newShopGrandTotal; ?></td>
+                                                    <td></td>
+                                                </tr>
+                                            </tfoot>
                                         </table>
                                         </div>
                                     </div>
@@ -1641,6 +1767,8 @@ ksort($districtTpCounts);
                                                     <th class="text-end" title="This DM's own Get Order-converted, Napkin-only sales">Achieved</th>
                                                     <th class="text-end" title="Every shop invoice this DM's TPs raised in the period">TP Invoice Amount</th>
                                                     <th class="text-end" title="Achieved + TP Invoice Amount">Achieve Total</th>
+                                                    <th class="text-end" title="Return amount against invoices this DM's own Get Orders converted into">Get Order Return</th>
+                                                    <th class="text-end" title="Return amount against every shop invoice this DM's own TPs raised (broader than Get Order Return)">TP Return</th>
                                                     <th class="text-end" title="Target Amount − Achieve Total">Balance</th>
                                                     <th class="text-center" title="Date this DM's cumulative Napkin-only (no Diaper) sales first reached their Target Amount">Target Completed Date</th>
                                                     <th class="text-center">Weekly</th>
@@ -1648,13 +1776,15 @@ ksort($districtTpCounts);
                                             </thead>
                                             <tbody>
                                                 <?php
-                                                $_dmTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice_amount' => 0, 'achieve_total' => 0, 'total_balance' => 0];
+                                                $_dmTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice_amount' => 0, 'achieve_total' => 0, 'total_balance' => 0, 'get_order_return_amt' => 0, 'tp_return_amt' => 0];
                                                 foreach ($myDms as $_dmIdx => $_dmRow):
                                                     $_dmTotal['target'] += $_dmRow['target'];
                                                     $_dmTotal['achieved'] += $_dmRow['achieved'];
                                                     $_dmTotal['tp_invoice_amount'] += $_dmRow['tp_invoice_amount'];
                                                     $_dmTotal['achieve_total'] += $_dmRow['achieve_total'];
                                                     $_dmTotal['total_balance'] += $_dmRow['total_balance'];
+                                                    $_dmTotal['get_order_return_amt'] += $_dmRow['get_order_return_amt'] ?? 0;
+                                                    $_dmTotal['tp_return_amt'] += $_dmRow['tp_return_amt'] ?? 0;
                                                 ?>
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($_dmRow['name']); ?></td>
@@ -1662,6 +1792,8 @@ ksort($districtTpCounts);
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmRow['achieved'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmRow['tp_invoice_amount'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmRow['achieve_total'], 0); ?></td>
+                                                    <td class="text-end" style="color:<?php echo ($_dmRow['get_order_return_amt'] ?? 0) > 0 ? '#dc2626' : '#9ca3af'; ?>;">&#8377;<?php echo inr_format($_dmRow['get_order_return_amt'] ?? 0, 0); ?></td>
+                                                    <td class="text-end" style="color:<?php echo ($_dmRow['tp_return_amt'] ?? 0) > 0 ? '#dc2626' : '#9ca3af'; ?>;">&#8377;<?php echo inr_format($_dmRow['tp_return_amt'] ?? 0, 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmRow['total_balance'], 0); ?></td>
                                                     <td class="text-center">
                                                         <?php if (!empty($_dmRow['target_completed_date'])): ?>
@@ -1683,6 +1815,8 @@ ksort($districtTpCounts);
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['achieved'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['tp_invoice_amount'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['achieve_total'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['get_order_return_amt'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['tp_return_amt'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['total_balance'], 0); ?></td>
                                                     <td></td>
                                                     <td></td>
@@ -1878,6 +2012,7 @@ ksort($districtTpCounts);
                                                         &#8377;<?php echo inr_format(abs($_zone['overage_amt']), 0); ?>
                                                         (<?php echo number_format($_zone['overage_pct'], 1); ?>%)
                                                     </span>
+                                                    &nbsp;|&nbsp; Return: <span style="font-weight:600;color:<?php echo ($_zone['return_amt'] ?? 0) > 0 ? '#dc2626' : '#9ca3af'; ?>;">&#8377;<?php echo inr_format($_zone['return_amt'] ?? 0, 0); ?></span>
                                                     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#zoneWeeklyModal<?php echo $_zoneIdx; ?>">Weekly</button>
                                                 </span>
                                             </div>

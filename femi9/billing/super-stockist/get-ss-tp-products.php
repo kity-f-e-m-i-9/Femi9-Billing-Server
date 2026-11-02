@@ -18,6 +18,14 @@ $chk->execute();
 if ($chk->get_result()->num_rows === 0) { echo json_encode([]); exit; }
 $chk->close();
 
+// No "p.deleted_at IS NULL" gate here on purpose: Inactive means the
+// company stopped supplying/selling this product going forward, but an SS
+// who already received stock of it before that still needs to be able to
+// dispatch their own existing stock onward to their TPs — same principle
+// as products.visible_in_get_order for Marketing Staff's Get Order (see
+// db_migrations/2026_10_29_products_visible_in_get_order.sql). The real
+// gate here is s.closing_qty > 0 — the SS can only invoice what they
+// actually still hold.
 $sql = "SELECT s.product_id, p.productName, p.hsn,
             s.closing_qty AS available_qty,
             COALESCE(p.stockist_price, p.distributor_price, 0) AS rate
@@ -26,7 +34,6 @@ $sql = "SELECT s.product_id, p.productName, p.hsn,
          WHERE s.user_type = 'super_stockiest'
            AND s.user_id = '$ss_id'
            AND s.closing_qty > 0
-           AND p.deleted_at IS NULL
            AND " . tpProductTypeSqlFilter($productType) . "
          ORDER BY p.productName ASC";
 

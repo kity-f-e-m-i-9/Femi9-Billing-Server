@@ -23,6 +23,13 @@ if ($_ppcCol && $_ppcCol->num_rows === 0) {
     $db_conn->query("ALTER TABLE products ADD COLUMN packs_per_cover INT UNSIGNED NULL AFTER packs_per_carton");
 }
 
+// Self-migrating: see db_migrations/2026_10_29_products_visible_in_get_order.sql
+$_vgoCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'visible_in_get_order'");
+if ($_vgoCol && $_vgoCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN visible_in_get_order TINYINT(1) NOT NULL DEFAULT 1 AFTER deleted_at");
+    $db_conn->query("UPDATE products SET visible_in_get_order = IF(deleted_at IS NULL, 1, 0)");
+}
+
 // CSRF Token Validation Function
 function validateCSRFToken(): bool {
     if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token'])) {
@@ -83,6 +90,7 @@ if (isset($_POST['add-product'])) {
     $packs_per_cover = trim($_POST['packs_per_cover'] ?? '');
     $packs_per_cover = ($packs_per_cover === '') ? null : (int) $packs_per_cover;
     $category = ($_POST['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin';
+    $visibleInGetOrder = ($_POST['visible_in_get_order'] ?? 'yes') === 'yes' ? 1 : 0;
 
     // Check if product already exists
     $stmt = $db_conn->prepare("SELECT COUNT(*) as numProducts FROM products WHERE temp_id = ?");
@@ -95,14 +103,14 @@ if (isset($_POST['add-product'])) {
         // Insert new product
         $stmt = $db_conn->prepare(
             "INSERT INTO products (temp_id, productName, category, pieces_per_pack, packs_per_carton, packs_per_cover, mrp, supersstock_price, super_distributor_price,
-            stockist_price, distributor_price, outlet_price, gst, gst_type, hsn, rwpoints, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
+            stockist_price, distributor_price, outlet_price, gst, gst_type, hsn, rwpoints, visible_in_get_order, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())"
         );
 
         $stmt->bind_param(
-            "sssiiidddddddssd",
+            "sssiiidddddddssdi",
             $temp_id, $productName, $category, $pieces_per_pack, $packs_per_carton, $packs_per_cover, $mrp, $supersstock_price, $super_distributor_price,
-            $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints
+            $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $visibleInGetOrder
         );
         
         if ($stmt->execute()) {
@@ -157,20 +165,25 @@ if (isset($_POST['update-product'])) {
     // Never touches historical records (invoices/POs/dispatch slips look
     // products up by id directly, unfiltered), only new-order pickers.
     $isInactive = ($_POST['status'] ?? 'active') === 'inactive';
+    // Separate from Active/Inactive: Get Order (Marketing Staff) is fulfilled
+    // from a TP's existing stock or sourced elsewhere, not from company
+    // stock, so it needs its own visibility toggle independent of whether
+    // the company itself still supplies/sells this product.
+    $visibleInGetOrder = ($_POST['visible_in_get_order'] ?? 'yes') === 'yes' ? 1 : 0;
 
     // Update product
     $stmt = $db_conn->prepare(
         "UPDATE products SET productName = ?, category = ?, pieces_per_pack = ?, packs_per_carton = ?, packs_per_cover = ?, mrp = ?, supersstock_price = ?,
         super_distributor_price = ?, stockist_price = ?, distributor_price = ?,
-        outlet_price = ?, gst = ?, gst_type = ?, hsn = ?, rwpoints = ?, deleted_at = ?, updated_at = NOW()
+        outlet_price = ?, gst = ?, gst_type = ?, hsn = ?, rwpoints = ?, deleted_at = ?, visible_in_get_order = ?, updated_at = NOW()
         WHERE id = ?"
     );
 
     $deletedAtValue = $isInactive ? date('Y-m-d H:i:s') : null;
     $stmt->bind_param(
-        "ssiiidddddddssdsi",
+        "ssiiidddddddssdsii",
         $productName, $category, $pieces_per_pack, $packs_per_carton, $packs_per_cover, $mrp, $supersstock_price, $super_distributor_price,
-        $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $deletedAtValue, $update_id
+        $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $deletedAtValue, $visibleInGetOrder, $update_id
     );
     
     if ($stmt->execute()) {

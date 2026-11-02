@@ -49,5 +49,25 @@ $ins->bind_param('si', $token, $ms['id']);
 $ins->execute();
 $ins->close();
 
+// view-ms-dashboard.php's own read-only "view as" bridge
+// (company_ms_view_bridge, cookie femi9_company_ms_view) takes priority
+// over this session-based login in marketing/checksession.php -- if an
+// admin viewed a DIFFERENT staff member's dashboard that way earlier
+// (cookie still valid up to 15 min), it silently overrides whichever
+// staff member this login targets, so dashboard.php keeps showing the
+// stale one no matter who's clicked here. Clear it so this session wins.
+if (!empty($_COOKIE['femi9_company_ms_view'])) {
+    $delBridge = $db_conn->prepare("DELETE FROM company_ms_view_bridge WHERE token = ?");
+    $delBridge->bind_param('s', $_COOKIE['femi9_company_ms_view']);
+    $delBridge->execute();
+    $delBridge->close();
+}
+setcookie('femi9_company_ms_view', '', [
+    'expires'  => time() - 3600,
+    'path'     => '/',
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
+
 header('Location: ../marketing/switch-login.php?token=' . urlencode($token));
 exit;

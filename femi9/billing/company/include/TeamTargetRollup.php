@@ -132,6 +132,38 @@ function getRawAchievedDailyByMsId($db_conn, array $ids, string $fromDate, strin
     return $out;
 }
 
+// The invoice ids each person's own Get Orders actually converted into, in
+// the date range — same (ms_id, invoiced_inv_id) pairing the "Achieved"
+// queries above are built on, just returned as ids instead of summed to an
+// amount. Used to look up Return % against specifically the invoices that
+// came from a DM's own Get Orders (not every invoice their TPs ever raised
+// — that broader figure is dashboard.php's own separate Return % card).
+function getGetOrderInvoiceIdsByMsId($db_conn, array $ids, string $fromDate, string $toDate): array {
+    $out = [];
+    foreach ($ids as $id) { $out[(int)$id] = []; }
+    if (empty($ids)) return $out;
+
+    $idList = implode(',', array_map('intval', $ids));
+    $fromEsc = $db_conn->real_escape_string($fromDate);
+    $toEsc   = $db_conn->real_escape_string($toDate);
+    $res = $db_conn->query("
+        SELECT DISTINCT o.ms_id, t.invoiced_inv_id
+        FROM ms_orders o
+        JOIN tp_orders t ON t.order_id = o.order_id
+        WHERE o.ms_id IN ($idList) AND o.new_order = 'yes'
+          AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
+          AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
+    ");
+    if ($res) {
+        while ($r = $res->fetch_assoc()) {
+            $id = (int)$r['ms_id'];
+            if (!isset($out[$id])) { continue; }
+            $out[$id][] = $r['invoiced_inv_id'];
+        }
+    }
+    return $out;
+}
+
 // First date (within [$fromDate, $toDate]) on which $msId's cumulative
 // Napkin-only achieved sales reached $target — null if never reached in
 // range. $dailyByMsId is getRawAchievedDailyByMsId()'s own output (passed

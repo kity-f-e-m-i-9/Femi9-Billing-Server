@@ -71,6 +71,14 @@ if ($handle === false) {
         $requiredCols = ['name', 'state', 'district', 'mobile number', 'address'];
         $missingCols  = array_diff($requiredCols, array_keys($colIndex));
 
+        // Self-migrating — same guard as shop-action.php's own single-shop
+        // add, so a bulk CSV import gets the same real "when was this
+        // actually added" tracking.
+        $_colChk = $db_conn->query("SHOW COLUMNS FROM shop LIKE 'created_at'");
+        if ($_colChk && $_colChk->num_rows === 0) {
+            $db_conn->query("ALTER TABLE shop ADD COLUMN created_at TIMESTAMP NULL DEFAULT NULL");
+        }
+
         if (!empty($missingCols)) {
             $errors[] = "Missing required column(s) in CSV header: " . implode(', ', $missingCols)
                 . ". Columns detected in your file: " . implode(', ', array_map('trim', $header));
@@ -173,13 +181,13 @@ if ($handle === false) {
                      plan_amount,valid_months,valid_from,valid_to,amount_method,amount_status,ref_number,
                      account_status,merchantOrderId,merchantTransactionId,merchantUserId,
                      taluk_id,firka_id,distributor_id,pincode_id,gstin,onboard_userTYPE,onboard_userID,
-                     address,userid,useridtext,shop_cat,country_code,landline)
+                     address,userid,useridtext,shop_cat,country_code,landline,created_at)
                     VALUES
                     ('" . (int)$stateNode['id'] . "','" . esc($db_conn, $tempId) . "','Nil','" . esc($db_conn, $name) . "','" . (int)$districtNode['id'] . "',
                      '" . esc($db_conn, $email) . "','" . esc($db_conn, $mobile) . "','Nil','Nil','0','1','$validFrom','$validTo','Nil','Nil','Nil','Nil','Nil','Nil','Nil',
                      '" . esc($db_conn, $talukId) . "','" . esc($db_conn, $firkaId) . "','','" . esc($db_conn, $pincode) . "','" . esc($db_conn, $gstin) . "',
                      '" . esc($db_conn, $Login_user_TYPEvl) . "','" . esc($db_conn, $Login_user_IDvl) . "',
-                     '" . esc($db_conn, $address) . "','" . (int)$runningUserId . "','" . esc($db_conn, $useridtext) . "','" . (int)$shopCatId . "','" . esc($db_conn, $countryCode) . "','" . esc($db_conn, $landline) . "')");
+                     '" . esc($db_conn, $address) . "','" . (int)$runningUserId . "','" . esc($db_conn, $useridtext) . "','" . (int)$shopCatId . "','" . esc($db_conn, $countryCode) . "','" . esc($db_conn, $landline) . "',NOW())");
 
                 if ($ok) {
                     $success++;

@@ -1,11 +1,6 @@
 <?php require_once __DIR__ . '/../shared/PasswordService.php'; include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('salesbdm_manage');
 include("config.php");
-require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
-tpEnsureShopInvoiceEligibilityColumn($db_conn);
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -209,14 +204,6 @@ $i= $start_from;
 																										<td>
 													    <div class="actions-group">
 													        <a href="salesbdm_edit.php?prid=<?php echo $product_id;?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
-													        <?php $shopInvEligible = !empty($result_product_list['shop_invoice_request_eligible']); ?>
-													        <button type="button" class="action-link toggle-shop-invoice-eligible-btn"
-													                title="<?php echo $shopInvEligible ? 'Shop Invoice Permission Requests: Eligible — click to remove' : 'Shop Invoice Permission Requests: Not eligible — click to make eligible'; ?>"
-													                data-id="<?php echo (int)$result_product_list['id']; ?>"
-													                data-eligible="<?php echo $shopInvEligible ? 1 : 0; ?>"
-													                data-name="<?php echo htmlspecialchars($result_product_list['bdm_name'], ENT_QUOTES); ?>">
-													            <i class="material-icons-outlined" style="font-size:17px;color:<?php echo $shopInvEligible ? '#10b981' : '#9ca3af'; ?>;">assignment_return</i>
-													        </button>
 													        <a href="salesbdm_delete.php?prid=<?php echo $product_id;?>" class="action-link delete" title="Delete" onclick="return confirm('You want to delete confirm?');"><i class="material-icons-outlined" style="font-size:17px;color:#ef4444;">delete_outline</i></a>
 													    </div>
 													</td>

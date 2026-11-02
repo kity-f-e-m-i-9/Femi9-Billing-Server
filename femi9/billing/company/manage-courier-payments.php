@@ -120,6 +120,10 @@ $stmt->close();
                                 <button type="button" class="mcp-approve" onclick="courierApprove(<?=htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false)?>, <?=$r['detected_amount'] !== null ? $r['detected_amount'] : $r['required_amount']?>)">Approve</button>
                                 <button type="button" class="mcp-reject" onclick="courierReject(<?=htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false)?>)">Reject</button>
                             </div>
+                            <?php elseif ($r['status'] === 'accepted'): ?>
+                            <div class="mcp-actions">
+                                <button type="button" class="mcp-reject" onclick="courierDelete(<?=htmlspecialchars((string)($r['id']), ENT_QUOTES, 'ISO-8859-1', false)?>)">Remove</button>
+                            </div>
                             <?php endif; ?>
                         </div>
                         <?php endforeach; endif; ?>
@@ -149,6 +153,15 @@ $stmt->close();
     function courierReject(id) {
         if (!confirm('Reject this courier payment screenshot?')) return;
         $.post('courier-payment-review-action-ajax.php', { courier_payment_id: id, action: 'reject' })
+            .done(function (data) {
+                if (data.success) window.location.reload();
+                else alert(data.message || 'Action failed.');
+            })
+            .fail(function () { alert('Could not reach the server.'); });
+    }
+    function courierDelete(id) {
+        if (!confirm('Remove this screenshot? Use this only if it was wrongly matched to this partner. This cannot be undone, and the correct partner will still need to upload their own proof separately.')) return;
+        $.post('courier-payment-review-action-ajax.php', { courier_payment_id: id, action: 'delete' })
             .done(function (data) {
                 if (data.success) window.location.reload();
                 else alert(data.message || 'Action failed.');

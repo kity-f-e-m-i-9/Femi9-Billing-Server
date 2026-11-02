@@ -16,6 +16,14 @@ $_chkTgt = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'monthly_targ
 if ($_chkTgt && $_chkTgt->num_rows === 0) {
     $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN monthly_target_amount DECIMAL(12,2) NULL DEFAULT NULL AFTER manager_id");
 }
+// Per-DM exemption from Get Order's 100m-from-shop location check (and from
+// needing location access turned on at all) -- see order_action_get.php,
+// which reads this same column. Off by default; the company turns it on for
+// one specific DM at a time via the checkbox below, never company-wide.
+$_chkLoc = $db_conn->query("SHOW COLUMNS FROM marketing_staff LIKE 'skip_location_check'");
+if ($_chkLoc && $_chkLoc->num_rows === 0) {
+    $db_conn->query("ALTER TABLE marketing_staff ADD COLUMN skip_location_check TINYINT(1) NOT NULL DEFAULT 0 AFTER monthly_target_amount");
+}
 
 //fetch product details
 $select_product_list="select * from marketing_staff where id=?";
@@ -218,6 +226,12 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 
 <label class="form-label">Monthly Target Amount (&#8377;)</label>
 <input type="number" step="0.01" min="0" name="monthly_target_amount" value="<?=$result_product_list['monthly_target_amount'] !== null ? htmlspecialchars($result_product_list['monthly_target_amount']) : '';?>" class="form-control" placeholder="optional">
+</br>
+
+<div class="form-check">
+    <input type="checkbox" class="form-check-input" id="skipLocationCheck" name="skip_location_check" value="1" <?php echo ((int)($result_product_list['skip_location_check'] ?? 0) === 1) ? 'checked' : ''; ?>>
+    <label class="form-check-label" for="skipLocationCheck">Allow Get Order without location (skip the 100&nbsp;m shop-location check for this DM)</label>
+</div>
 </br>
 
 <?php

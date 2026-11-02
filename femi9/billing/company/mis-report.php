@@ -2791,7 +2791,7 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                     <style>
                         /* ── Main / Total Flow toggle ─────────────────── */
                         .tf-toggle { display:inline-flex; gap:4px; background:var(--page-plane); border:1px solid var(--border); border-radius:22px; padding:4px; margin-bottom:14px; }
-                        .tf-toggle-btn { border:none; background:transparent; color:var(--text-secondary); font-size:13px; font-weight:600; padding:7px 20px; border-radius:18px; cursor:pointer; transition:background .12s,color .12s; }
+                        .tf-toggle-btn { display:inline-block; border:none; background:transparent; color:var(--text-secondary); font-size:13px; font-weight:600; padding:7px 20px; border-radius:18px; cursor:pointer; text-decoration:none; transition:background .12s,color .12s; }
                         .tf-toggle-btn.active { background:var(--blue); color:#fff; }
                         /* ── Total Flow panel ─────────────────────────── */
                         .tf-banner { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:14px 20px; margin-bottom:14px; box-shadow:0 1px 2px rgba(11,11,11,0.03); }
@@ -2820,12 +2820,31 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                          Flow panel's data is fetched lazily (only on first
                          click) from dashboard-total-flow-data.php and cached
                          in JS afterwards; it never runs on normal page load. -->
+                    <?php
+                    // Income to Company / Territory Partner / Super Stockist / Stockist used to
+                    // be one "Main" tab with a Scope <select> inside it (full-page reload on
+                    // change). Company wants them as their own top-level tabs instead, next to
+                    // Total Flow -- each still a full-page link (?scope=...) since every scope's
+                    // figures are computed server-side by this same huge script, not fetched via
+                    // AJAX like Total Flow's panel is. "Main" is kept as the Income-to-Company
+                    // tab's button id/JS-toggle target so switching back from Total Flow/Sales
+                    // BDM/Marketing Staff while already on scope=company stays instant (no
+                    // reload) exactly as before; the other three scopes always navigate.
+                    $scopeTabQs = '&mis_type=' . urlencode($mis_type) . '&from=' . urlencode($from) . '&to=' . urlencode($to);
+                    ?>
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
                         <div class="tf-toggle" id="dashViewToggle" style="margin-bottom:0;">
-                            <button type="button" class="tf-toggle-btn active" id="btnDashMain" data-view="main">Main</button>
+                            <?php if ($scope === 'company'): ?>
+                            <button type="button" class="tf-toggle-btn active" id="btnDashMain" data-view="main">Income to Company</button>
+                            <?php else: ?>
+                            <a class="tf-toggle-btn" href="?scope=company<?php echo $scopeTabQs; ?>" id="btnDashMain">Income to Company</a>
+                            <?php endif; ?>
+                            <a class="tf-toggle-btn<?php echo $scope === 'tp' ? ' active' : ''; ?>" href="?scope=tp<?php echo $scopeTabQs; ?>">Territory Partner</a>
                             <button type="button" class="tf-toggle-btn" id="btnDashTotalFlow" data-view="totalflow">Total Flow</button>
                             <button type="button" class="tf-toggle-btn" id="btnDashSalesBdm" data-view="salesbdm">Sales BDM</button>
                             <button type="button" class="tf-toggle-btn" id="btnDashMarketingStaff" data-view="marketingstaff">Marketing Staff</button>
+                            <a class="tf-toggle-btn<?php echo $scope === 'super_stockiest' ? ' active' : ''; ?>" href="?scope=super_stockiest<?php echo $scopeTabQs; ?>">Super Stockist</a>
+                            <a class="tf-toggle-btn<?php echo $scope === 'stockiest' ? ' active' : ''; ?>" href="?scope=stockiest<?php echo $scopeTabQs; ?>">Stockist</a>
                         </div>
                         <?php if ($scope === 'company' && !$is_neksomo_view): ?>
                         <a href="mis-report-export-xlsx.php?scope=<?php echo urlencode($scope); ?>&from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?><?php echo $filter_tp > 0 ? '&tp_id='.(int)$filter_tp : ''; ?>"
@@ -2846,15 +2865,12 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                                     <option value="sales" selected>Sales</option>
                                 </select>
                             </div>
-                            <div>
-                                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Scope</label>
-                                <select name="scope" id="scopeSelect" class="form-control form-control-sm" style="width:190px;" onchange="this.form.submit()">
-                                    <option value="company" <?php echo $scope==='company'?'selected':''; ?>>Income to Company</option>
-                                    <option value="tp" <?php echo $scope==='tp'?'selected':''; ?>>Territory Partner</option>
-                                    <option value="super_stockiest" <?php echo $scope==='super_stockiest'?'selected':''; ?>>Super Stockist</option>
-                                    <option value="stockiest" <?php echo $scope==='stockiest'?'selected':''; ?>>Stockist</option>
-                                </select>
-                            </div>
+                            <!-- Scope is now picked via the tab row above (Income to Company /
+                                 Territory Partner / Super Stockist / Stockist), not this form --
+                                 carry the current one through as a hidden field so changing
+                                 From/To/MIS Type and clicking Apply doesn't silently reset it
+                                 back to the $scope default. -->
+                            <input type="hidden" name="scope" value="<?php echo htmlspecialchars($scope, ENT_QUOTES, 'UTF-8'); ?>">
                             <div id="tpSubFilter" style="<?php echo $scope!=='tp' ? 'display:none;' : ''; ?>">
                                 <label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px;">Territory Partner</label>
                                 <select name="tp_id" class="form-control form-control-sm" style="width:200px;" onchange="this.form.submit()">
@@ -2897,11 +2913,6 @@ if ($is_neksomo_view && !defined('MIS_REPORT_SUPPRESS_HTML')) {
                             Period: <b><?php echo date('d M Y', strtotime($from)); ?></b> to <b><?php echo date('d M Y', strtotime($to)); ?></b>
                         </div>
                     </div>
-                    <script>
-                    document.getElementById('scopeSelect').addEventListener('change', function() {
-                        document.getElementById('tpSubFilter').style.display = this.value === 'tp' ? '' : 'none';
-                    });
-                    </script>
 
                     <!-- ── SECTION NAVIGATION (quick jump) ─────────────────── -->
                     <nav class="section-nav" id="sectionNav">

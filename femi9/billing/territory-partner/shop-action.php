@@ -37,17 +37,29 @@ $useridtext = "FEMI9-R-" . str_pad($userid, 3, '0', STR_PAD_LEFT);
 $valid_from = date("Y-m-d");
 $valid_to   = date("Y-m-d", strtotime("+1 months"));
 
+// Self-migrating — shop (unlike ms_shop) had no "when was this added" column
+// at all, so a TP-added shop could never be counted into any date-ranged
+// "new shop" report (e.g. marketing/dashboard.php's "New Shop Onboarding").
+// NULL default on existing rows is deliberate: we don't know their real add
+// date, so backfilling them to NOW() would wrongly count the whole
+// historical book as "added today" the moment this migrates — only shops
+// created from here on get a real, trustworthy created_at.
+$_colChk = $db_conn->query("SHOW COLUMNS FROM shop LIKE 'created_at'");
+if ($_colChk && $_colChk->num_rows === 0) {
+    $db_conn->query("ALTER TABLE shop ADD COLUMN created_at TIMESTAMP NULL DEFAULT NULL");
+}
+
 mysqli_query($db_conn, "INSERT INTO shop
     (state_id,temp_id,user_icon,name,district_id,email,mobile_number,username,password,
      plan_amount,valid_months,valid_from,valid_to,amount_method,amount_status,ref_number,
      account_status,merchantOrderId,merchantTransactionId,merchantUserId,
      taluk_id,firka_id,distributor_id,pincode_id,gstin,onboard_userTYPE,onboard_userID,
-     address,userid,useridtext,shop_cat,country_code,landline)
+     address,userid,useridtext,shop_cat,country_code,landline,created_at)
     VALUES
     ('".db_esc($state_id)."','".db_esc($temp_id)."','".db_esc($user_icon)."','".db_esc($name)."','".db_esc($district_id)."','".db_esc($email)."','".db_esc($mobile)."',
      'Nil','Nil','0','1','".db_esc($valid_from)."','".db_esc($valid_to)."','Nil','Nil','Nil','Nil','Nil','Nil','Nil',
      '".db_esc($taluk_id)."','".db_esc($firka_id)."','','".db_esc($pincode_id)."','".db_esc($gstin)."',
      '".db_esc($Login_user_TYPEvl)."','".db_esc($Login_user_IDvl)."',
-     '".db_esc($address)."','".db_esc($userid)."','".db_esc($useridtext)."','".db_esc($shop_cat)."','".db_esc($country_code)."','".db_esc($landline)."')");
+     '".db_esc($address)."','".db_esc($userid)."','".db_esc($useridtext)."','".db_esc($shop_cat)."','".db_esc($country_code)."','".db_esc($landline)."',NOW())");
 
 echo "<script>window.location='shop-manage.php?addedsuccess';</script>";

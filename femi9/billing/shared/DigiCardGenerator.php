@@ -342,12 +342,26 @@ function _dcRenderPartnerCard(array $p)
             $valueX = $colonX + 22;
             $maxValueWidth = $W - $valueX - 60;
 
+            // A single word wider than the box (e.g. "Choolaimedu") forces
+            // _dcWrapTextLines's character-level fallback, which visually
+            // splits it mid-word ("Choolaim" / "edu") -- ugly, and avoidable
+            // simply by shrinking the font a bit further so the whole word
+            // fits on one line. Detected here (not left to the height-budget
+            // check below) so the loop keeps shrinking past a size that
+            // already satisfies the vertical budget if it would still break
+            // a word; only the font-size floor forces acceptance of a break.
             $yEnd = $formStartY;
+            $anyHardBreak = false;
             foreach ($rowsData as [, $value]) {
+                foreach (preg_split('/\s+/', trim($value)) as $word) {
+                    if ($word === '') { continue; }
+                    $wordBbox = imagettfbbox($valueSize, 0, $fontBold, $word);
+                    if (($wordBbox[2] - $wordBbox[0]) > $maxValueWidth) { $anyHardBreak = true; break; }
+                }
                 $lineCount = count(_dcWrapTextLines($fontBold, $valueSize, $value, $maxValueWidth));
                 $yEnd += (int) (($lineCount - 1) * $valueSize * 1.4) + (int) ($valueSize * 2.3);
             }
-            if ($yEnd <= $budgetBottom || $formSize <= 12) { break; }
+            if (($yEnd <= $budgetBottom && !$anyHardBreak) || $formSize <= 12) { break; }
             $formSize--;
         } while (true);
 

@@ -352,11 +352,16 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <?php endif; ?>
 
                                                     <label class="form-label">Category*</label>
-                                                    <div class="btn-group mb-2 d-block" role="group" id="productCategoryFilter">
-                                                        <button type="button" class="btn btn-outline-primary active" data-cat="napkin">Napkin</button>
-                                                        <button type="button" class="btn btn-outline-primary" data-cat="diaper">Diaper</button>
+                                                    <div id="productCategoryFilter" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+                                                        <div class="category-card active" data-cat="napkin" style="flex:1 1 160px;cursor:pointer;border:2px solid #4f6ef7;background:#eef2ff;border-radius:10px;padding:14px 16px;text-align:center;">
+                                                            <div style="font-weight:700;color:#1f2937;">Napkin</div>
+                                                            <div style="font-size:12px;color:#6b7280;margin-top:2px;">Femi9 Sanitary Napkin products</div>
+                                                        </div>
+                                                        <div class="category-card" data-cat="diaper" style="flex:1 1 160px;cursor:pointer;border:2px solid #e5e7eb;background:#fff;border-radius:10px;padding:14px 16px;text-align:center;">
+                                                            <div style="font-weight:700;color:#1f2937;">Diaper</div>
+                                                            <div style="font-size:12px;color:#6b7280;margin-top:2px;">Lumi Baby Diaper products</div>
+                                                        </div>
                                                     </div>
-                                                    <br/>
 
                                                     <div id="tpAssignBlock" style="<?=$dmHasActiveTp ? '' : 'display:none;'?>">
                                                     <label class="form-label">District Filter</label>
@@ -552,38 +557,50 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     var productCellIndex    = 1; // checkbox, product select, qty
     var productCellTemplate = null;
 
+    // Napkin/Diaper category filter. Disabling a non-matching <option> does
+    // NOT hide it from Select2's own results list — Select2 still lists a
+    // disabled option (just greyed out/unselectable), so the dropdown kept
+    // showing every product regardless of which category was active. A
+    // custom `matcher` is Select2's actual mechanism for excluding options
+    // from the results entirely, so that's what filters here now.
+    var activeProductCategory = 'napkin';
+    function productCategoryMatcher(params, data) {
+        if (data.element) {
+            var cat = data.element.getAttribute('data-category');
+            if (cat && cat !== activeProductCategory) { return null; }
+        }
+        if ($.trim(params.term) === '') { return data; }
+        if (typeof data.text === 'undefined') { return null; }
+        if (data.text.toUpperCase().indexOf(params.term.toUpperCase()) > -1) { return data; }
+        return null;
+    }
     function initProductSearch($scope) {
-        $scope.find('select.product-select').select2({ placeholder: 'Search product…', width: '100%' });
+        $scope.find('select.product-select').select2({ placeholder: 'Search product…', width: '100%', matcher: productCategoryMatcher });
     }
 
-    // Napkin/Diaper category filter — disables non-matching <option>s so
-    // Select2's own results list (which reads live from the underlying
-    // <select>'s options each time it opens) simply skips them, same as it
-    // already skips any other disabled option. Clears a row's selection if
-    // its currently-picked product falls outside the newly chosen category.
-    var activeProductCategory = 'napkin';
+    // Clears a row's selection if its currently-picked product falls outside
+    // the newly chosen category — the matcher above only controls what's
+    // offered going forward, not an already-made selection.
     function applyProductCategoryFilter($scope) {
         $scope.find('select.product-select').each(function () {
             var $sel = $(this);
-            var changedSelection = false;
-            $sel.find('option').each(function () {
-                var cat = this.getAttribute('data-category');
-                if (!cat) { return; } // the "Select Product" placeholder option
-                var show = (cat === activeProductCategory);
-                this.disabled = !show;
-                if (!show && this.selected) { this.selected = false; changedSelection = true; }
-            });
-            if (changedSelection) {
+            var opt = this.options[this.selectedIndex];
+            var cat = opt ? opt.getAttribute('data-category') : null;
+            if (cat && cat !== activeProductCategory) {
                 $sel.val('').trigger('change');
                 var row = $sel.closest('tr')[0];
                 if (row) { recalcOrderLine(row.querySelector('.order-qty')); }
             }
         });
     }
-    $(document).on('click', '#productCategoryFilter button', function () {
+    $(document).on('click', '#productCategoryFilter .category-card', function () {
         activeProductCategory = this.getAttribute('data-cat');
-        $('#productCategoryFilter button').removeClass('active');
-        $(this).addClass('active');
+        $('#productCategoryFilter .category-card').each(function () {
+            var active = (this.getAttribute('data-cat') === activeProductCategory);
+            this.classList.toggle('active', active);
+            this.style.borderColor = active ? '#4f6ef7' : '#e5e7eb';
+            this.style.background = active ? '#eef2ff' : '#fff';
+        });
         applyProductCategoryFilter($('#dataTable'));
     });
 

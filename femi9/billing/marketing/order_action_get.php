@@ -20,6 +20,29 @@ if (isset($_REQUEST['add_order_get'])) {
 	$latitude=isset($_POST["latitude"]) && $_POST["latitude"]!=='' ? floatval($_POST["latitude"]) : null;
 	$longitude=isset($_POST["longitude"]) && $_POST["longitude"]!=='' ? floatval($_POST["longitude"]) : null;
 
+	// Per-DM exemption (set on this DM's record in Manage Marketing Staff,
+	// company side) from both the "need location access on" and the 100m
+	// distance check below -- a company-approved exception for one specific
+	// person, not a general bypass. Off (0) for everyone unless explicitly
+	// turned on.
+	//
+	// Keyed off the SESSION-resolved DM id ($markeingSTFID, set by
+	// config.php from the logged-in account), never the raw $_POST['ms_id']
+	// -- that field is just a hidden form input and can be edited/forged
+	// client-side. Trusting it here would let anyone bypass the location
+	// check entirely just by POSTing the id of whichever DM happens to have
+	// the exemption turned on.
+	$skipLocationCheck = false;
+	$msIdForCheck = (int)($markeingSTFID ?? 0);
+	if ($msIdForCheck > 0) {
+		$chkSkip = mysqli_query($db_conn, "SHOW COLUMNS FROM marketing_staff LIKE 'skip_location_check'");
+		if ($chkSkip && mysqli_num_rows($chkSkip) > 0) {
+			$skipRes = mysqli_query($db_conn, "SELECT skip_location_check FROM marketing_staff WHERE id='" . $msIdForCheck . "' LIMIT 1");
+			$skipRow = $skipRes ? mysqli_fetch_assoc($skipRes) : null;
+			$skipLocationCheck = $skipRow && (int)$skipRow['skip_location_check'] === 1;
+		}
+	}
+
 	// Looks up an address string via Google's forward Geocoding API — same
 	// key/cacert setup as reverse-geocode.php (that one goes lat/lng->address,
 	// this goes address->lat/lng). Returns [lat, lng] on a confident match,
@@ -54,40 +77,42 @@ if (isset($_REQUEST['add_order_get'])) {
 	// Confirmed 2026-09-11 after a 3.5km-away order went through unchecked
 	// against exactly such a shop (the gap this whole feature closes).
 	$shop_id_esc = (int)$shop_id;
-	if ($latitude === null || $longitude === null) {
-		$_SESSION['errorMessage'] = "Could not get your current location. Please enable location access and try again — Get Order requires you to be at the shop.";
-		header("Location: add_order.php");
-		exit;
-	}
-	$shopLocRes = mysqli_query($db_conn, "SELECT address, state_name, district_name, taluk_name, pincode, latitude, longitude FROM ms_shop WHERE id='".db_esc($shop_id_esc)."' LIMIT 1");
-	$shopLocRow = $shopLocRes ? mysqli_fetch_assoc($shopLocRes) : null;
-	if (!$shopLocRow || $shopLocRow['latitude'] === null || $shopLocRow['latitude'] === '' || $shopLocRow['longitude'] === null || $shopLocRow['longitude'] === '') {
-		$addressParts = array_filter([
-			$shopLocRow['address'] ?? '', $shopLocRow['taluk_name'] ?? '',
-			$shopLocRow['district_name'] ?? '', $shopLocRow['state_name'] ?? '', $shopLocRow['pincode'] ?? '',
-		]);
-		$geocoded = geocodeShopAddress(implode(', ', $addressParts));
-		if ($geocoded === null) {
-			$_SESSION['errorMessage'] = "This shop's address could not be automatically located. Please edit the shop and manually capture its location before taking a Get Order here.";
+	if (!$skipLocationCheck) {
+		if ($latitude === null || $longitude === null) {
+			$_SESSION['errorMessage'] = "Could not get your current location. Please enable location access and try again — Get Order requires you to be at the shop.";
 			header("Location: add_order.php");
 			exit;
 		}
-		[$shopLat, $shopLng] = $geocoded;
-		mysqli_query($db_conn, "UPDATE ms_shop SET latitude='" . $shopLat . "', longitude='" . $shopLng . "' WHERE id='$shop_id_esc'");
-	} else {
-		$shopLat = (float)$shopLocRow['latitude'];
-		$shopLng = (float)$shopLocRow['longitude'];
-	}
-	$R = 6371000;
-	$dLat = deg2rad($shopLat - $latitude);
-	$dLng = deg2rad($shopLng - $longitude);
-	$a = sin($dLat / 2) ** 2 + cos(deg2rad($latitude)) * cos(deg2rad($shopLat)) * sin($dLng / 2) ** 2;
-	$distanceMeters = $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
-	if ($distanceMeters > 100) {
-		$distText = $distanceMeters >= 1000 ? round($distanceMeters / 1000, 2) . " km" : round($distanceMeters) . " m";
-		$_SESSION['errorMessage'] = "You are $distText away from this shop's location. Get Order can only be submitted within 100 m of the shop.";
-		header("Location: add_order.php");
-		exit;
+		$shopLocRes = mysqli_query($db_conn, "SELECT address, state_name, district_name, taluk_name, pincode, latitude, longitude FROM ms_shop WHERE id='".db_esc($shop_id_esc)."' LIMIT 1");
+		$shopLocRow = $shopLocRes ? mysqli_fetch_assoc($shopLocRes) : null;
+		if (!$shopLocRow || $shopLocRow['latitude'] === null || $shopLocRow['latitude'] === '' || $shopLocRow['longitude'] === null || $shopLocRow['longitude'] === '') {
+			$addressParts = array_filter([
+				$shopLocRow['address'] ?? '', $shopLocRow['taluk_name'] ?? '',
+				$shopLocRow['district_name'] ?? '', $shopLocRow['state_name'] ?? '', $shopLocRow['pincode'] ?? '',
+			]);
+			$geocoded = geocodeShopAddress(implode(', ', $addressParts));
+			if ($geocoded === null) {
+				$_SESSION['errorMessage'] = "This shop's address could not be automatically located. Please edit the shop and manually capture its location before taking a Get Order here.";
+				header("Location: add_order.php");
+				exit;
+			}
+			[$shopLat, $shopLng] = $geocoded;
+			mysqli_query($db_conn, "UPDATE ms_shop SET latitude='" . $shopLat . "', longitude='" . $shopLng . "' WHERE id='$shop_id_esc'");
+		} else {
+			$shopLat = (float)$shopLocRow['latitude'];
+			$shopLng = (float)$shopLocRow['longitude'];
+		}
+		$R = 6371000;
+		$dLat = deg2rad($shopLat - $latitude);
+		$dLng = deg2rad($shopLng - $longitude);
+		$a = sin($dLat / 2) ** 2 + cos(deg2rad($latitude)) * cos(deg2rad($shopLat)) * sin($dLng / 2) ** 2;
+		$distanceMeters = $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
+		if ($distanceMeters > 100) {
+			$distText = $distanceMeters >= 1000 ? round($distanceMeters / 1000, 2) . " km" : round($distanceMeters) . " m";
+			$_SESSION['errorMessage'] = "You are $distText away from this shop's location. Get Order can only be submitted within 100 m of the shop.";
+			header("Location: add_order.php");
+			exit;
+		}
 	}
 
 	$latitude_sql=$latitude===null ? "NULL" : "'".$latitude."'";

@@ -10,9 +10,42 @@ $id       = (int)($_POST['courier_payment_id'] ?? 0);
 $action   = $_POST['action'] ?? '';
 $reviewedBy = $_SESSION['LOGIN_USER'] ?? '';
 
-if ($id < 1 || !in_array($action, ['approve', 'reject'], true)) {
+if ($id < 1 || !in_array($action, ['approve', 'reject', 'delete'], true)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Invalid request.']);
+    exit;
+}
+
+// Delete is for a wrongly-accepted screenshot (e.g. the TP uploaded someone
+// else's payment proof under their own login) -- reached from the Accepted
+// tab, not the pending_review approve/reject flow below, so it's checked
+// and handled separately before the pending_review lookup.
+if ($action === 'delete') {
+    $delStmt = $db_conn->prepare("SELECT id, file_path FROM tp_courier_payments WHERE id = ? AND status = 'accepted'");
+    $delStmt->bind_param('i', $id);
+    $delStmt->execute();
+    $delRow = $delStmt->get_result()->fetch_assoc();
+    $delStmt->close();
+
+    if (!$delRow) {
+        echo json_encode(['success' => false, 'message' => 'This screenshot is not in Accepted status (it may already have been removed).']);
+        exit;
+    }
+
+    $del = $db_conn->prepare("DELETE FROM tp_courier_payments WHERE id = ? AND status = 'accepted'");
+    $del->bind_param('i', $id);
+    $del->execute();
+    $deleted = $del->affected_rows === 1;
+    $del->close();
+
+    if ($deleted && $delRow['file_path']) {
+        $filePath = __DIR__ . '/../territory-partner/courier_payment_screenshots/' . $delRow['file_path'];
+        if (is_file($filePath)) @unlink($filePath);
+    }
+
+    echo json_encode($deleted
+        ? ['success' => true, 'message' => 'Screenshot removed.']
+        : ['success' => false, 'message' => 'Could not remove this screenshot. Please try again.']);
     exit;
 }
 
