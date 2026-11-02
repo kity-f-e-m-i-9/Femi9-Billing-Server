@@ -104,7 +104,12 @@ if (!empty($allIds)) {
     }
 }
 
-function subtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
+// Memoized — renderRowsRecursive() calls this once per row in the whole
+// tree, and without caching, each call would re-walk its entire subtree
+// again, making total work O(n^2) (worse on a deep, narrow chain of
+// managers). $cache is keyed by id and shared across the whole render pass.
+function subtreeSumAndIds(int $id, array $byManager, array $rawStats, array &$cache): array {
+    if (isset($cache[$id])) { return $cache[$id]; }
     $sum = $rawStats[$id] ?? ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0];
     $ids = [$id];
     $children = $byManager[$id] ?? [];
@@ -113,7 +118,7 @@ function subtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
     // district targets. Same convention as company/ms-team-view.php.
     if (!empty($children)) { $sum['target'] = 0.0; }
     foreach ($children as $child) {
-        [$childSum, $childIds] = subtreeSumAndIds((int)$child['id'], $byManager, $rawStats);
+        [$childSum, $childIds] = subtreeSumAndIds((int)$child['id'], $byManager, $rawStats, $cache);
         $sum['shops']    += $childSum['shops'];
         $sum['oldshops'] += $childSum['oldshops'];
         $sum['got']      += $childSum['got'];
@@ -122,13 +127,15 @@ function subtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
         $sum['achieved'] += $childSum['achieved'];
         $ids = array_merge($ids, $childIds);
     }
-    return [$sum, $ids];
+    $cache[$id] = [$sum, $ids];
+    return $cache[$id];
 }
 
 // ── Company-wide KPI totals ─────────────────────────────────────────────────
 $kpiShops = 0; $kpiOldShops = 0; $kpiGot = 0; $kpiNo = 0; $kpiTarget = 0.0; $kpiAchieved = 0.0;
+$subtreeCache = [];
 foreach ($smRoots as $sm) {
-    [$sum] = subtreeSumAndIds((int)$sm['id'], $byManager, $rawStats);
+    [$sum] = subtreeSumAndIds((int)$sm['id'], $byManager, $rawStats, $subtreeCache);
     $kpiShops    += $sum['shops'];
     $kpiOldShops += $sum['oldshops'];
     $kpiGot      += $sum['got'];
@@ -139,10 +146,10 @@ foreach ($smRoots as $sm) {
 $kpiBalance = max(0, $kpiTarget - $kpiAchieved);
 $teamCount = count($allIds);
 
-function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, int $rank = 0, int $indentLevel = 0, string $dateParam = '', string $ordersDateParam = ''): string {
+function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, array &$subtreeCache, int $rank = 0, int $indentLevel = 0, string $dateParam = '', string $ordersDateParam = ''): string {
     $id = (int)$row['id'];
     $color = $levelColorMap[(int)$row['team_level_id']] ?? '#999999';
-    [$sum, $ids] = subtreeSumAndIds($id, $byManager, $rawStats);
+    [$sum, $ids] = subtreeSumAndIds($id, $byManager, $rawStats, $subtreeCache);
     $idsParam = implode(',', $ids);
     $indentPx = $indentLevel * 24;
 
@@ -187,11 +194,11 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
 }
 
 // Recursively render a person's row, then their direct reports' rows.
-function renderRowsRecursive(array $row, array $byManager, array $rawStats, array $levelColorMap, int $indentLevel, int $rank = 0, string $dateParam = '', string $ordersDateParam = ''): string {
-    $html = renderStatRow($row, $byManager, $rawStats, $levelColorMap, $rank, $indentLevel, $dateParam, $ordersDateParam);
+function renderRowsRecursive(array $row, array $byManager, array $rawStats, array $levelColorMap, array &$subtreeCache, int $indentLevel, int $rank = 0, string $dateParam = '', string $ordersDateParam = ''): string {
+    $html = renderStatRow($row, $byManager, $rawStats, $levelColorMap, $subtreeCache, $rank, $indentLevel, $dateParam, $ordersDateParam);
     $kids = $byManager[(int)$row['id']] ?? [];
     foreach ($kids as $kid) {
-        $html .= renderRowsRecursive($kid, $byManager, $rawStats, $levelColorMap, $indentLevel + 1, 0, $dateParam, $ordersDateParam);
+        $html .= renderRowsRecursive($kid, $byManager, $rawStats, $levelColorMap, $subtreeCache, $indentLevel + 1, 0, $dateParam, $ordersDateParam);
     }
     return $html;
 }
@@ -395,7 +402,7 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                                             <tbody>
                                             <?php $rank = 0; foreach ($smRoots as $sm):
                                                 $rank++;
-                                                echo renderRowsRecursive($sm, $byManager, $rawStats, $levelColorMap, 0, $rank, $dateParam, $ordersDateParam);
+                                                echo renderRowsRecursive($sm, $byManager, $rawStats, $levelColorMap, $subtreeCache, 0, $rank, $dateParam, $ordersDateParam);
                                             endforeach; ?>
                                             </tbody>
                                         </table>

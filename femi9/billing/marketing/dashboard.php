@@ -1389,16 +1389,76 @@ ksort($districtTpCounts);
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <p style="margin:0 0 10px;font-size:12.5px;color:#6b7280;">Shops onboarded this period, by category</p>
+                                        <p style="margin:0 0 10px;font-size:12.5px;color:#6b7280;">Shops onboarded this period, by category — click a category to see the shop list</p>
                                         <div style="display:flex;flex-wrap:wrap;gap:10px;">
                                             <?php foreach ($shopCategorySplit as $_sc): ?>
-                                            <span style="background:#eef2ff;color:#3730a3;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;"><?php echo htmlspecialchars($_sc['category']); ?>: <?php echo (int)$_sc['count']; ?></span>
+                                            <button type="button" class="scs-pill" data-category="<?php echo htmlspecialchars($_sc['category']); ?>" style="background:#eef2ff;color:#3730a3;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;border:none;cursor:pointer;"><?php echo htmlspecialchars($_sc['category']); ?>: <?php echo (int)$_sc['count']; ?></button>
                                             <?php endforeach; ?>
+                                        </div>
+                                        <div id="scsResultWrap" style="display:none;margin-top:16px;border-top:1px solid #e5e7eb;padding-top:14px;">
+                                            <p id="scsResultTitle" style="margin:0 0 8px;font-size:13px;font-weight:600;color:#374151;"></p>
+                                            <div style="overflow-x:auto;">
+                                            <table class="table table-sm table-hover">
+                                                <thead>
+                                                    <tr style="color:#6b7280;font-size:12px;text-transform:uppercase;">
+                                                        <th>Shop Name</th>
+                                                        <th>Mobile</th>
+                                                        <th>District</th>
+                                                        <th>Taluk</th>
+                                                        <th>Onboarded</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="scsResultTbody"></tbody>
+                                            </table>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        <script>
+                        (function () {
+                            var scsWrap = document.getElementById('scsResultWrap');
+                            var scsTitle = document.getElementById('scsResultTitle');
+                            var scsTbody = document.getElementById('scsResultTbody');
+                            if (!scsWrap) return;
+                            var scsEsc = document.createElement('div');
+                            function scsH(s) { scsEsc.textContent = (s == null ? '' : s); return scsEsc.innerHTML; }
+                            var scsFrom = <?php echo json_encode($from); ?>;
+                            var scsTo = <?php echo json_encode($to); ?>;
+                            document.querySelectorAll('.scs-pill').forEach(function (pill) {
+                                pill.addEventListener('click', function () {
+                                    var category = pill.getAttribute('data-category');
+                                    scsWrap.style.display = 'block';
+                                    scsTitle.textContent = category + ' — shops';
+                                    scsTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Loading…</td></tr>';
+                                    var qs = 'category=' + encodeURIComponent(category) + '&from=' + encodeURIComponent(scsFrom) + '&to=' + encodeURIComponent(scsTo);
+                                    fetch('get-shop-category-list.php?' + qs)
+                                        .then(function (r) { return r.json(); })
+                                        .then(function (rows) {
+                                            if (!rows || !rows.length) {
+                                                scsTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No shops found.</td></tr>';
+                                                return;
+                                            }
+                                            var html = '';
+                                            rows.forEach(function (r) {
+                                                html += '<tr>' +
+                                                    '<td>' + scsH(r.name) + '</td>' +
+                                                    '<td>' + scsH(r.mobile) + '</td>' +
+                                                    '<td>' + scsH(r.district) + '</td>' +
+                                                    '<td>' + scsH(r.taluk) + '</td>' +
+                                                    '<td>' + scsH(r.date) + '</td>' +
+                                                    '</tr>';
+                                            });
+                                            scsTbody.innerHTML = html;
+                                        })
+                                        .catch(function () {
+                                            scsTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Could not load — try again.</td></tr>';
+                                        });
+                                });
+                            });
+                        })();
+                        </script>
 
                         <!-- Shop Category Wise — pick a category + date range, list the actual shops -->
                         <div class="modal fade" id="shopCategoryWiseModal" tabindex="-1" aria-hidden="true">

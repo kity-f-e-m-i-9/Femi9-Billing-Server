@@ -420,6 +420,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="Retail-Report-Details-Distributor.php">Retail (D/SD)</a></li>
 						<li><a href="Retail-Report-Details-TP.php">Retail (TP)</a></li>
 						<li><a href="OT-Report-Detail-Page">OT Channel</a></li>
+						<li><a href="channel-sales-report">Channel-wise Sales</a></li>
                         </ul>
                     </li>
                     <li>
@@ -960,6 +961,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						</li>
 						<li><a href="Retail-Report-First-Page">Retail</a></li>
 						<li><a href="OT-Report-Detail-Page">OT Channel</a></li>
+						<li><a href="channel-sales-report">Channel-wise Sales</a></li>
                         </ul>
                     </li>
 					<?php }?>

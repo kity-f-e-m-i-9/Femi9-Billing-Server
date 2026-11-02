@@ -57,13 +57,13 @@ function getRawTargetAchievedStats($db_conn, array $ids, string $fromDate, strin
     // per person (matches manage_order_product.php's distinct-invoice-ids
     // approach); summing the invoice's own line items (rather than its
     // header total) is what lets Diaper lines be excluded per-item.
-    // No COLLATE cast on the join below (tp_orders.invoiced_inv_id,
-    // user_invoice.inv_id and user_invoice_items.inv_id already all share
-    // utf8mb4_general_ci — confirmed via SHOW FULL COLUMNS) — a COLLATE
-    // clause on a join column, even a no-op one matching the column's own
-    // collation, stops MySQL using its index (EXPLAIN showed a full table
-    // scan of user_invoice_items — ~180k rows — turning this into a 9s+
-    // query; removing it brought the same query under 0.2s).
+    // COLLATE cast on the join below — tp_orders.invoiced_inv_id and
+    // user_invoice_items.inv_id no longer reliably share one collation (a DB
+    // reimport/restore can recreate a table under the server's default
+    // collation instead of the original utf8mb4_general_ci), which throws
+    // "Illegal mix of collations" and 500s every page that calls this.
+    // Casting both sides to utf8mb4_general_ci costs the index use EXPLAIN
+    // showed without it, but a working query beats a fast crash.
     $fromEsc = $db_conn->real_escape_string($fromDate);
     $toEsc   = $db_conn->real_escape_string($toDate);
     $resA = $db_conn->query("
@@ -76,7 +76,7 @@ function getRawTargetAchievedStats($db_conn, array $ids, string $fromDate, strin
               AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
               AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
         ) x
-        JOIN user_invoice_items uii ON uii.inv_id = x.invoiced_inv_id
+        JOIN user_invoice_items uii ON uii.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
         JOIN products p ON p.id = uii.pr_id
         WHERE COALESCE(p.category,'') != 'diaper'
         GROUP BY x.ms_id
@@ -115,8 +115,8 @@ function getRawAchievedDailyByMsId($db_conn, array $ids, string $fromDate, strin
               AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
               AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
         ) x
-        JOIN user_invoice ui ON ui.inv_id = x.invoiced_inv_id
-        JOIN user_invoice_items uii ON uii.inv_id = x.invoiced_inv_id
+        JOIN user_invoice ui ON ui.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
+        JOIN user_invoice_items uii ON uii.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
         JOIN products p ON p.id = uii.pr_id
         WHERE COALESCE(p.category,'') != 'diaper'
         GROUP BY x.ms_id, ui.date
