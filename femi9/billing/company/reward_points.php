@@ -33,18 +33,15 @@ error_reporting(E_ALL);
 // INPUT VALIDATION & SANITIZATION
 // ============================================================================
 
-$allowed_user_types = ['super_stockiest', 'stockiest', 'super_distributor', 'distributor'];
-$getinvuser = $_REQUEST['femiusr'] ?? 'distributor';
-
-if (!in_array($getinvuser, $allowed_user_types, true)) {
-    die("Invalid user type");
-}
+// Stockist-only: Super Stockist/Distributor/Super Distributor are deliberately
+// not offered here (or anywhere this page is linked from), same as they don't
+// see reward points in their own logins -- a femiusr param for any of them is
+// ignored rather than honored.
+$allowed_user_types = ['stockiest'];
+$getinvuser = 'stockiest';
 
 $user_type_config = [
-    'super_stockiest' => ['label' => 'Super Stockist', 'table' => 'super_stockiest'],
-    'stockiest'       => ['label' => 'Stockist',       'table' => 'stockiest'],
-    'super_distributor' => ['label' => 'Super Distributor', 'table' => 'super_distributor'],
-    'distributor'     => ['label' => 'Distributor',    'table' => 'distributor']
+    'stockiest' => ['label' => 'Stockist', 'table' => 'stockiest']
 ];
 
 $lablenamedisplay = $user_type_config[$getinvuser]['label'];

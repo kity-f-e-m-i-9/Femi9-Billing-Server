@@ -96,14 +96,16 @@ unset($u);
         .badge-advance { background:#f59e0b; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         .badge-return { background:#ef4444; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         table.dataTable thead th { background:#f8f9fa; font-weight:600; }
+        table.dataTable tbody td { vertical-align: top; padding-top: 12px; padding-bottom: 12px; }
+        table.dataTable tbody td > span:first-child { display: inline-block; margin-top: 2px; }
         .legacy-col { min-width:150px; }
-        .legacy-chip { display:block; width:fit-content; white-space:nowrap; font-size:14px; font-weight:600; border-radius:14px; padding:6px 14px; margin-top:5px; line-height:1.4; }
+        .legacy-chip { display:flex; align-items:center; width:fit-content; white-space:nowrap; font-size:14px; font-weight:600; border-radius:14px; padding:6px 14px; margin-top:8px; line-height:1.4; }
         .legacy-chip-id { color:#92400e; background:#fef3c7; }
         .legacy-chip-purchase { color:#fff; background:#10b981; }
         .legacy-chip-daily { color:#fff; background:#3b82f6; }
         .legacy-chip-total { color:#fff; background:#4f46e5; }
         .legacy-chip-sales { color:#fff; background:#0ea5e9; }
-        .legacy-grand-total { display:block; font-size:11px; color:#111827; font-weight:700; margin-top:6px; border-top:1px dashed #d1d5db; padding-top:4px; white-space:nowrap; }
+        .legacy-grand-total { display:block; font-size:11px; color:#111827; font-weight:700; margin-top:8px; border-top:1px dashed #d1d5db; padding-top:6px; white-space:nowrap; }
     </style>
 </head>
 <body>

@@ -29,30 +29,13 @@ require_once $autoloadPath;
 // ============================================================================
 // XLSX EXPORT HANDLER
 // ============================================================================
-$allowed_user_types_ex = ['super_stockiest', 'stockiest', 'super_distributor', 'distributor'];
-
-$getinvuser_ex = $_REQUEST['femiusr'] ?? 'distributor';
-
-if (!in_array($getinvuser_ex, $allowed_user_types_ex, true)) {
-    die("Invalid user type");
-}
+// Stockist-only, matching reward_points.php -- see its own comment.
+$getinvuser_ex = 'stockiest';
 
 $user_type_config_ex = [
-    'super_stockiest'   => [
-        'label' => 'Super Stockist',
-        'table' => 'super_stockiest'
-    ],
-    'stockiest'         => [
+    'stockiest' => [
         'label' => 'Stockist',
         'table' => 'stockiest'
-    ],
-    'super_distributor' => [
-        'label' => 'Super Distributor',
-        'table' => 'super_distributor'
-    ],
-    'distributor'       => [
-        'label' => 'Distributor',
-        'table' => 'distributor'
     ]
 ];
 

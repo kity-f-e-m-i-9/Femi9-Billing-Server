@@ -32,11 +32,11 @@ if (!function_exists('getLegacyRolePointsAll')) {
         $fromDate = LEGACY_ROLE_POINTS_FROM_DATE;
         $toDate   = LEGACY_ROLE_POINTS_TO_DATE;
 
+        // Stockist-only -- Super Stockist/Distributor/Super Distributor legacy
+        // roles are deliberately not surfaced here (TP login, company view, or
+        // export), same restriction as reward_points.php.
         $roleTables = [
-            'super_stockiest'   => 'Super Stockist',
-            'stockiest'         => 'Stockist',
-            'super_distributor' => 'Super Distributor',
-            'distributor'       => 'Distributor',
+            'stockiest' => 'Stockist',
         ];
 
         $results = [];

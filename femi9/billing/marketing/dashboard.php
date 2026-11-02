@@ -57,6 +57,28 @@ require_once __DIR__ . '/include/AssignedLocations.php';
 require_once __DIR__ . '/include/MsDistrictScope.php';
 
 $msId          = (int)$Login_user_IDvl;
+
+// Areas the company assigned to this person TODAY (company/ms_edit.php and
+// ms_action.php both re-insert every current row into marketing_staff_locations
+// on every save, so this fires again if the company just re-saves an
+// unchanged assignment the same day — acceptable here since the point is
+// "an admin touched my area today", not a strict diff). Surfaced as a modal
+// that pops up the moment this page loads, so a DM/ASM sees it the instant
+// they log in instead of having to notice it buried in a card somewhere.
+$todayAssignedAreas = [];
+$_resTodayLoc = $db_conn->query("
+    SELECT n.name, n.depth
+    FROM marketing_staff_locations msl
+    JOIN partner_location_nodes n ON n.id = msl.location_id
+    WHERE msl.ms_id = $msId AND DATE(msl.created_at) = CURDATE()
+    ORDER BY n.name
+");
+if ($_resTodayLoc) {
+    while ($_r = $_resTodayLoc->fetch_assoc()) {
+        $todayAssignedAreas[] = $_r['name'];
+    }
+}
+
 // Target-scope nodes: District OR Division depth, used as-is (not collapsed
 // up to the enclosing district) — see getMsAssignedTargetScopeNodes()'s own
 // doc comment. $districtNames stays the generic "assigned location name(s)"
@@ -1097,6 +1119,34 @@ ksort($districtTpCounts);
     <?php endif; ?>
 </head>
 <body<?php echo $embed ? ' class="ms-embed"' : ''; ?>>
+    <?php if (!empty($todayAssignedAreas)): ?>
+    <div class="modal fade" id="newAreaAssignedModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#eef2ff;">
+                    <h5 class="modal-title" style="color:#3730a3;">New Area Assigned</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin:0 0 10px;font-size:13.5px;color:#374151;">You have been assigned to the following area<?php echo count($todayAssignedAreas) > 1 ? 's' : ''; ?> today:</p>
+                    <ul style="margin:0;padding-left:20px;">
+                        <?php foreach ($todayAssignedAreas as $_area): ?>
+                        <li style="font-size:14px;font-weight:600;color:#1f2937;"><?php echo htmlspecialchars($_area); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var _naModalEl = document.getElementById('newAreaAssignedModal');
+            if (_naModalEl && window.bootstrap) {
+                new bootstrap.Modal(_naModalEl).show();
+            }
+        });
+    </script>
+    <?php endif; ?>
     <div class="app align-content-stretch d-flex flex-wrap">
         <?php if (!$embed): ?>
         <div class="app-sidebar">

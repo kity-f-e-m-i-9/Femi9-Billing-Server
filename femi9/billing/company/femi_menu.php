@@ -471,10 +471,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li>
                         <a href="#"><i class="material-icons-two-tone">analytics</i>Reward Points<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
-						<li><a href="reward_points?pgeusr=1ss&&femiusr=super_stockiest">Super Stockist's</a></li>
 						<li><a href="reward_points?pgeusr=2st&&femiusr=stockiest">Stockist's</a></li>
-						<li><a href="reward_points?pgeusr=3dst&&femiusr=distributor">Distributor's</a></li>
-						<li><a href="reward_points?pgeusr=4sdst&&femiusr=super_distributor">Super Distributor's</a></li>
 						<li><a href="reward_points_tp">Territory Partner's</a></li>
 						<li><a href="Daily-Login-Report-First-Page">Daily Login Points</a></li>
                         </ul>
@@ -1020,10 +1017,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 					<li>
                         <a href="#"><i class="material-icons-two-tone">analytics</i>Reward Points<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                         <ul class="sub-menu">
-						<li><a href="reward_points?pgeusr=1ss&&femiusr=super_stockiest">Super Stockist's</a></li>
 						<li><a href="reward_points?pgeusr=2st&&femiusr=stockiest">Stockist's</a></li>
-						<li><a href="reward_points?pgeusr=3dst&&femiusr=distributor">Distributor's</a></li>
-						<li><a href="reward_points?pgeusr=4sdst&&femiusr=super_distributor">Super Distributor's</a></li>
 										<li><a href="reward_points_tp">Territory Partner's</a></li>
                         </ul>
                     </li>
