@@ -24,6 +24,13 @@ if ($_vgoCol && $_vgoCol->num_rows === 0) {
     $db_conn->query("UPDATE products SET visible_in_get_order = IF(deleted_at IS NULL, 1, 0)");
 }
 
+// Self-migrating: see db_migrations/2026_11_03_products_visible_to_tp_cp.sql
+$_vtcCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'visible_to_tp_cp'");
+if ($_vtcCol && $_vtcCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN visible_to_tp_cp TINYINT(1) NOT NULL DEFAULT 1 AFTER visible_in_get_order");
+    $db_conn->query("UPDATE products SET visible_to_tp_cp = IF(deleted_at IS NULL, 1, 0)");
+}
+
 //fetch product details
 $select_product_list="select * from products where id=? and (temp_id not like 'NKS-%' or temp_id is null)";
 										$fetch_product_list=db_q($db_conn,$select_product_list,[$prid]);
@@ -131,6 +138,13 @@ $select_product_list="select * from products where id=? and (temp_id not like 'N
                                                 <select name="visible_in_get_order" class="form-control" required>
                                                     <option value="yes" <?php echo $_prodVisibleInGetOrder?'selected':''; ?>>Visible</option>
                                                     <option value="no" <?php echo !$_prodVisibleInGetOrder?'selected':''; ?>>Not Visible</option>
+                                                </select>
+
+												<?php $_prodVisibleToTpCp = !isset($result_product_list["visible_to_tp_cp"]) || (int)$result_product_list["visible_to_tp_cp"] === 1; ?>
+												<label for="exampleInputEmail1" class="form-label">Visible to TP/CP (New Orders) <small class="text-muted">(controls whether a TP or CP can pick this product when placing a fresh PO to Company/Super Stockist — separate from Status and Get Order above. Stock a TP/CP/SS already holds is never affected; they can still move it onward regardless of this setting)</small></label>
+                                                <select name="visible_to_tp_cp" class="form-control" required>
+                                                    <option value="yes" <?php echo $_prodVisibleToTpCp?'selected':''; ?>>Visible</option>
+                                                    <option value="no" <?php echo !$_prodVisibleToTpCp?'selected':''; ?>>Not Visible</option>
                                                 </select>
 
 												<label for="exampleInputEmail1" class="form-label">Pieces per Pack <small class="text-muted">(optional)</small></label>

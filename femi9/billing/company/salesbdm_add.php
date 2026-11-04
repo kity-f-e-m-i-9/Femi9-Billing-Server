@@ -172,14 +172,16 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 </br>
 
 <label class="form-label">Zone</label>
-<select name="zone" class="form-control">
+<select name="zone" id="zoneSelect" class="form-control">
     <option value="">-- optional --</option>
     <?php foreach ($zonesForDropdown as $z): ?>
-    <option value="<?=htmlspecialchars($z['name'])?>"><?=htmlspecialchars($z['name'])?></option>
+    <option value="<?=htmlspecialchars($z['name'])?>" data-zone-id="<?=(int)$z['id']?>"><?=htmlspecialchars($z['name'])?></option>
     <?php endforeach; ?>
 </select>
 <?php if (empty($zonesForDropdown)): ?>
 <small class="text-muted">No zones set up yet — <a href="manage-zones.php" target="_blank">create one</a> first.</small>
+<?php else: ?>
+<small class="text-muted">Picking a zone auto-fills Assign Location with every district in it -- add or remove from there freely afterward, it won't change the zone itself.</small>
 <?php endif; ?>
 </br>
 
@@ -438,10 +440,43 @@ $db_conn->query("CREATE TABLE IF NOT EXISTS salesbdm_team_levels (
                 }
                 allNodes = resp.nodes;
                 renderList($.trim($('#lpSearchInput').val()));
+                applyPendingZoneDistricts();
             }).fail(function () {
                 $('#lpBody').html('<div class="lp-empty">Failed to load. Please try again.</div>');
             });
         }
+
+        // ---- Zone: auto-fill Assign Location with that zone's districts ----
+        // Read-only lookup (get-zone-districts.php never writes), so this only
+        // pre-fills `selected` -- the admin can still freely add/remove before
+        // Save, and doing so never touches the zone's own district list.
+        var pendingZoneDistricts = null;
+
+        function applyPendingZoneDistricts() {
+            if (!pendingZoneDistricts || !loaded) return;
+            var toApply = pendingZoneDistricts;
+            pendingZoneDistricts = null;
+            var nodeById = {};
+            $.each(allNodes, function (_, n) { nodeById[n.id] = n; });
+            $.each(toApply, function (_, d) {
+                var node = nodeById[d.id];
+                if (node && !node.is_taken && !isSelected(node.id)) {
+                    selected.push({ id: node.id, name: node.name });
+                }
+            });
+            renderChips();
+            renderList($.trim($('#lpSearchInput').val()));
+            updateHiddenInputs();
+        }
+
+        $('#zoneSelect').on('change', function () {
+            var zoneId = $(this).find(':selected').data('zone-id');
+            if (!zoneId) { return; }
+            $.getJSON('get-zone-districts.php?zone_id=' + zoneId, function (districts) {
+                pendingZoneDistricts = districts || [];
+                loadNodes();
+            });
+        });
 
         $('#locationPanel').on('click', function (e) { e.stopPropagation(); });
 

@@ -44,6 +44,20 @@ $stmt_del->bind_param("i", $tp_db_id);
 $stmt_del->execute();
 $stmt_del->close();
 
+// Free up this TP's assigned locations so they're immediately available to
+// hand to another TP (or re-assign on a recreated one) without the company
+// having to go edit territory_partner_locations by hand — search-location-
+// nodes.php's "is_taken" check only looks at this table, with no awareness
+// of deleted_at, so a soft-deleted TP's old rows here would otherwise keep
+// showing the location as locked forever. Unlike territory_partners itself,
+// this table is a pure current-assignment map with no historical reporting
+// value of its own, so deleting these rows outright (not soft-deleting) is
+// safe.
+$stmt_loc = $db_conn->prepare("DELETE FROM territory_partner_locations WHERE territory_partner_id = ?");
+$stmt_loc->bind_param("i", $tp_db_id);
+$stmt_loc->execute();
+$stmt_loc->close();
+
 require_once __DIR__ . '/../shared/TpStatusHistory.php';
 logTpStatusChange($db_conn, $tp_db_id, (int)$tp['is_active'], 0);
 

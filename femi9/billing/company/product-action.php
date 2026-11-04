@@ -30,6 +30,13 @@ if ($_vgoCol && $_vgoCol->num_rows === 0) {
     $db_conn->query("UPDATE products SET visible_in_get_order = IF(deleted_at IS NULL, 1, 0)");
 }
 
+// Self-migrating: see db_migrations/2026_11_03_products_visible_to_tp_cp.sql
+$_vtcCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'visible_to_tp_cp'");
+if ($_vtcCol && $_vtcCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN visible_to_tp_cp TINYINT(1) NOT NULL DEFAULT 1 AFTER visible_in_get_order");
+    $db_conn->query("UPDATE products SET visible_to_tp_cp = IF(deleted_at IS NULL, 1, 0)");
+}
+
 // CSRF Token Validation Function
 function validateCSRFToken(): bool {
     if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token'])) {
@@ -170,20 +177,24 @@ if (isset($_POST['update-product'])) {
     // stock, so it needs its own visibility toggle independent of whether
     // the company itself still supplies/sells this product.
     $visibleInGetOrder = ($_POST['visible_in_get_order'] ?? 'yes') === 'yes' ? 1 : 0;
+    // Separate again: whether a TP/CP can pick this product on their own
+    // "place a new PO to Company/Super Stockist" screen -- see
+    // db_migrations/2026_11_03_products_visible_to_tp_cp.sql.
+    $visibleToTpCp = ($_POST['visible_to_tp_cp'] ?? 'yes') === 'yes' ? 1 : 0;
 
     // Update product
     $stmt = $db_conn->prepare(
         "UPDATE products SET productName = ?, category = ?, pieces_per_pack = ?, packs_per_carton = ?, packs_per_cover = ?, mrp = ?, supersstock_price = ?,
         super_distributor_price = ?, stockist_price = ?, distributor_price = ?,
-        outlet_price = ?, gst = ?, gst_type = ?, hsn = ?, rwpoints = ?, deleted_at = ?, visible_in_get_order = ?, updated_at = NOW()
+        outlet_price = ?, gst = ?, gst_type = ?, hsn = ?, rwpoints = ?, deleted_at = ?, visible_in_get_order = ?, visible_to_tp_cp = ?, updated_at = NOW()
         WHERE id = ?"
     );
 
     $deletedAtValue = $isInactive ? date('Y-m-d H:i:s') : null;
     $stmt->bind_param(
-        "ssiiidddddddssdsii",
+        "ssiiidddddddssdsiii",
         $productName, $category, $pieces_per_pack, $packs_per_carton, $packs_per_cover, $mrp, $supersstock_price, $super_distributor_price,
-        $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $deletedAtValue, $visibleInGetOrder, $update_id
+        $stockist_price, $distributor_price, $outlet_price, $gst, $gst_type, $hsn, $rwpoints, $deletedAtValue, $visibleInGetOrder, $visibleToTpCp, $update_id
     );
     
     if ($stmt->execute()) {

@@ -116,10 +116,18 @@ $pickupMode = tpPickupMode($db_conn, (int)$Login_user_IDvl, $productType);
 $allowSelfPickup = ($pickupMode !== 'disabled');
 
 // Product catalog scoped to the chosen type — this is a stock replenishment
-// request to the company, not limited to what the TP already holds (unlike
-// Field Order).
+// request to the company (or, per the approver choice below, the TP's
+// assigned Super Stockist — same list either way), not limited to what the
+// TP already holds (unlike Field Order). Also gated on visible_to_tp_cp,
+// independent of Active/Inactive: see db_migrations/
+// 2026_11_03_products_visible_to_tp_cp.sql for why.
+$_vtcCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'visible_to_tp_cp'");
+if ($_vtcCol && $_vtcCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN visible_to_tp_cp TINYINT(1) NOT NULL DEFAULT 1 AFTER visible_in_get_order");
+    $db_conn->query("UPDATE products SET visible_to_tp_cp = IF(deleted_at IS NULL, 1, 0)");
+}
 $productList = [];
-$resProd = mysqli_query($db_conn, "SELECT id, productName, stockist_price, packs_per_carton FROM products WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) AND " . tpProductTypeSqlFilter($productType, 'products') . " ORDER BY productName ASC");
+$resProd = mysqli_query($db_conn, "SELECT id, productName, stockist_price, packs_per_carton FROM products WHERE deleted_at IS NULL AND visible_to_tp_cp = 1 AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) AND " . tpProductTypeSqlFilter($productType, 'products') . " ORDER BY productName ASC");
 if ($resProd) while ($p = mysqli_fetch_assoc($resProd)) $productList[] = $p;
 
 // If this TP is assigned to a Super Stockist, they get a choice of approver
@@ -496,8 +504,8 @@ $tpDeliveryAddressParts = array_filter([
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
-                                <?php if (!empty($myCps)): ?>
-                                <div id="cpStockHint" class="text-muted" style="font-size:12px;margin-top:8px;display:none;">Only products currently in stock at the selected Channel Partner are shown below.</div>
+                                <?php if (!empty($myCps) || $assignedSs !== null): ?>
+                                <div id="cpStockHint" class="text-muted" style="font-size:12px;margin-top:8px;display:none;">Only products currently in stock there are shown below.</div>
                                 <?php endif; ?>
                             </div>
                             <?php endif; ?>
@@ -755,20 +763,20 @@ $tpDeliveryAddressParts = array_filter([
                              the cart stays exactly as it was under
                              Company/SS. See checkCpStockMismatch() /
                              showCpSwitchWarning() in the script below. -->
-                        <?php if ($myCp !== null): ?>
+                        <?php if ($myCp !== null || $assignedSs !== null): ?>
                         <div class="modal fade" id="cpSwitchWarningModal" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-scrollable">
                                 <div class="modal-content" style="border:none;border-radius:14px;overflow:hidden;">
                                     <div class="modal-header" style="border-bottom:1px solid #e9ecef;">
                                         <h6 class="modal-title" style="font-weight:700;color:#1f2937;">
                                             <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:5px;color:#ef4444;">error_outline</i>
-                                            Not in stock at this Channel Partner
+                                            Not enough stock at the selected source
                                         </h6>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body" style="padding:18px 22px;">
                                         <p style="font-size:12.5px;color:#6b7280;margin-bottom:14px;">
-                                            These products already added to your cart aren't available (or don't have enough stock) at this Channel Partner. Remove them and continue, or cancel to keep this order with your current Submit To.
+                                            These products already added to your cart aren't available (or don't have enough stock) there. Remove them and continue, or cancel to keep this order with your current Submit To.
                                         </p>
                                         <div id="cpSwitchWarningList"></div>
                                     </div>
@@ -1064,15 +1072,31 @@ $tpDeliveryAddressParts = array_filter([
     // before the switch is allowed to actually happen — see
     // showCpSwitchWarning()/cancelCpSwitch()/confirmCpSwitchRemoveItems().
     var pendingCpSwitchChoice = null;
+    var pendingCpSwitchApprover = null;
     var pendingCpMismatchedIds = [];
+
+    // Source for the stock-mismatch check on a given approver — 'cp' and
+    // 'ss' both source from a specific holder's actual stock (not the
+    // static Company catalog), so switching to either needs the same
+    // already-in-cart-but-not-in-stock-there check.
+    function stockCheckUrl(choice, approver) {
+        if (approver === 'cp') {
+            var cpId = choice.getAttribute('data-cp-id');
+            return 'get-cp-products.php?cp_id=' + encodeURIComponent(cpId) + '&product_type=<?=urlencode($productType)?>';
+        }
+        if (approver === 'ss') {
+            return 'get-ss-products.php?product_type=<?=urlencode($productType)?>';
+        }
+        return null;
+    }
 
     function onApproverChange() {
         var choice = document.querySelector('input[name="approver_choice"]:checked');
         var approver = choice ? choice.value : 'company';
+        var checkUrl = stockCheckUrl(choice, approver);
 
-        if (approver === 'cp' && poLines.length > 0) {
-            var cpId = choice.getAttribute('data-cp-id');
-            $.getJSON('get-cp-products.php?cp_id=' + encodeURIComponent(cpId) + '&product_type=<?=urlencode($productType)?>', function (data) {
+        if (checkUrl && poLines.length > 0) {
+            $.getJSON(checkUrl, function (data) {
                 var stockMap = {};
                 (data || []).forEach(function (p) { stockMap[p.product_id] = parseInt(p.available_qty) || 0; });
                 var mismatched = [];
@@ -1082,14 +1106,16 @@ $tpDeliveryAddressParts = array_filter([
                 });
                 if (mismatched.length > 0) {
                     pendingCpSwitchChoice = choice;
+                    pendingCpSwitchApprover = approver;
                     pendingCpMismatchedIds = mismatched.map(function (m) { return m.pr_id; });
                     showCpSwitchWarning(mismatched);
                 } else {
                     applyApproverChange(choice, approver);
                 }
             }).fail(function () {
-                // Couldn't verify — let the normal switch proceed; loadCpProducts()
-                // has its own failure handling for a genuinely broken fetch.
+                // Couldn't verify — let the normal switch proceed; loadCpProducts()/
+                // loadSsProducts() has its own failure handling for a genuinely
+                // broken fetch.
                 applyApproverChange(choice, approver);
             });
             return;
@@ -1101,7 +1127,7 @@ $tpDeliveryAddressParts = array_filter([
     function showCpSwitchWarning(mismatched) {
         var list = document.getElementById('cpSwitchWarningList');
         list.innerHTML = mismatched.map(function (m) {
-            var reason = (m.avail === null) ? 'Not available at this CP' : ('Only ' + m.avail + ' in stock (need ' + m.qty + ')');
+            var reason = (m.avail === null) ? 'Not available there' : ('Only ' + m.avail + ' in stock (need ' + m.qty + ')');
             return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border:1px solid #fee2e2;background:#fef2f2;border-radius:10px;padding:10px 14px;margin-bottom:8px;">' +
                 '<span>' + escHtmlPo(m.name) + ' <span class="text-muted" style="font-size:11.5px;">(Qty ' + m.qty + ')</span></span>' +
                 '<span style="font-size:11px;font-weight:700;color:#991b1b;white-space:nowrap;">' + escHtmlPo(reason) + '</span>' +
@@ -1119,6 +1145,7 @@ $tpDeliveryAddressParts = array_filter([
     function cancelCpSwitch() {
         if (currentApproverEl) currentApproverEl.checked = true;
         pendingCpSwitchChoice = null;
+        pendingCpSwitchApprover = null;
         pendingCpMismatchedIds = [];
         var modalEl = document.getElementById('cpSwitchWarningModal');
         var modal = bootstrap.Modal.getInstance(modalEl);
@@ -1130,9 +1157,11 @@ $tpDeliveryAddressParts = array_filter([
         poLines = poLines.filter(function (l) { return pendingCpMismatchedIds.indexOf(l.pr_id) === -1; });
         renderPoLines();
         var choice = pendingCpSwitchChoice;
+        var approver = pendingCpSwitchApprover;
         pendingCpSwitchChoice = null;
+        pendingCpSwitchApprover = null;
         pendingCpMismatchedIds = [];
-        applyApproverChange(choice, 'cp');
+        applyApproverChange(choice, approver);
         var modalEl = document.getElementById('cpSwitchWarningModal');
         var modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
@@ -1161,6 +1190,10 @@ $tpDeliveryAddressParts = array_filter([
             var cpId = choice.getAttribute('data-cp-id');
             document.getElementById('preferred_cp_id_input').value = cpId;
             loadCpProducts(cpId);
+            if (cpHintEl) cpHintEl.style.display = '';
+        } else if (approver === 'ss') {
+            document.getElementById('preferred_cp_id_input').value = '';
+            loadSsProducts();
             if (cpHintEl) cpHintEl.style.display = '';
         } else {
             document.getElementById('preferred_cp_id_input').value = '';
@@ -1230,6 +1263,30 @@ $tpDeliveryAddressParts = array_filter([
             sel.disabled = false;
             if (!data || !data.length) {
                 sel.innerHTML = '<option value="">No stock available at this CP</option>';
+                sel.disabled = true;
+            }
+        }).fail(function () {
+            sel.innerHTML = defaultProductOptionsHtml;
+            sel.disabled = false;
+        });
+    }
+
+    function loadSsProducts() {
+        var sel = document.getElementById('pr_select');
+        if (!defaultProductOptionsHtml) { defaultProductOptionsHtml = sel.innerHTML; }
+        $(sel).val('').trigger('change');
+        document.getElementById('po_price').value = '';
+        sel.innerHTML = '<option value="">Loading…</option>';
+        sel.disabled = true;
+        $.getJSON('get-ss-products.php?product_type=<?=urlencode($productType)?>', function (data) {
+            var opts = '<option value=""></option>';
+            (data || []).forEach(function (p) {
+                opts += '<option value="' + p.product_id + '" data-price="' + p.rate + '" data-avail="' + p.available_qty + '" data-ppc="' + (p.packs_per_carton || 0) + '">' + escHtmlPo(p.productName) + '</option>';
+            });
+            sel.innerHTML = opts;
+            sel.disabled = false;
+            if (!data || !data.length) {
+                sel.innerHTML = '<option value="">No stock available at your Super Stockist</option>';
                 sel.disabled = true;
             }
         }).fail(function () {

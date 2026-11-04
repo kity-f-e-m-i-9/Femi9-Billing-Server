@@ -297,15 +297,16 @@ while($resultCountry=mysqli_fetch_array($fetchCountry)){?>
 
 <label class="form-label">Zone</label>
 <?php $currentZone = $result_product_list['zone'] ?? ''; ?>
-<select name="zone" class="form-control">
+<select name="zone" id="zoneSelect" class="form-control">
     <option value="">-- optional --</option>
     <?php foreach ($zonesForDropdown as $z): ?>
-    <option value="<?=htmlspecialchars($z['name'])?>" <?=($currentZone === $z['name']) ? 'selected' : ''?>><?=htmlspecialchars($z['name'])?></option>
+    <option value="<?=htmlspecialchars($z['name'])?>" data-zone-id="<?=(int)$z['id']?>" <?=($currentZone === $z['name']) ? 'selected' : ''?>><?=htmlspecialchars($z['name'])?></option>
     <?php endforeach; ?>
     <?php if ($currentZone !== '' && !in_array($currentZone, array_column($zonesForDropdown, 'name'), true)): ?>
     <option value="<?=htmlspecialchars($currentZone)?>" selected><?=htmlspecialchars($currentZone)?> (old value, no matching zone)</option>
     <?php endif; ?>
 </select>
+<small class="text-muted">Picking a zone auto-fills Assign Location with every district in it -- add or remove from there freely afterward, it won't change the zone itself.</small>
 </br>
 
 <div class="form-group" style="display:block;">
@@ -586,10 +587,45 @@ if ($currentTeamLevelId) {
                 }
                 allNodes = resp.nodes;
                 renderList($.trim($('#lpSearchInput').val()));
+                applyPendingZoneDistricts();
             }).fail(function () {
                 $('#lpBody').html('<div class="lp-empty">Failed to load. Please try again.</div>');
             });
         }
+
+        // ---- Zone: auto-fill Assign Location with that zone's districts ----
+        // Read-only lookup (get-zone-districts.php never writes), so this only
+        // pre-fills `selected` -- the admin can still freely add/remove before
+        // Update, and doing so never touches the zone's own district list.
+        var pendingZoneDistricts = null;
+
+        function applyPendingZoneDistricts() {
+            if (!pendingZoneDistricts || !loaded) return;
+            var toApply = pendingZoneDistricts;
+            pendingZoneDistricts = null;
+            var nodeById = {};
+            $.each(allNodes, function (_, n) { nodeById[n.id] = n; });
+            $.each(toApply, function (_, d) {
+                var node = nodeById[d.id];
+                if (node && !node.is_taken && !isSelected(node.id)) {
+                    selected.push({ id: node.id, name: node.name });
+                }
+            });
+            renderChips();
+            renderList($.trim($('#lpSearchInput').val()));
+            updateHiddenInputs();
+        }
+
+        $('#zoneSelect').on('change', function () {
+            var zoneId = $(this).find(':selected').data('zone-id');
+            if (!zoneId) { return; }
+            $.getJSON('get-zone-districts.php?zone_id=' + zoneId, function (districts) {
+                pendingZoneDistricts = districts || [];
+                // Always reload fresh (not just when not yet loaded) so
+                // is_taken reflects the current state before merging in.
+                loadNodes();
+            });
+        });
 
         $('#locationPanel').on('click', function (e) { e.stopPropagation(); });
 

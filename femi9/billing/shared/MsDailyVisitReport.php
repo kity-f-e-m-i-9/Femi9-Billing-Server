@@ -237,11 +237,12 @@ function getMsDailyVisitDaySummary(mysqli $db_conn, string $from, string $to, in
     foreach ($rows as $r) {
         $d = $r['date'];
         if (!isset($byDate[$d])) {
-            $byDate[$d] = ['date' => $d, 'total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0];
+            $byDate[$d] = ['date' => $d, 'total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0, 'diaper_value' => 0.0];
         }
         $byDate[$d]['total_visits']++;
         if ($r['is_new']) { $byDate[$d]['new_visits']++; } else { $byDate[$d]['existing_visits']++; }
         if ($r['visit_type'] === 'order') { $byDate[$d]['get_order_visits']++; }
+        $byDate[$d]['diaper_value'] += $r['diaper_value'];
 
         // Napkin/Diaper shop counts — a shop visited more than once the
         // same day for the same category still counts once (distinct shop
@@ -260,7 +261,7 @@ function getMsDailyVisitDaySummary(mysqli $db_conn, string $from, string $to, in
     $end = new DateTime($to);
     while ($cursor <= $end) {
         $d = $cursor->format('Y-m-d');
-        $row = $byDate[$d] ?? ['date' => $d, 'total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0];
+        $row = $byDate[$d] ?? ['date' => $d, 'total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0, 'diaper_value' => 0.0];
         $row['visit_target_met'] = $row['total_visits'] >= 35;
         $row['get_order_target_met'] = $row['get_order_visits'] >= 20;
         $out[] = $row;

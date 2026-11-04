@@ -1261,6 +1261,7 @@ ksort($districtTpCounts);
                                                     <th class="text-end">Get Order Visits</th>
                                                     <th class="text-end">Napkin Shops</th>
                                                     <th class="text-end">Diaper Shops</th>
+                                                    <th class="text-end">Diaper Value</th>
                                                     <th class="text-center">Status</th>
                                                 </tr>
                                             </thead>
@@ -1274,6 +1275,7 @@ ksort($districtTpCounts);
                                                     <td class="text-end"><?php echo (int)$_vd['get_order_visits']; ?> / 20</td>
                                                     <td class="text-end"><?php echo (int)$_vd['napkin_shops']; ?></td>
                                                     <td class="text-end"><?php echo (int)$_vd['diaper_shops']; ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_vd['diaper_value'], 0); ?></td>
                                                     <td class="text-center">
                                                         <?php if ($_vd['visit_target_met'] && $_vd['get_order_target_met']): ?>
                                                         <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">Met</span>
@@ -1286,7 +1288,7 @@ ksort($districtTpCounts);
                                             </tbody>
                                             <tfoot>
                                                 <?php
-                                                $_vdTot = ['total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0];
+                                                $_vdTot = ['total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0, 'diaper_value' => 0.0];
                                                 foreach ($myOwnVisitDays as $_vd) {
                                                     $_vdTot['total_visits']     += $_vd['total_visits'];
                                                     $_vdTot['new_visits']       += $_vd['new_visits'];
@@ -1294,6 +1296,7 @@ ksort($districtTpCounts);
                                                     $_vdTot['get_order_visits'] += $_vd['get_order_visits'];
                                                     $_vdTot['napkin_shops']     += $_vd['napkin_shops'];
                                                     $_vdTot['diaper_shops']     += $_vd['diaper_shops'];
+                                                    $_vdTot['diaper_value']     += $_vd['diaper_value'];
                                                 }
                                                 ?>
                                                 <tr style="font-weight:600;border-top:2px solid #e5e7eb;">
@@ -1304,6 +1307,7 @@ ksort($districtTpCounts);
                                                     <td class="text-end"><?php echo (int)$_vdTot['get_order_visits']; ?></td>
                                                     <td class="text-end"><?php echo (int)$_vdTot['napkin_shops']; ?></td>
                                                     <td class="text-end"><?php echo (int)$_vdTot['diaper_shops']; ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_vdTot['diaper_value'], 0); ?></td>
                                                     <td></td>
                                                 </tr>
                                             </tfoot>
@@ -1734,12 +1738,13 @@ ksort($districtTpCounts);
                                                                 <th class="text-end">Get Order Visits</th>
                                                                 <th class="text-end">Napkin Shops</th>
                                                                 <th class="text-end">Diaper Shops</th>
+                                                                <th class="text-end">Diaper Value</th>
                                                                 <th class="text-center">Status</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody id="dmVisitTbody<?php echo $_i; ?>">
                                                             <?php
-                                                            $_dmVdTot = ['total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0];
+                                                            $_dmVdTot = ['total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0, 'diaper_value' => 0.0];
                                                             foreach (($_dm['visit_days'] ?? []) as $_vd):
                                                                 $_dmVdTot['total_visits']     += $_vd['total_visits'];
                                                                 $_dmVdTot['new_visits']       += $_vd['new_visits'];
@@ -1747,6 +1752,7 @@ ksort($districtTpCounts);
                                                                 $_dmVdTot['get_order_visits'] += $_vd['get_order_visits'];
                                                                 $_dmVdTot['napkin_shops']     += $_vd['napkin_shops'];
                                                                 $_dmVdTot['diaper_shops']     += $_vd['diaper_shops'];
+                                                                $_dmVdTot['diaper_value']     += $_vd['diaper_value'];
                                                             ?>
                                                             <tr>
                                                                 <td><?php echo date('d M Y', strtotime($_vd['date'])); ?></td>
@@ -1756,6 +1762,7 @@ ksort($districtTpCounts);
                                                                 <td class="text-end"><?php echo (int)$_vd['get_order_visits']; ?> / 20</td>
                                                                 <td class="text-end"><?php echo (int)$_vd['napkin_shops']; ?></td>
                                                                 <td class="text-end"><?php echo (int)$_vd['diaper_shops']; ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_vd['diaper_value'], 0); ?></td>
                                                                 <td class="text-center">
                                                                     <?php if ($_vd['visit_target_met'] && $_vd['get_order_target_met']): ?>
                                                                     <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">Met</span>
@@ -1775,6 +1782,7 @@ ksort($districtTpCounts);
                                                                 <td class="text-end"><?php echo (int)$_dmVdTot['get_order_visits']; ?></td>
                                                                 <td class="text-end"><?php echo (int)$_dmVdTot['napkin_shops']; ?></td>
                                                                 <td class="text-end"><?php echo (int)$_dmVdTot['diaper_shops']; ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_dmVdTot['diaper_value'], 0); ?></td>
                                                                 <td></td>
                                                             </tr>
                                                         </tfoot>

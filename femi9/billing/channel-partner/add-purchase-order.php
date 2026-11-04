@@ -115,9 +115,15 @@ $headroom = cpAvailableHeadroom($db_conn, (int)$Login_user_IDvl);
 
 // Product catalog scoped to the chosen type, priced at MRP — this is a stock
 // replenishment request to the company, not limited to what the CP already
-// holds.
+// holds. Also gated on visible_to_tp_cp, independent of Active/Inactive:
+// see db_migrations/2026_11_03_products_visible_to_tp_cp.sql for why.
+$_vtcCol = $db_conn->query("SHOW COLUMNS FROM products LIKE 'visible_to_tp_cp'");
+if ($_vtcCol && $_vtcCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE products ADD COLUMN visible_to_tp_cp TINYINT(1) NOT NULL DEFAULT 1 AFTER visible_in_get_order");
+    $db_conn->query("UPDATE products SET visible_to_tp_cp = IF(deleted_at IS NULL, 1, 0)");
+}
 $productList = [];
-$resProd = mysqli_query($db_conn, "SELECT id, productName, mrp FROM products WHERE deleted_at IS NULL AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) AND " . tpProductTypeSqlFilter($productType, 'products') . " ORDER BY productName ASC");
+$resProd = mysqli_query($db_conn, "SELECT id, productName, mrp FROM products WHERE deleted_at IS NULL AND visible_to_tp_cp = 1 AND (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) AND " . tpProductTypeSqlFilter($productType, 'products') . " ORDER BY productName ASC");
 if ($resProd) while ($p = mysqli_fetch_assoc($resProd)) $productList[] = $p;
 
 // CP's own registered delivery address — shown as the default when the

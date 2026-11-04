@@ -29,7 +29,7 @@ foreach ($pr_ids as $i => $rpid) {
     $qty = (int)($qtys[$i] ?? 0);
     if ($pid < 1 || $qty < 1) continue;
 
-    $pStmt = $db_conn->prepare("SELECT mrp FROM products WHERE id = ? AND deleted_at IS NULL LIMIT 1");
+    $pStmt = $db_conn->prepare("SELECT mrp FROM products WHERE id = ? AND deleted_at IS NULL AND visible_to_tp_cp = 1 LIMIT 1");
     $pStmt->bind_param("i", $pid);
     $pStmt->execute();
     $pRow = $pStmt->get_result()->fetch_assoc();
