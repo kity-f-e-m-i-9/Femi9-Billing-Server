@@ -29,9 +29,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && in_array($_GET['action'] ?? '', ['li
     }
     if ($_GET['action'] === 'list') {
         $q = filter_var($_GET['q'] ?? '', FILTER_VALIDATE_INT) ?: null;
+        $qb = filter_var($_GET['qb'] ?? '', FILTER_VALIDATE_INT) ?: null;
         $page = get_transferable_raw_material_bundles_page(
             $db_conn, $rp, $cg, $wh, $q,
-            (int) ($_GET['limit'] ?? 100), (int) ($_GET['offset'] ?? 0)
+            (int) ($_GET['limit'] ?? 100), (int) ($_GET['offset'] ?? 0), $qb
         );
         echo json_encode([
             'summary'  => get_transferable_bundle_summary($db_conn, $rp, $cg, $wh),
@@ -45,7 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && in_array($_GET['action'] ?? '', ['li
     try {
         $sel = select_transferable_raw_material_bundles(
             $db_conn, $rp, $cg, $wh, (string) ($_GET['mode'] ?? ''),
-            (int) ($_GET['n'] ?? 0), (int) ($_GET['from'] ?? 0), (int) ($_GET['to'] ?? 0)
+            (int) ($_GET['n'] ?? 0), (int) ($_GET['from'] ?? 0), (int) ($_GET['to'] ?? 0),
+            (int) ($_GET['batch'] ?? 0) ?: null
         );
         echo json_encode(['count' => count($sel['ids']), 'pieces' => $sel['pieces'], 'overflow' => $sel['overflow'], 'cap' => RM_BUNDLE_TRANSFER_CAP]);
     } catch (StockException $e) {
@@ -265,6 +267,7 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
                                             </div>
                                             <div class="bt-panel" data-mode="range" hidden>
                                                 <div class="bt-range">
+                                                    <div class="ata-field"><label>Batch no.</label><input type="number" inputmode="numeric" min="1" name="range_batch" id="btRangeBatch" placeholder="e.g. 3"></div>
                                                     <div class="ata-field"><label>From bundle no.</label><input type="number" inputmode="numeric" min="1" name="range_from" id="btRangeFrom" placeholder="e.g. 12"></div>
                                                     <div class="ata-field"><label>To bundle no.</label><input type="number" inputmode="numeric" min="1" name="range_to" id="btRangeTo" placeholder="e.g. 480"></div>
                                                 </div>
@@ -272,6 +275,7 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
                                             <div class="bt-panel" data-mode="ids" hidden>
                                                 <div class="ata-field" style="max-width:260px;margin-bottom:10px;">
                                                     <label>Find bundle no.</label>
+                                                    <input type="number" inputmode="numeric" min="1" id="btSearchBatch" placeholder="Batch number" style="max-width:140px;margin-right:6px;">
                                                     <input type="number" inputmode="numeric" min="1" id="btSearch" placeholder="Type a bundle number">
                                                 </div>
                                                 <div class="bt-list-scroll">
@@ -319,7 +323,8 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
                                             $srcNos = explode(',', $b['source_nos']);
                                             $newNos = explode(',', $b['new_nos']);
                                             $pairs = [];
-                                            foreach ($srcNos as $i => $sno) { $pairs[] = '#' . (int)$sno . ' → #' . (int)($newNos[$i] ?? 0); }
+                                            $fmtNo = function ($v) { $p = explode('/', (string) $v); return ($p[0] !== '-' && $p[0] !== '' ? 'B' . (int) $p[0] . '·' : '') . '#' . (int) ($p[1] ?? $p[0]); };
+                                            foreach ($srcNos as $i => $sno) { $pairs[] = $fmtNo($sno) . ' → ' . $fmtNo($newNos[$i] ?? '0'); }
                                         ?>
                                             <tr<?= $b['status'] === 'undone' ? ' style="opacity:.55;"' : '' ?>>
                                                 <td><?= date('d-M-Y H:i', strtotime($b['created_at'])) ?></td>
@@ -372,13 +377,13 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
         toCg = $('btToCg'), toWh = $('btToWh'), rows = $('btRows'),
         hint = $('btHint'), selectWrap = $('btSelectWrap'), sourceSummary = $('btSourceSummary'),
         preview = $('btPreview'), submit = $('btSubmit'), barSummary = $('btBarSummary'),
-        countN = $('btCountN'), rangeFrom = $('btRangeFrom'), rangeTo = $('btRangeTo'),
+        countN = $('btCountN'), rangeFrom = $('btRangeFrom'), rangeTo = $('btRangeTo'), rangeBatch = $('btRangeBatch'), searchBatch = $('btSearchBatch'),
         search = $('btSearch'), moreBtn = $('btMore'), listInfo = $('btListInfo'),
         pickedInputs = $('btPickedInputs');
 
     var CAP = 2000, PICK_CAP = 200, PAGE = 100;
     var selected = new Map();           // id -> remaining (Pick individually)
-    var listOffset = 0, listQuery = '', listToken = 0, previewToken = 0, previewTimer = null;
+    var listOffset = 0, listQuery = '', listBatch = '', listToken = 0, previewToken = 0, previewTimer = null;
     var previewState = { count: 0, pieces: 0, ok: false };
 
     function fmt(n) { return Number(n).toLocaleString('en-IN'); }
@@ -422,7 +427,7 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
         if (m === 'range') {
             var f = parseInt(rangeFrom.value, 10), t = parseInt(rangeTo.value, 10);
             if (!(f > 0) || !(t >= f)) { showPreview(''); refreshBar(); return; }
-            extra = '&action=preview&mode=range&from=' + f + '&to=' + t;
+            extra = '&action=preview&mode=range&from=' + f + '&to=' + t + (parseInt(rangeBatch.value, 10) > 0 ? '&batch=' + parseInt(rangeBatch.value, 10) : '');
         } else {
             var n = parseInt(countN.value, 10);
             if (!(n > 0)) { showPreview(''); refreshBar(); return; }
@@ -458,7 +463,7 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
         var date = b.created_at ? b.created_at.substring(0, 10) : '';
         var isSel = selected.has(b.id);
         tr.innerHTML = '<td><input type="checkbox" class="bt-check" value="' + b.id + '" data-remaining="' + b.remaining_pieces + '"' + (isSel ? ' checked' : '') + '></td>'
-            + '<td>Bundle #' + b.bundle_no + '</td>'
+            + '<td>' + (b.batch_no ? 'Batch ' + b.batch_no + ' · ' : '') + 'Bundle #' + b.bundle_no + '</td>'
             + '<td style="text-align:right;">' + fmt(b.nominal_pieces) + '</td>'
             + '<td style="text-align:right;">' + fmt(b.remaining_pieces) + '</td>'
             + '<td>' + esc(date) + '</td>';
@@ -481,7 +486,7 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
         if (!sourceReady()) return;
         if (!append) { listOffset = 0; rows.innerHTML = ''; }
         var token = ++listToken;
-        fetch(qs('&action=list&limit=' + PAGE + '&offset=' + listOffset + (listQuery ? '&q=' + encodeURIComponent(listQuery) : '')), { credentials: 'same-origin' })
+        fetch(qs('&action=list&limit=' + PAGE + '&offset=' + listOffset + (listQuery ? '&q=' + encodeURIComponent(listQuery) : '') + (listBatch ? '&qb=' + encodeURIComponent(listBatch) : '')), { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (token !== listToken || d.error) return;
@@ -541,12 +546,14 @@ $batches = get_raw_material_bundle_transfer_batches($db_conn, 100);
     [product, fromCg, fromWh].forEach(function (el) { el.addEventListener('change', loadSource); });
     [toCg, toWh].forEach(function (el) { el.addEventListener('change', refreshBar); });
     document.querySelectorAll('input[name="selection_mode"]').forEach(function (r) { r.addEventListener('change', applyMode); });
-    [countN, rangeFrom, rangeTo].forEach(function (el) { el.addEventListener('input', schedulePreview); });
+    [countN, rangeFrom, rangeTo, rangeBatch].forEach(function (el) { el.addEventListener('input', schedulePreview); });
     moreBtn.addEventListener('click', function () { loadList(true); });
     var searchTimer = null;
-    search.addEventListener('input', function () {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(function () { listQuery = search.value.trim(); loadList(false); }, 300);
+    [search, searchBatch].forEach(function (el) {
+        el.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function () { listQuery = search.value.trim(); listBatch = searchBatch.value.trim(); loadList(false); }, 300);
+        });
     });
 
     $('btForm').addEventListener('submit', function (e) {

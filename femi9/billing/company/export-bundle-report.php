@@ -41,7 +41,7 @@ if ($tab === 'transactions') {
         femi_fputcsv($out, [
             date('d-M-Y H:i', strtotime($r['created_at'])),
             ucfirst($r['type']),
-            !empty($r['is_bucket']) ? 'Loose pieces bucket' : 'Bundle #' . ($r['bundle_no'] ?? $r['bundle_id']),
+            !empty($r['is_bucket']) ? 'Loose pieces bucket' : rm_bundle_tag($r['batch_no'] ?? null, $r['bundle_no'] ?? $r['bundle_id']),
             $r['product_name'],
             $r['gname'],
             $r['warehouse_code'] ?? '',

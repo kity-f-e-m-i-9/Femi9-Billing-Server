@@ -376,7 +376,7 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                                     <summary style="cursor:pointer;color:#6b7280;">Recent movements</summary>
                                     <?php foreach ($k['entries'] as $e): ?>
                                     <div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed #eef0f3;">
-                                        <span><?php echo htmlspecialchars($bucketTypeLabels[$e['type']] ?? $e['type'], ENT_QUOTES, 'UTF-8'); ?><?php echo $e['bundle_no'] !== null ? ' #' . (int) $e['bundle_no'] : ''; ?> <span class="text-muted"><?php echo date('d-M H:i', strtotime($e['created_at'])); ?></span></span>
+                                        <span><?php echo htmlspecialchars($bucketTypeLabels[$e['type']] ?? $e['type'], ENT_QUOTES, 'UTF-8'); ?><?php echo $e['bundle_no'] !== null ? ' ' . htmlspecialchars(rm_bundle_tag($e['batch_no'] ?? null, (int) $e['bundle_no']), ENT_QUOTES, 'UTF-8') : ''; ?> <span class="text-muted"><?php echo date('d-M H:i', strtotime($e['created_at'])); ?></span></span>
                                         <strong style="color:<?php echo $e['qty'] >= 0 ? '#15803d' : '#b91c1c'; ?>;"><?php echo ($e['qty'] >= 0 ? '+' : '') . number_format($e['qty']); ?></strong>
                                     </div>
                                     <?php endforeach; ?>
@@ -451,6 +451,8 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                             <button type="button" class="ata-chip" id="rangeToggleChip">Number range</button>
                         </div>
                         <div class="ata-range-row" id="rangeRow" hidden>
+                            <span>Batch</span>
+                            <input type="number" min="1" id="rangeBatch" placeholder="batch" style="max-width:90px;">
                             <span>Bundle no.</span>
                             <input type="number" min="1" id="rangeFrom" placeholder="from">
                             <span>to</span>
@@ -507,6 +509,7 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                              data-search="<?php echo htmlspecialchars($searchBlob, ENT_QUOTES, 'UTF-8'); ?>"
                              data-bundle-id="<?php echo (int) $b['id']; ?>"
                              data-no="<?php echo (int) $b['bundle_no']; ?>"
+                             data-batch="<?php echo (int) ($b['batch_no'] ?? 0); ?>"
                              data-remaining="<?php echo (int) $b['remaining_pieces']; ?>"
                              data-bundle-label="<?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>"
                              role="button" tabindex="0"
@@ -515,7 +518,7 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                              style="cursor:pointer;">
                             <div class="ata-bc-top">
                                 <div>
-                                    <div class="ata-bc-title"><?php if ($b['status'] === 'open'): ?><input type="checkbox" class="bundle-select-cb" value="<?php echo (int) $b['id']; ?>" data-no="<?php echo (int) $b['bundle_no']; ?>" data-remaining="<?php echo max(0, (int) $b['remaining_pieces']); ?>" onclick="event.stopPropagation();" aria-label="Select <?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?>" style="width:18px;height:18px;margin-right:8px;vertical-align:-3px;cursor:pointer;"><?php endif; ?><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                    <div class="ata-bc-title"><?php if ($b['status'] === 'open'): ?><input type="checkbox" class="bundle-select-cb" value="<?php echo (int) $b['id']; ?>" data-no="<?php echo (int) $b['bundle_no']; ?>" data-batch="<?php echo (int) ($b['batch_no'] ?? 0); ?>" data-remaining="<?php echo max(0, (int) $b['remaining_pieces']); ?>" onclick="event.stopPropagation();" aria-label="Select <?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?>" style="width:18px;height:18px;margin-right:8px;vertical-align:-3px;cursor:pointer;"><?php endif; ?><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></div>
                                     <div class="ata-bc-product"><?php echo htmlspecialchars($b['product_name'], ENT_QUOTES, 'UTF-8'); ?></div>
                                 </div>
                                 <span class="<?php echo $b['status'] === 'open' ? 'badge-open' : 'badge-closed'; ?>"><?php echo ucfirst($b['status']); ?></span>
@@ -543,12 +546,12 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
 
                             <?php if ($isCarried): ?>
                             <div style="font-size:11.5px;color:#6b7280;margin-bottom:8px;">
-                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</i> Carried into Bundle #<?php echo (int) ($b['carried_to_bundle_no'] ?? $b['carried_to_bundle_id']); ?>
+                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</i> Carried into <?php echo htmlspecialchars($b['carried_to_tag'] ?? ('Bundle #' . (int) $b['carried_to_bundle_id']), ENT_QUOTES, 'UTF-8'); ?>
                             </div>
                             <?php endif; ?>
                             <?php if ($b['carried_from_bundle_id'] !== null): ?>
                             <div style="font-size:11.5px;color:#6b7280;margin-bottom:8px;">
-                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</i> Carried from Bundle #<?php echo (int) ($b['carried_from_bundle_no'] ?? $b['carried_from_bundle_id']); ?>
+                                <i class="material-icons-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</i> Carried from <?php echo htmlspecialchars($b['carried_from_tag'] ?? ('Bundle #' . (int) $b['carried_from_bundle_id']), ENT_QUOTES, 'UTF-8'); ?>
                             </div>
                             <?php endif; ?>
 
@@ -578,7 +581,7 @@ ksort($bundlesByProduct, SORT_STRING | SORT_FLAG_CASE);
                                     <div style="display:flex;align-items:center;gap:8px;" onclick="event.stopPropagation();">
                                         <span class="text-muted small"><?php echo htmlspecialchars($b['closed_by'] ?? '', ENT_QUOTES, 'UTF-8'); ?></span>
                                         <?php if ($b['transferred_to_bundle_id'] === null): ?>
-                                        <form method="post" style="display:inline;" onsubmit="return confirm('Reopen <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>?<?php echo $b['carried_to_bundle_id'] !== null ? ' This will also pull back the leftover pieces that were carried forward to Bundle #' . (int) ($b['carried_to_bundle_no'] ?? $b['carried_to_bundle_id']) . '.' : (($b['to_bucket_pieces'] ?? 0) > 0 ? ' This will also take ' . (int) $b['to_bucket_pieces'] . ' pc back out of the loose-pieces bucket.' : ''); ?>');">
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('Reopen <?php echo htmlspecialchars(addslashes($b['label']), ENT_QUOTES, 'UTF-8'); ?>?<?php echo $b['carried_to_bundle_id'] !== null ? ' This will also pull back the leftover pieces that were carried forward to ' . addslashes($b['carried_to_tag'] ?? ('Bundle #' . (int) $b['carried_to_bundle_id'])) . '.' : (($b['to_bucket_pieces'] ?? 0) > 0 ? ' This will also take ' . (int) $b['to_bucket_pieces'] . ' pc back out of the loose-pieces bucket.' : ''); ?>');">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
                                             <input type="hidden" name="action" value="reopen">
                                             <input type="hidden" name="bundle_id" value="<?php echo (int) $b['id']; ?>">
@@ -1386,10 +1389,12 @@ document.getElementById('rangeApply').addEventListener('click', function () {
     var from = parseInt(document.getElementById('rangeFrom').value, 10);
     var to = parseInt(document.getElementById('rangeTo').value, 10);
     if (!(from > 0) || !(to >= from)) { alert('Enter a valid bundle number range (from ≤ to).'); return; }
+    var batchSel = parseInt(document.getElementById('rangeBatch').value, 10) || 0;
     clearAllSelection();
     visibleOpenCbs().forEach(function (cb) {
         var no = parseInt(cb.getAttribute('data-no'), 10) || 0;
-        if (no >= from && no <= to) cb.checked = true;
+        var bt = parseInt(cb.getAttribute('data-batch'), 10) || 0;
+        if (no >= from && no <= to && (!batchSel || bt === batchSel)) cb.checked = true;
     });
     document.querySelectorAll('.ata-loc-group').forEach(function (g) { if (g.querySelector('.bundle-select-cb:checked')) g.classList.remove('is-collapsed'); });
     updateBulkBar();
@@ -1410,7 +1415,7 @@ function renderReview() {
         var main = document.createElement('div');
         main.className = 'ri-main';
         var t = document.createElement('div');
-        t.textContent = card.getAttribute('data-bundle-label') || ('Bundle #' + cb.getAttribute('data-no'));
+        t.textContent = card.getAttribute('data-bundle-label') || ((cb.getAttribute('data-batch') > 0 ? 'Batch ' + cb.getAttribute('data-batch') + ' · ' : '') + 'Bundle #' + cb.getAttribute('data-no'));
         var sub = document.createElement('div');
         sub.className = 'ri-sub';
         sub.textContent = card.getAttribute('data-product') + ' · ' + card.getAttribute('data-godown')

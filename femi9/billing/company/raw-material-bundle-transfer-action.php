@@ -89,7 +89,8 @@ if ($action === 'transfer') {
         if ($selectionMode !== 'ids') {
             $sel = select_transferable_raw_material_bundles(
                 $db_conn, $rawProductId, $fromCg, $fromWh, $selectionMode,
-                (int) ($_POST['count_n'] ?? 0), (int) ($_POST['range_from'] ?? 0), (int) ($_POST['range_to'] ?? 0)
+                (int) ($_POST['count_n'] ?? 0), (int) ($_POST['range_from'] ?? 0), (int) ($_POST['range_to'] ?? 0),
+                (int) ($_POST['range_batch'] ?? 0) ?: null
             );
             if ($sel['overflow']) {
                 throw new StockException("More than " . number_format(RM_BUNDLE_TRANSFER_CAP) . " bundles match — narrow the range, then repeat.");
