@@ -24,6 +24,10 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
     if ($_statusCol && $_statusCol->num_rows === 0) {
         $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
     }
+    $_districtCol = $db_conn->query("SHOW COLUMNS FROM ot_sales LIKE 'district'");
+    if ($_districtCol && $_districtCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE ot_sales ADD COLUMN district VARCHAR(100) NULL DEFAULT NULL AFTER customer_address");
+    }
 
     $tempid         = str_replace("'", "&#39;", $_REQUEST['tempid']);
     $godownid       = str_replace("'", "&#39;", $_REQUEST['godownid']);
@@ -64,6 +68,7 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
         : "";
 
     $customer_address  = RemoveSpecialChar(str_replace("'", "&#39;", $_POST["customer_address"]));
+    $district          = RemoveSpecialChar(str_replace("'", "&#39;", $_POST["district"] ?? ''));
     $shipping_address  = RemoveSpecialChar(str_replace("'", "&#39;", $_POST["shipping_address"]));
 
     $gst_number = ($_POST["gst_number"] != NULL)
@@ -230,17 +235,17 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
                 "INSERT INTO ot_sales
                     (godownid, warehouse_id, cat, qty, date, tempid, prid, price, discount,
                      sub_total, total, gst, gst_amount, customer_name, customer_mobile,
-                     customer_address, order_number, amount_received, amount_date,
+                     customer_address, district, order_number, amount_received, amount_date,
                      shipping_address, gst_number, order_date, ship_date, hsn,
                      buyer_gsttype, state_id, gst_type, username, usertype)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0', '1991-01-01',
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0', '1991-01-01',
                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $stmt->bind_param(
-                'iissssidddddsssssssssssssss',
+                'iissssidddddssssssssssssssss',
                 $godownid, $warehouseId, $catname, $qty_value, $date, $tempid, $product_id_value,
                 $rate_value, $discount_value, $sub_total, $total, $gst, $gst_amount,
-                $customer_name, $customer_mobile, $customer_address, $order_number,
+                $customer_name, $customer_mobile, $customer_address, $district, $order_number,
                 $shipping_address, $gst_number, $order_date, $ship_date, $hsn,
                 $buyer_gsttype, $state_id, $gst_type, $username, $usertype
             );
@@ -383,6 +388,7 @@ if (isset($_REQUEST['updateRecord'])) {
         : "";
 
     $customer_address = RemoveSpecialChar(str_replace("'", "&#39;", $_POST["customer_address"]));
+    $district         = RemoveSpecialChar(str_replace("'", "&#39;", $_POST["district"] ?? ''));
     $shipping_address = RemoveSpecialChar(str_replace("'", "&#39;", $_POST["shipping_address"]));
 
     $gst_number = ($_POST["gst_number"] != NULL)
@@ -438,6 +444,10 @@ if (isset($_REQUEST['updateRecord'])) {
     $_statusColUpd = $db_conn->query("SHOW COLUMNS FROM ot_sales_invoice LIKE 'status'");
     if ($_statusColUpd && $_statusColUpd->num_rows === 0) {
         $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
+    }
+    $_districtColUpd = $db_conn->query("SHOW COLUMNS FROM ot_sales LIKE 'district'");
+    if ($_districtColUpd && $_districtColUpd->num_rows === 0) {
+        $db_conn->query("ALTER TABLE ot_sales ADD COLUMN district VARCHAR(100) NULL DEFAULT NULL AFTER customer_address");
     }
     $stmtStatusUpd = $db_conn->prepare("SELECT status FROM ot_sales_invoice WHERE tempid = ?");
     $stmtStatusUpd->bind_param('s', $tempid);
@@ -540,14 +550,14 @@ if (isset($_REQUEST['updateRecord'])) {
         db_q($db_conn,$update_total,[$unroundvalue,$roundoff,$net_total,$tempid]);
     }
 
-    $Update_Records = "update ot_sales set 
+    $Update_Records = "update ot_sales set
         cat=?, date=?, customer_name=?,
-        customer_mobile=?, customer_address=?,
+        customer_mobile=?, customer_address=?, district=?,
         order_number=?, shipping_address=?,
         gst_number=?, order_date=?, ship_date=?,
-        state_id=?, gst_type=? 
+        state_id=?, gst_type=?
         where tempid=?";
-    db_q($db_conn,$Update_Records,[$catname,$date,$customer_name,$customer_mobile,$customer_address,$order_number,$shipping_address,$gst_number,$order_date,$ship_date,$state_id,$gst_type,$tempid]);
+    db_q($db_conn,$Update_Records,[$catname,$date,$customer_name,$customer_mobile,$customer_address,$district,$order_number,$shipping_address,$gst_number,$order_date,$ship_date,$state_id,$gst_type,$tempid]);
 
     $_SESSION['sucMessage'] = "Changes Saved Successfully!";
     echo "<script>window.location='ot-sale-view?Updated';</script>";

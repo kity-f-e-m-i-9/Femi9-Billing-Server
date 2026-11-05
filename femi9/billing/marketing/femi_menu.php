@@ -105,6 +105,14 @@ if($LoginPasswordCheck=="12345678")
                     </li>
 
 					<li>
+                        <a href="my-assigned-tps"><i class="material-icons-two-tone">groups</i>Your Assigned TPs</a>
+                    </li>
+
+					<li>
+                        <a href="my-assigned-tp-reward-points"><i class="material-icons-two-tone">stars</i>Your TPs' Reward Points</a>
+                    </li>
+
+					<li>
                         <a href="awareness-campaign"><i class="material-icons-two-tone">campaign</i>Awareness Campaign</a>
                     </li>
 

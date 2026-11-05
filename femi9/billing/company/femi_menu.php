@@ -421,6 +421,9 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="Retail-Report-Details-TP.php">Retail (TP)</a></li>
 						<li><a href="OT-Report-Detail-Page">OT Channel</a></li>
 						<li><a href="channel-sales-report">Channel-wise Sales</a></li>
+						<li><a href="product-tp-sales-report">Product-wise TP Sales</a></li>
+						<li><a href="district-tp-stock-report">District-wise TP Stock</a></li>
+						<li><a href="district-tp-reward-points-report">District-wise TP Reward Points</a></li>
                         </ul>
                     </li>
                     <li>
@@ -959,6 +962,9 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="Retail-Report-First-Page">Retail</a></li>
 						<li><a href="OT-Report-Detail-Page">OT Channel</a></li>
 						<li><a href="channel-sales-report">Channel-wise Sales</a></li>
+						<li><a href="product-tp-sales-report">Product-wise TP Sales</a></li>
+						<li><a href="district-tp-stock-report">District-wise TP Stock</a></li>
+						<li><a href="district-tp-reward-points-report">District-wise TP Reward Points</a></li>
                         </ul>
                     </li>
 					<?php }?>

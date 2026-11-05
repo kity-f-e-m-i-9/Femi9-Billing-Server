@@ -83,18 +83,83 @@ error_reporting(0);
                                 </div>
                             </div>
                         </div>
-						
+
+                        <?php
+                        // Date/Category filter — this page had none before; defaults to the
+                        // current month so it doesn't just dump every return ever recorded.
+                        if (($_REQUEST['frdate'] ?? '') === '' && ($_REQUEST['todate'] ?? '') === '') {
+                            $se_fromDate = date('Y-m-01');
+                            $se_toDate   = date('Y-m-d');
+                        } else {
+                            $se_fromDate = $_REQUEST['frdate'];
+                            $se_toDate   = $_REQUEST['todate'];
+                        }
+                        $se_cat = trim((string)($_REQUEST['se_cat'] ?? ''));
+
+                        $_catFilterOptionsRet = [];
+                        $_catListResRet = $db_conn->query("SELECT DISTINCT os.cat FROM ot_sales_return osr JOIN ot_sales os ON os.tempid = osr.tempid WHERE os.cat IS NOT NULL AND os.cat != '' ORDER BY os.cat ASC");
+                        if ($_catListResRet) { while ($_r = $_catListResRet->fetch_assoc()) { $_catFilterOptionsRet[] = $_r['cat']; } }
+                        ?>
+
+                        <form method="get" action="ot-sale-manage-return">
+                        <div class="overviewcontainar">
+                        <div id="searchleftcont">
+                        <label class="form-label">From Date</label>
+                        <input type="date" name="frdate" value="<?=htmlspecialchars((string)$se_fromDate, ENT_QUOTES)?>" class="form-control">
+                        </div>
+                        <div id="searchleftcont">
+                        <label class="form-label">To Date</label>
+                        <input type="date" name="todate" value="<?=htmlspecialchars((string)$se_toDate, ENT_QUOTES)?>" class="form-control">
+                        </div>
+                        <div id="searchleftcont">
+                        <label class="form-label">Category</label>
+                        <select name="se_cat" class="form-control">
+                        <option value="">All Categories</option>
+                        <?php foreach ($_catFilterOptionsRet as $_catOpt): ?>
+                        <option value="<?=htmlspecialchars($_catOpt, ENT_QUOTES)?>" <?=($se_cat === $_catOpt ? 'selected' : '')?>><?=htmlspecialchars($_catOpt, ENT_QUOTES)?></option>
+                        <?php endforeach; ?>
+                        </select>
+                        </div>
+                        <div id="searchbuttoncont">
+                        <button type="submit" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
+                        </div>
+                        <div id="searchbuttoncont">&nbsp;
+                        <button type="button" onclick="javascript:window.location='ot-sale-manage-return';" class="btn btn-danger">Reset</button>
+                        </div>
+                        <div id="searchbuttoncont">&nbsp;
+                        <button type="button" onclick="exportOtReturnExcel();" class="btn btn-success" title="Excel export of the current filter, one sheet per Category"><i class="material-icons" style="font-size:16px;vertical-align:middle;">file_download</i> Export Excel</button>
+                        </div>
+                        </div>
+                        <div style="clear:both;"></div>
+                        <br/>
+                        </form>
+                        <script>
+                        function exportOtReturnExcel() {
+                            var params = new URLSearchParams({
+                                frdate: document.querySelector('input[name="frdate"]').value,
+                                todate: document.querySelector('input[name="todate"]').value,
+                                se_cat: document.querySelector('select[name="se_cat"]').value
+                            });
+                            window.open('export-ot-sale-return-xlsx.php?' + params.toString(), '_blank');
+                        }
+                        </script>
+
                         <?php
                         //----Serial Number Counter.......................
                         $i = 0;
                         //---------------------------------------------------------------
-                        
+
                         // Get products for table headers
                         $products = array();
                         $select_products = "SELECT * FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC";
                         $fetch_products = mysqli_query($db_conn, $select_products);
                         while($result_products = mysqli_fetch_array($fetch_products)) {
                             $products[] = $result_products;
+                        }
+
+                        $_otrExtraFilter = '';
+                        if ($se_cat !== '') {
+                            $_otrExtraFilter .= " AND os.cat = '" . db_esc($se_cat) . "'";
                         }
                         ?>
 
@@ -123,8 +188,10 @@ error_reporting(0);
 											<tbody>
 										<?php
                                             // Main query with proper ordering - no pagination limit (DataTables will handle pagination)
-                                            $select_product_list = "SELECT DISTINCT osr.tempid, osr.return_date 
-                                                                   FROM ot_sales_return osr 
+                                            $select_product_list = "SELECT DISTINCT osr.tempid, osr.return_date
+                                                                   FROM ot_sales_return osr
+                                                                   JOIN ot_sales os ON os.tempid = osr.tempid
+                                                                   WHERE osr.return_date BETWEEN '" . db_esc($se_fromDate) . "' AND '" . db_esc($se_toDate) . "' $_otrExtraFilter
                                                                    ORDER BY osr.return_date DESC";
                                             $fetch_product_list = mysqli_query($db_conn, $select_product_list);
                                             

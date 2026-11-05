@@ -161,10 +161,14 @@ $STName=$result_stateList12['st_name'];
            <input type="text" name="customer_mobile" onChange="showMobileNumber(this.value)" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" class="form-control" maxlength="10" value="<?=htmlspecialchars((string)($result_Records['customer_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			<br/>
 			
+			<label class="form-label">District*</label>
+            <input type="text" required="required" name="district" onkeypress="restrictSpecialChars(event)" class="form-control" maxlength="100" value="<?=htmlspecialchars((string)($result_Records['district'] ?? ''), ENT_QUOTES, 'ISO-8859-1', false);?>">
+			<br/>
+
 			<label class="form-label">Billing Address*</label>
             <textarea name="customer_address" class="form-control" onkeypress="restrictSpecialChars(event)" required="required"><?=htmlspecialchars((string)($result_Records['customer_address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>
-			
+
 			<label class="form-label">Shipping Address*</label>
             <textarea name="shipping_address" class="form-control" onkeypress="restrictSpecialChars(event)" required="required"><?=htmlspecialchars((string)($result_Records['shipping_address']), ENT_QUOTES, 'ISO-8859-1', false);?></textarea>
 			<br/>

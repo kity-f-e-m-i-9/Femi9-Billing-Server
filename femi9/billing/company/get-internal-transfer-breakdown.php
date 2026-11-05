@@ -54,8 +54,22 @@ if ($warehouseParam === 'unassigned') {
     $warehouseCond = '';
 }
 
-$type = ($_GET['type'] ?? 'internal') === 'cp' ? 'cp' : 'internal';
-$rows = $type === 'cp'
-    ? datewiseCpMovementBreakdownRows($db_conn, $productId, $fromDate, $toDate, $godownIdsSql, $filterByGodown, $warehouseCond, $warehouseNames)
-    : datewiseTransferBreakdownRows($db_conn, $productId, $fromDate, $toDate, $godownIdsSql, $filterByGodown, $warehouseCond, $warehouseNames);
+$type = $_GET['type'] ?? 'internal';
+switch ($type) {
+    case 'cp':
+        $rows = datewiseCpMovementBreakdownRows($db_conn, $productId, $fromDate, $toDate, $godownIdsSql, $filterByGodown, $warehouseCond, $warehouseNames);
+        break;
+    case 'input':
+    case 'sales':
+    case 'return':
+    case 'manuf':
+        $rows = datewiseLedgerHistoryRows($db_conn, $productId, $fromDate, $toDate, $godownIdsSql, $filterByGodown, $warehouseCond, $type);
+        break;
+    case 'dfd':
+        $rows = datewiseDfdHistoryRows($db_conn, $productId, $fromDate, $toDate, $godownIdsSql, $filterByGodown);
+        break;
+    default:
+        $type = 'internal';
+        $rows = datewiseTransferBreakdownRows($db_conn, $productId, $fromDate, $toDate, $godownIdsSql, $filterByGodown, $warehouseCond, $warehouseNames);
+}
 echo json_encode(['rows' => $rows, 'type' => $type]);

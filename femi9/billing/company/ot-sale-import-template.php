@@ -128,7 +128,7 @@ $invNumberHeader = $isTracked ? 'Invoice Number* (or type NEXT)' : 'Invoice Numb
 if ($isTracked) {
     $fixedHeaders = [
         'Company Profile*', 'Warehouse Code', 'Category*', 'Date* (YYYY-MM-DD)', $invNumberHeader,
-        'Customer Name', 'Customer Mobile', 'Customer Address', 'Shipping Address',
+        'Customer Name', 'Customer Mobile', 'Customer Address', 'District', 'Shipping Address',
         'GST Number', 'Order Number',
         'Courier Charges', 'State', 'Coupon Code',
         'Wallet Amount (Website/ID Concept only)',
@@ -136,13 +136,13 @@ if ($isTracked) {
     ];
 } else {
     // Marketplace categories (Amazon, Flipkart, Blinkit, etc.) — Coupon Code,
-    // Customer Mobile, GST Number, Order Date and Ship Date don't apply to
-    // these orders, so they're left out entirely rather than shown blank.
+    // Customer Mobile, GST Number, Order Date, Ship Date and Wallet Amount
+    // (Website/ID Concept only) don't apply to these orders, so they're left
+    // out entirely rather than shown blank.
     $fixedHeaders = [
         'Company Profile*', 'Warehouse Code', 'Category*', 'Date* (YYYY-MM-DD)', $invNumberHeader,
-        'Customer Name', 'Customer Address', 'Shipping Address',
+        'Customer Name', 'Customer Address', 'District', 'Shipping Address',
         'Order Number', 'Courier Charges', 'State',
-        'Wallet Amount (Website/ID Concept only)',
         'Product*', 'Qty*', 'Rate*', 'Discount',
     ];
 }
@@ -220,6 +220,7 @@ $exampleFixedValues = [
     'Customer Name' => 'John Doe',
     'Customer Mobile' => '9999999999',
     'Customer Address' => 'Sample address',
+    'District' => 'Chennai',
     'Shipping Address' => 'Sample address',
     'State' => '',
     'Coupon Code' => '',

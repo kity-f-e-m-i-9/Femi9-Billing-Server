@@ -122,6 +122,7 @@ $fixedFieldMap = [
     'customer name'    => 'customer_name',
     'customer mobile'  => 'customer_mobile',
     'customer address' => 'customer_address',
+    'district'         => 'district',
     'shipping address' => 'shipping_address',
     'gst number'       => 'gst_number',
     'order number'     => 'order_number',
@@ -529,6 +530,7 @@ for ($idx = $data_start_index; $idx < count($row_nums); $idx++) {
                 'customer_name'    => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'customer_name')),
                 'customer_mobile'  => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'customer_mobile')),
                 'customer_address' => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'customer_address')),
+                'district'         => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'district')),
                 'shipping_address' => RemoveSpecialChar(ot_import_val($rowData, $colToFixedField, 'shipping_address')),
                 'gst_number'       => $gst_number,
                 'buyer_gsttype'    => $buyer_gsttype,
@@ -599,6 +601,10 @@ $_statusCol = $db_conn->query("SHOW COLUMNS FROM ot_sales_invoice LIKE 'status'"
 if ($_statusCol && $_statusCol->num_rows === 0) {
     $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
 }
+$_districtCol = $db_conn->query("SHOW COLUMNS FROM ot_sales LIKE 'district'");
+if ($_districtCol && $_districtCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE ot_sales ADD COLUMN district VARCHAR(100) NULL DEFAULT NULL AFTER customer_address");
+}
 
 $db_conn->begin_transaction();
 try {
@@ -639,17 +645,17 @@ try {
                 "INSERT INTO ot_sales
                     (godownid, warehouse_id, cat, qty, date, tempid, prid, price, discount,
                      sub_total, total, gst, gst_amount, customer_name, customer_mobile,
-                     customer_address, order_number, amount_received, amount_date,
+                     customer_address, district, order_number, amount_received, amount_date,
                      shipping_address, gst_number, order_date, ship_date, hsn,
                      buyer_gsttype, state_id, gst_type, username, usertype)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0', '1991-01-01',
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '0', '1991-01-01',
                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             $stmt->bind_param(
-                'iissssidddddsssssssssssssss',
+                'iissssidddddssssssssssssssss',
                 $g['godownid'], $g['warehouse_id'], $g['cat'], $line['qty'], $g['date'], $tempid, $line['product_id'],
                 $line['rate'], $line['discount'], $sub_total, $total, $line['gst'], $gst_amount,
-                $g['customer_name'], $g['customer_mobile'], $g['customer_address'], $g['order_number'],
+                $g['customer_name'], $g['customer_mobile'], $g['customer_address'], $g['district'], $g['order_number'],
                 $g['shipping_address'], $g['gst_number'], $g['order_date'], $g['ship_date'], $line['hsn'],
                 $g['buyer_gsttype'], $g['state_id'], $gst_type, $login_user, $Login_user_TYPEvl
             );

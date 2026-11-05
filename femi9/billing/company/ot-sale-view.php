@@ -190,11 +190,24 @@ if (isset($_SESSION['errorMessage'])) {
 <div id="searchbuttoncont">&nbsp;
 <button type="button" onclick="printAllConfirmed();" class="btn btn-dark" title="Print every Confirmed invoice in this date range/category as one document"><i class="material-icons" style="font-size:16px;vertical-align:middle;">print</i> Print All Confirmed</button>
 </div>
+
+<div id="searchbuttoncont">&nbsp;
+<button type="button" onclick="exportOtSalesExcel();" class="btn btn-success" title="Excel export of the current filter, one sheet per Category"><i class="material-icons" style="font-size:16px;vertical-align:middle;">file_download</i> Export Excel</button>
+</div>
 							</div>
 							<div style="clear:both;"></div>
 							<br/>
 							</form>
 							<script>
+							function exportOtSalesExcel() {
+								var params = new URLSearchParams({
+									frdate: document.querySelector('input[name="frdate"]').value,
+									todate: document.querySelector('input[name="todate"]').value,
+									se_cat: document.querySelector('select[name="se_cat"]').value,
+									se_status: document.querySelector('select[name="se_status"]').value
+								});
+								window.open('export-ot-sale-view-xlsx.php?' + params.toString(), '_blank');
+							}
 							function printAllConfirmed() {
 								// A hand-picked checkbox selection (any row, draft or confirmed —
 								// the print page itself filters down to confirmed-only) always wins

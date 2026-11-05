@@ -344,6 +344,13 @@ $stmt_states->close();
                                                 <br>
                                                 </div>
 
+                                                <!-- District -->
+                                                <label class="form-label">District *</label>
+                                                <input type="text" required name="district"
+                                                       onkeypress="restrictSpecialChars(event)"
+                                                       class="form-control" maxlength="100">
+                                                <br>
+
                                                 <!-- Billing Address -->
                                                 <label class="form-label">Billing Address *</label>
                                                 <textarea name="customer_address" class="form-control"

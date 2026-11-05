@@ -402,10 +402,10 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
 													<td><?php echo htmlspecialchars((string)($Result_productDetils["productName"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo htmlspecialchars((string)($Result_OPStock['opening_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo date("d/M/Y",strtotime($Result_OPStock['opening_date']));?></td>
-													<td align="right"><?php echo htmlspecialchars((string)($Result_OPStock['input_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></td>
-													<td align="right"><?php echo $SalesQtyShown;?></td>
-													<td align="right"><?php echo $ReturnQty;?></td>
-													<td align="right"><?php echo $isUnassignedBucket ? $DfdQty : '&mdash;';?></td>
+													<td align="right"><?php if ((int)$Result_OPStock['input_qty'] != 0): ?><a href="javascript:void(0)" class="ledger-detail-link" data-ledger-type="input" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="<?=$isUnassignedBucket ? 'unassigned' : (int)$bucketKey;?>" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo htmlspecialchars((string)($Result_OPStock['input_qty']), ENT_QUOTES, 'ISO-8859-1', false);?></a><?php else: ?><?php echo htmlspecialchars((string)($Result_OPStock['input_qty']), ENT_QUOTES, 'ISO-8859-1', false);?><?php endif; ?></td>
+													<td align="right"><?php if ($SalesQtyShown != 0): ?><a href="javascript:void(0)" class="ledger-detail-link" data-ledger-type="sales" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="<?=$isUnassignedBucket ? 'unassigned' : (int)$bucketKey;?>" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo $SalesQtyShown;?></a><?php else: ?><?php echo $SalesQtyShown;?><?php endif; ?></td>
+													<td align="right"><?php if ($ReturnQty != 0): ?><a href="javascript:void(0)" class="ledger-detail-link" data-ledger-type="return" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="<?=$isUnassignedBucket ? 'unassigned' : (int)$bucketKey;?>" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo $ReturnQty;?></a><?php else: ?><?php echo $ReturnQty;?><?php endif; ?></td>
+													<td align="right"><?php if ($isUnassignedBucket && $DfdQty != 0): ?><a href="javascript:void(0)" class="ledger-detail-link" data-ledger-type="dfd" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="unassigned" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo $DfdQty;?></a><?php else: ?><?php echo $isUnassignedBucket ? $DfdQty : '&mdash;';?><?php endif; ?></td>
 													<td align="right"><?php if ($IntrnTransferQty > 0): ?><a href="javascript:void(0)" class="intrn-transfer-link" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="<?=$isUnassignedBucket ? 'unassigned' : (int)$bucketKey;?>" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo $IntrnTransferQty;?></a><?php else: ?><?php echo $IntrnTransferQty;?><?php endif; ?></td>
 													<td align="right"><?php if ($MovementToCP > 0): ?><a href="javascript:void(0)" class="cp-movement-link" data-product-id="<?=(int)$StockProductID;?>" data-godown-id="<?=(int)$user_id_Loginvl;?>" data-warehouse="<?=$isUnassignedBucket ? 'unassigned' : (int)$bucketKey;?>" data-from-date="2000-01-01" data-to-date="<?=date('Y-m-d');?>"><?php echo $MovementToCP;?></a><?php else: ?><?php echo $MovementToCP;?><?php endif; ?></td>
 													<td align="right"><b><?php echo $ClosingStock;?></b></td>
@@ -655,13 +655,15 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
        .cp-movement-link classes and data-* attributes, so one delegated
        listener covers both, for both Internal Transfer and Movement to CP). ── */
     document.addEventListener('click', function (e) {
-        var link = e.target.closest('.intrn-transfer-link, .cp-movement-link');
+        var link = e.target.closest('.intrn-transfer-link, .cp-movement-link, .ledger-detail-link');
         if (!link) return;
         e.preventDefault();
 
         var isCp = link.classList.contains('cp-movement-link');
+        var isLedger = link.classList.contains('ledger-detail-link');
+        var type = isLedger ? link.dataset.ledgerType : (isCp ? 'cp' : 'internal');
         var params = new URLSearchParams();
-        params.set('type', isCp ? 'cp' : 'internal');
+        params.set('type', type);
         params.set('product_id', link.dataset.productId);
         params.set('from_date', link.dataset.fromDate);
         params.set('to_date', link.dataset.toDate);
@@ -674,7 +676,12 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
             });
         }
 
-        document.getElementById('intrnTransferModalTitle').textContent = isCp ? 'Movement to CP Breakdown' : 'Internal Transfer Breakdown';
+        var titles = {
+            cp: 'Movement to CP Breakdown', internal: 'Internal Transfer Breakdown',
+            input: 'Input Stock Qty — Transaction History', sales: 'Sales Qty — Transaction History',
+            return: 'Return Qty — Transaction History', dfd: 'Demo/Free/Damage Qty — Transaction History'
+        };
+        document.getElementById('intrnTransferModalTitle').textContent = titles[type] || 'Breakdown';
         var modalBody = document.getElementById('intrnTransferModalBody');
         modalBody.innerHTML = '<div class="loading-placeholder">Loading…</div>';
         var modal = new bootstrap.Modal(document.getElementById('intrnTransferModal'));
@@ -685,11 +692,20 @@ foreach ($bucket['rows'] as $StockProductID => $Result_OPStock) {
             .then(function (data) {
                 var rows = data.rows || [];
                 if (!rows.length) {
-                    modalBody.innerHTML = '<div class="loading-placeholder">No detail available for this transfer.</div>';
+                    modalBody.innerHTML = '<div class="loading-placeholder">No detail available.</div>';
                     return;
                 }
                 var html;
-                if (isCp) {
+                if (isLedger) {
+                    html = '<table class="table table-sm"><thead><tr>'
+                        + '<th>Date</th><th>Type</th><th>Reference</th>'
+                        + '<th style="text-align:right;">Qty</th></tr></thead><tbody>';
+                    rows.forEach(function (r) {
+                        html += '<tr><td>' + escapeHtml(r.date) + '</td><td>' + escapeHtml(r.label) + '</td>'
+                            + '<td>' + escapeHtml(r.ref_id) + '</td>'
+                            + '<td style="text-align:right;"><b>' + r.qty + '</b></td></tr>';
+                    });
+                } else if (isCp) {
                     html = '<table class="table table-sm"><thead><tr>'
                         + '<th>From Company Profile</th><th>From Warehouse</th>'
                         + '<th>Channel Partner</th>'

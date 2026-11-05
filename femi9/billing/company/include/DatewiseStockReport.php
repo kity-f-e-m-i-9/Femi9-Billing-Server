@@ -415,6 +415,102 @@ function datewiseCpMovementBreakdownRows($db_conn, int $prid, string $fromDate, 
     return $out;
 }
 
+// Readable label for one stock_ledger action, for the transaction-history
+// click-to-view popups below — shown to non-technical users, so plain
+// English rather than the raw action string.
+function ledgerActionLabel(string $action, string $refType): string {
+    $labels = [
+        'credit'              => 'Stock In',
+        'reverse_credit'      => 'Stock In Reversed',
+        'transfer_in'         => 'Transfer In (from another Company Profile/Warehouse)',
+        'transfer_in_reverse' => 'Transfer In Reversed',
+        'return_accept'       => 'Customer Return Accepted',
+        'deduct'              => 'Sale',
+        'reverse_deduct'      => 'Sale Return',
+        'ot_deduct'           => 'OT Channel Sale',
+        'ot_reverse'          => 'OT Channel Return',
+        'ot_deduct_undo'      => 'OT Sale Deleted',
+        'ot_reverse_undo'     => 'OT Return Deleted',
+        'transfer_out'        => $refType === 'demofree' ? 'Demo/Free/Damage' : 'Transfer Out',
+        'transfer_out_reverse'=> $refType === 'demofree' ? 'Demo/Free/Damage Reversed' : 'Transfer Out Reversed',
+    ];
+    return $labels[$action] ?? $action;
+}
+
+// Raw transaction-history list for a product's Input Stock / Sales / Return
+// Qty figure — the click-to-view popup equivalent of
+// datewiseTransferBreakdownRows()/datewiseCpMovementBreakdownRows(), but for
+// columns that don't have a natural "from -> to" shape, so this returns a
+// flat chronological list of every stock_ledger row that fed the number
+// instead: ['date','label','ref_id','qty']. $kind selects which actions to
+// include, matching computeStockMovement()'s own action sets for that
+// column — see that function's comments for why each action belongs where.
+function datewiseLedgerHistoryRows($db_conn, int $prid, string $fromDate, string $toDate, string $companyIdsSql, bool $filterByGodown, string $warehouseCond, string $kind): array {
+    $fromDate = mysqli_real_escape_string($db_conn, $fromDate);
+    $toDate   = mysqli_real_escape_string($db_conn, $toDate);
+    $godownCond = $filterByGodown ? " AND user_id IN ($companyIdsSql)" : '';
+    $dateCond   = " AND created_at >= '$fromDate 00:00:00' AND created_at <= '$toDate 23:59:59'";
+
+    $actionsByKind = [
+        'input'  => ['credit', 'reverse_credit', 'transfer_in', 'transfer_in_reverse', 'return_accept'],
+        'sales'  => ['deduct', 'ot_deduct', 'ot_deduct_undo'],
+        'return' => ['reverse_deduct', 'ot_reverse', 'ot_reverse_undo'],
+        'manuf'  => ['credit'],
+    ];
+    $actions = $actionsByKind[$kind] ?? [];
+    if (empty($actions)) return [];
+    $actionsSql = implode(',', array_map(fn($a) => "'" . $a . "'", $actions));
+    $extraCond = $kind === 'manuf' ? " AND ref_id LIKE 'manuf_purchase_%'" : '';
+
+    $sql = "SELECT created_at, action, ref_type, ref_id, qty
+            FROM stock_ledger
+            WHERE product_id=$prid AND user_type='company' AND action IN ($actionsSql)
+            $godownCond$warehouseCond$dateCond$extraCond
+            ORDER BY created_at DESC
+            LIMIT 300";
+    $res = mysqli_query($db_conn, $sql);
+    $out = [];
+    while ($row = mysqli_fetch_assoc($res)) {
+        $isNegative = in_array($row['action'], ['reverse_credit', 'transfer_in_reverse', 'ot_deduct_undo', 'ot_reverse_undo'], true);
+        $out[] = [
+            'date'   => date('d-m-Y h:i A', strtotime($row['created_at'])),
+            'label'  => ledgerActionLabel($row['action'], (string)$row['ref_type']),
+            'ref_id' => (string)$row['ref_id'],
+            'qty'    => ($isNegative ? -1 : 1) * (int)$row['qty'],
+        ];
+    }
+    return $out;
+}
+
+// Raw transaction-history list for the Demo/Free/Damage Qty figure — reads
+// straight from demofreedamage (its own source table, not stock_ledger —
+// see computeStockMovement()'s $dfd_qty note on why only the Unassigned
+// bucket can show this). $companyIdsSql/$filterByGodown mirror the other
+// breakdown functions' scoping convention.
+function datewiseDfdHistoryRows($db_conn, int $prid, string $fromDate, string $toDate, string $companyIdsSql, bool $filterByGodown): array {
+    $fromDate = mysqli_real_escape_string($db_conn, $fromDate);
+    $toDate   = mysqli_real_escape_string($db_conn, $toDate);
+    $godownCond = $filterByGodown ? " AND userid IN ($companyIdsSql)" : '';
+    $sql = "SELECT date, remarks, category, qty, tempid
+            FROM demofreedamage
+            WHERE product_id=$prid AND usertype='company'$godownCond
+              AND date >= '$fromDate' AND date <= '$toDate'
+            ORDER BY date DESC
+            LIMIT 300";
+    $res = mysqli_query($db_conn, $sql);
+    $out = [];
+    while ($row = mysqli_fetch_assoc($res)) {
+        $label = 'Demo/Free/Damage' . ($row['category'] ? ' (' . $row['category'] . ')' : '');
+        $out[] = [
+            'date'   => date('d-m-Y', strtotime($row['date'])),
+            'label'  => $label,
+            'ref_id' => (string)($row['remarks'] ?: $row['tempid']),
+            'qty'    => -1 * (int)$row['qty'],
+        ];
+    }
+    return $out;
+}
+
 // SQL fragment: "AND warehouse_id IN (...)" / "AND warehouse_id IS NULL" /
 // combined via OR — applied to stock_ledger/stock queries only when a
 // warehouse filter was actually submitted.
