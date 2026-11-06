@@ -113,6 +113,16 @@ if($LoginPasswordCheck=="12345678")
                     </li>
 
 					<li>
+                        <a href="my-firka-assignments"><i class="material-icons-two-tone">assignment_ind</i>Firka Assignments</a>
+                    </li>
+
+					<?php if ($hasTeamMN): ?>
+					<li>
+                        <a href="manage-daily-assign-district-tps"><i class="material-icons-two-tone">assignment_ind</i>Daily Assign District TPs</a>
+                    </li>
+					<?php endif; ?>
+
+					<li>
                         <a href="awareness-campaign"><i class="material-icons-two-tone">campaign</i>Awareness Campaign</a>
                     </li>
 

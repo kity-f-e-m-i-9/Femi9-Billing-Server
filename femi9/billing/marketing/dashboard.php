@@ -108,6 +108,46 @@ $embed = !empty($_GET['embed']);
 
 $scopeIds       = array_column($scopeNodes, 'id');
 
+// Firka -> TP assignments made TODAY anywhere under this person's own
+// scope (District/Division), from the "Daily Assign District TPs" tool —
+// e.g. an ASM assigning a TP under a DM reporting to them. Surfaced on the
+// SAME "just logged in" modal as $todayAssignedAreas above, so a DM
+// actually notices it instead of having to go check my-firka-assignments.php
+// themselves. Excludes changes this person made themselves (assigned_by
+// matches their own session name) — no point alerting someone about their
+// own action. Wrapped in try/catch: tp_daily_assignments is a one-time-
+// schema table (company/tp-daily-assignment-schema.sql) that may not exist
+// yet on every environment, and this alert must never be able to break the
+// whole dashboard for everyone if it's missing.
+$todayFirkaAssignments = [];
+if (!empty($scopeIds)) {
+    try {
+        $_scopeIdList = implode(',', array_map('intval', $scopeIds));
+        $_ownName = $_SESSION['LOGIN_USER_NAME'] ?? '';
+        $_stmtTfa = $db_conn->prepare("
+            WITH RECURSIVE node_tree AS (
+                SELECT id FROM partner_location_nodes WHERE id IN ($_scopeIdList)
+                UNION ALL
+                SELECT n.id FROM partner_location_nodes n JOIN node_tree nt ON n.parent_id = nt.id
+            )
+            SELECT f.name AS firka_name, tp.name AS tp_name, tda.assigned_by
+            FROM tp_daily_assignments tda
+            JOIN partner_location_nodes f ON f.id = tda.location_id
+            LEFT JOIN territory_partners tp ON tp.id = tda.territory_partner_id
+            WHERE tda.assign_date = CURDATE()
+              AND tda.location_id IN (SELECT id FROM node_tree)
+              AND (tda.assigned_by IS NULL OR tda.assigned_by != ?)
+            ORDER BY f.name ASC
+        ");
+        $_stmtTfa->bind_param('s', $_ownName);
+        $_stmtTfa->execute();
+        $todayFirkaAssignments = $_stmtTfa->get_result()->fetch_all(MYSQLI_ASSOC);
+        $_stmtTfa->close();
+    } catch (\Throwable $e) {
+        $todayFirkaAssignments = [];
+    }
+}
+
 // ── District Managers under this person — clickable list, each showing their
 // own assigned district(s) + target/achieved/balance for the same period.
 // "DM" = whichever marketing_team_levels row has "District" in its name, same
@@ -1119,21 +1159,37 @@ ksort($districtTpCounts);
     <?php endif; ?>
 </head>
 <body<?php echo $embed ? ' class="ms-embed"' : ''; ?>>
-    <?php if (!empty($todayAssignedAreas)): ?>
+    <?php if (!empty($todayAssignedAreas) || !empty($todayFirkaAssignments)): ?>
     <div class="modal fade" id="newAreaAssignedModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header" style="background:#eef2ff;">
-                    <h5 class="modal-title" style="color:#3730a3;">New Area Assigned</h5>
+                    <h5 class="modal-title" style="color:#3730a3;">Today's Updates</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <?php if (!empty($todayAssignedAreas)): ?>
                     <p style="margin:0 0 10px;font-size:13.5px;color:#374151;">You have been assigned to the following area<?php echo count($todayAssignedAreas) > 1 ? 's' : ''; ?> today:</p>
-                    <ul style="margin:0;padding-left:20px;">
+                    <ul style="margin:0 0 16px;padding-left:20px;">
                         <?php foreach ($todayAssignedAreas as $_area): ?>
                         <li style="font-size:14px;font-weight:600;color:#1f2937;"><?php echo htmlspecialchars($_area); ?></li>
                         <?php endforeach; ?>
                     </ul>
+                    <?php endif; ?>
+                    <?php if (!empty($todayFirkaAssignments)): ?>
+                    <p style="margin:0 0 10px;font-size:13.5px;color:#374151;">Territory Partner assignment<?php echo count($todayFirkaAssignments) > 1 ? 's were' : ' was'; ?> updated today in your area:</p>
+                    <ul style="margin:0;padding-left:20px;">
+                        <?php foreach ($todayFirkaAssignments as $_fa): ?>
+                        <li style="font-size:14px;color:#1f2937;margin-bottom:4px;">
+                            <b><?php echo htmlspecialchars($_fa['firka_name']); ?></b>
+                            → <?php echo $_fa['tp_name'] ? htmlspecialchars($_fa['tp_name']) : '<span style="color:#b45309;">Vacant</span>'; ?>
+                            <?php if (!empty($_fa['assigned_by'])): ?>
+                            <span style="color:#9ca3af;font-size:12px;"> (by <?php echo htmlspecialchars($_fa['assigned_by']); ?>)</span>
+                            <?php endif; ?>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
