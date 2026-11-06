@@ -1,6 +1,7 @@
 <?php include("checksession.php");
 require_once("include/GodownAccess.php");
 require_once("include/GodownWarehouseMapping.php");
+require_once("include/CartonBoxes.php");
 include("config.php");
 date_default_timezone_set("Asia/Kolkata");
 
@@ -27,6 +28,12 @@ $products = $db_conn->query(
 $godowns = $db_conn->query(
     "SELECT id, gname FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . " ORDER BY gname ASC"
 )->fetch_all(MYSQLI_ASSOC);
+
+$coverProducts = $db_conn->query(
+    "SELECT DISTINCT p.id, p.productName FROM neksomo_product_mapping m
+     INNER JOIN products p ON p.id = m.company_product_id ORDER BY p.productName ASC"
+)->fetch_all(MYSQLI_ASSOC);
+$cartonTypes = get_active_carton_types($db_conn);
 
 $allWarehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is_active = 1 ORDER BY code ASC")->fetch_all(MYSQLI_ASSOC);
 ?>
@@ -160,6 +167,48 @@ $allWarehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is
                             </div>
                         </div>
 
+                        <?php foreach ([
+                            ['covers', 'Covers to Move (optional)', 'layers', '#f59e0b', '#d97706', 'cover_product_id[]', 'cover_qty[]', $coverProducts, 'productName', 'Cover for product'],
+                            ['cartons', 'Carton Boxes to Move (optional)', 'archive', '#10b981', '#059669', 'carton_type_id[]', 'carton_qty[]', $cartonTypes, 'name', 'Carton type'],
+                        ] as [$key, $title, $icon, $c1, $c2, $idName, $qtyName, $opts, $label, $lbl]): ?>
+                        <div class="card mt-3" style="border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);border-radius:14px;overflow:hidden;">
+                            <div style="background:linear-gradient(135deg, <?= $c1 ?> 0%, <?= $c2 ?> 100%);padding:16px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                                <span style="color:#fff;font-weight:600;font-size:15px;">
+                                    <i class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;"><?= $icon ?></i>
+                                    <?= $title ?>
+                                </span>
+                                <button type="button" class="btn btn-sm add-extra-row" data-target="<?= $key ?>" style="background:#fff;color:<?= $c2 ?>;font-weight:600;border:none;">
+                                    <i class="material-icons" style="font-size:15px;vertical-align:middle;">add</i> Add
+                                </button>
+                            </div>
+                            <div class="card-body" style="padding:20px 22px;">
+                                <div id="rows-<?= $key ?>"></div>
+                                <template id="tpl-<?= $key ?>">
+                                    <div class="gsm-product-row">
+                                        <div class="row g-3 align-items-end">
+                                            <div class="col-lg-8 col-md-6">
+                                                <label class="form-label small text-muted mb-1"><?= $lbl ?></label>
+                                                <select name="<?= $idName ?>" class="form-control extra-select">
+                                                    <option value="">Select</option>
+                                                    <?php foreach ($opts as $o): ?>
+                                                    <option value="<?= (int)$o['id'] ?>"><?= htmlspecialchars($o[$label], ENT_QUOTES, 'UTF-8') ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div class="col-lg-3 col-md-4">
+                                                <label class="form-label small text-muted mb-1">Quantity</label>
+                                                <input type="number" min="1" name="<?= $qtyName ?>" class="form-control" placeholder="e.g. 100">
+                                            </div>
+                                            <div class="col-lg-1 col-md-2 d-flex justify-content-md-end">
+                                                <button type="button" class="gsm-remove-btn" title="Remove"><i class="material-icons-outlined" style="font-size:18px;">delete</i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+
                         <div class="d-flex justify-content-end mt-3 mb-4">
                             <a href="godown-stock-move-manage.php" class="btn btn-secondary me-2">View History</a>
                             <button type="submit" class="btn btn-lg" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);border:none;color:#fff;font-weight:600;padding:10px 32px;border-radius:10px;box-shadow:0 4px 12px rgba(102,126,234,.35);">
@@ -176,7 +225,7 @@ $allWarehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is
                             <div class="row g-3 align-items-end">
                                 <div class="col-lg-8 col-md-6">
                                     <label class="form-label small text-muted mb-1">Product</label>
-                                    <select required name="product_id[]" class="form-control product-select">
+                                    <select name="product_id[]" class="form-control product-select">
                                         <option value="" hidden>Select</option>
                                         <?php foreach ($products as $p): ?>
                                         <option value="<?= (int)$p['id'] ?>"><?= htmlspecialchars($p['productName'], ENT_QUOTES, 'UTF-8') ?></option>
@@ -185,7 +234,7 @@ $allWarehouses = $db_conn->query("SELECT id, code, name FROM warehouses WHERE is
                                 </div>
                                 <div class="col-lg-3 col-md-4">
                                     <label class="form-label small text-muted mb-1">Quantity</label>
-                                    <input type="number" min="1" required name="qty[]" class="form-control" placeholder="e.g. 50">
+                                    <input type="number" min="1" name="qty[]" class="form-control" placeholder="e.g. 50">
                                 </div>
                                 <div class="col-lg-1 col-md-2 d-flex justify-content-md-end">
                                     <button type="button" class="gsm-remove-btn" title="Remove this product">
@@ -256,6 +305,30 @@ document.getElementById('moveForm').addEventListener('submit', function (e) {
         return;
     }
 
+    // Blank product rows are dropped (a covers/cartons-only move is valid);
+    // a half-filled row, or nothing at all, is rejected.
+    var anyItem = false;
+    var halfFilled = false;
+    rowsContainer.querySelectorAll('.gsm-product-row').forEach(function (r) {
+        var pid = r.querySelector('.product-select').value;
+        var q = r.querySelector('[name="qty[]"]').value;
+        if (pid && q) anyItem = true; else if (pid || q) halfFilled = true;
+    });
+    document.querySelectorAll('.extra-select').forEach(function (sel) {
+        var q = sel.closest('.gsm-product-row').querySelector('input[type=number]').value;
+        if (sel.value && q) anyItem = true; else if (sel.value || q) halfFilled = true;
+    });
+    if (halfFilled || !anyItem) {
+        e.preventDefault();
+        alert(halfFilled ? 'Please fill in both the item and quantity for every row, or remove the row.' : 'Add at least one product, cover or carton box to move.');
+        return;
+    }
+    rowsContainer.querySelectorAll('.gsm-product-row').forEach(function (r) {
+        if (!r.querySelector('.product-select').value) {
+            r.querySelectorAll('select,input').forEach(function (el) { el.disabled = true; });
+        }
+    });
+
     var productIds = Array.from(rowsContainer.querySelectorAll('.product-select')).map(function (s) { return s.value; });
     var seen = {};
     for (var i = 0; i < productIds.length; i++) {
@@ -267,6 +340,17 @@ document.getElementById('moveForm').addEventListener('submit', function (e) {
         }
         seen[productIds[i]] = true;
     }
+});
+
+// Covers / cartons: optional sections, start empty, rows added on demand.
+document.querySelectorAll('.add-extra-row').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var key = btn.dataset.target;
+        var frag = document.getElementById('tpl-' + key).content.cloneNode(true);
+        var rowEl = frag.querySelector('.gsm-product-row');
+        rowEl.querySelector('.gsm-remove-btn').addEventListener('click', function () { rowEl.remove(); });
+        document.getElementById('rows-' + key).appendChild(frag);
+    });
 });
 
 // Start with one row so the form is usable immediately.

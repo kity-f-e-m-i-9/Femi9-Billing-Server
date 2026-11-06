@@ -3,6 +3,7 @@ include("checksession.php"); require_once("include/PermissionCheck.php"); requir
 require_once("include/GodownAccess.php");
 require_once("include/StockService.php");
 require_once("include/GodownStockMove.php");
+require_once("include/GodownCoverCartonMove.php");
 include("config.php");
 
 // Finance-only, same as the rest of the Internal Stock Transfer area —
@@ -33,7 +34,37 @@ $createdBy            = $_SESSION['LOGIN_USER'] ?? 'system';
 $rawProductIds = $_POST['product_id'] ?? [];
 $rawQtys       = $_POST['qty'] ?? [];
 
-if (!$fromCompanyGodownId || !$toCompanyGodownId || !is_array($rawProductIds) || empty($rawProductIds)) {
+// Optional covers / carton boxes moved in the same batch. Each list is
+// parsed independently; blank rows (nothing selected) are ignored.
+$parseExtra = function (string $idKey, string $qtyKey): array {
+    $ids  = is_array($_POST[$idKey] ?? null) ? $_POST[$idKey] : [];
+    $qtys = is_array($_POST[$qtyKey] ?? null) ? $_POST[$qtyKey] : [];
+    $out = [];
+    foreach ($ids as $i => $rawId) {
+        $id  = filter_var($rawId, FILTER_VALIDATE_INT) ?: 0;
+        $qty = filter_var($qtys[$i] ?? '', FILTER_VALIDATE_INT) ?: 0;
+        if (!$id && $rawId === '' && ($qtys[$i] ?? '') === '') continue;
+        if (!$id || $qty <= 0) {
+            $_SESSION['errorMessage'] = "Please fill in every field for every cover / carton row.";
+            header("Location: godown-stock-move.php");
+            exit;
+        }
+        $out[] = ['id' => $id, 'qty' => $qty];
+    }
+    $ids = array_column($out, 'id');
+    if (count($ids) !== count(array_unique($ids))) {
+        $_SESSION['errorMessage'] = "Each cover / carton type can only appear once per move batch.";
+        header("Location: godown-stock-move.php");
+        exit;
+    }
+    return $out;
+};
+$coverRows  = $parseExtra('cover_product_id', 'cover_qty');
+$cartonRows = $parseExtra('carton_type_id', 'carton_qty');
+
+if (!is_array($rawProductIds)) { $rawProductIds = []; }
+
+if (!$fromCompanyGodownId || !$toCompanyGodownId || (empty($rawProductIds) && !$coverRows && !$cartonRows)) {
     $_SESSION['errorMessage'] = "Please fill in every required field.";
     header("Location: godown-stock-move.php");
     exit;
@@ -107,10 +138,21 @@ try {
         );
     }
 
+    foreach ($coverRows as $c) {
+        move_covers($db_conn, $c['id'], $fromCompanyGodownId, $fromWarehouseId,
+            $toCompanyGodownId, $toWarehouseId, $c['qty'], $note, generate_godown_stock_move_ref_id(), $createdBy);
+    }
+    foreach ($cartonRows as $c) {
+        move_cartons($db_conn, $c['id'], $fromCompanyGodownId, $fromWarehouseId,
+            $toCompanyGodownId, $toWarehouseId, $c['qty'], $note, generate_godown_stock_move_ref_id(), $createdBy);
+    }
+
     $db_conn->commit();
-    $_SESSION['sucMessage'] = count($rows) === 1
-        ? "Stock moved successfully."
-        : count($rows) . " products moved successfully.";
+    $parts = [];
+    if ($rows)       $parts[] = count($rows) . " product(s)";
+    if ($coverRows)  $parts[] = count($coverRows) . " cover type(s)";
+    if ($cartonRows) $parts[] = count($cartonRows) . " carton type(s)";
+    $_SESSION['sucMessage'] = implode(", ", $parts) . " moved successfully.";
     header("Location: godown-stock-move.php");
     exit;
 } catch (StockException $e) {
