@@ -117,6 +117,7 @@ if (!empty($salesBdmID) && empty($_companyBridgeView)) {
             <li><a href="<?php echo $_companyBase; ?>manage-field-orders">Field Orders</a></li>
             <li><a href="<?php echo $_companyBase; ?>field-orders-summary">Field Orders Summary</a></li>
             <li><a href="<?php echo $_bdmBase; ?>tp-invoices">TP Invoices</a></li>
+            <li><a href="<?php echo $_bdmBase; ?>my-assigned-tps-stock">Assigned TPs Stock</a></li>
         </ul>
     </li>
 

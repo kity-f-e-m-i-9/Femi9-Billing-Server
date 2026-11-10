@@ -105,7 +105,7 @@ if($LoginPasswordCheck=="12345678")
                     </li>
 
 					<li>
-                        <a href="my-assigned-tps"><i class="material-icons-two-tone">groups</i>Your Assigned TPs</a>
+                        <a href="my-assigned-tps"><i class="material-icons-two-tone">groups</i>Your Assigned TPs Stock</a>
                     </li>
 
 					<li>

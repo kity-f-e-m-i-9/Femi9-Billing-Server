@@ -190,4 +190,20 @@ function isLocationInBdmDistricts($db_conn, int $bdmId, int $locationId): bool {
     }
     return false;
 }
+
+// Every Territory Partner assigned to any BDM in $bdmId's own subtree (self
+// + every subordinate) — not just $bdmId's own personal district match.
+// Used by shop-invoice-permission-requests.php / shop-invoice-request-
+// review-ajax.php so a Chief BDM's "Our Team" visibility actually covers
+// every subordinate's TPs, even ones outside the Chief's own personal zone.
+// includeInactive=true so a TP that went inactive after filing a request
+// doesn't silently vanish from the list.
+function getBdmSubtreeAssignedTpIds($db_conn, int $bdmId): array {
+    require_once __DIR__ . '/TeamSubtree.php';
+    $tpIds = [];
+    foreach (getBdmSubtreeIds($db_conn, $bdmId) as $sid) {
+        $tpIds = array_merge($tpIds, getBdmAssignedTpIds($db_conn, $sid, true));
+    }
+    return array_values(array_unique($tpIds));
+}
 ?>

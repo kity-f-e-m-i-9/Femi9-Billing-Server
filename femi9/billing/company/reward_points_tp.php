@@ -164,6 +164,9 @@ unset($u);
                                     <a href="reward_points_tp_export_xlsx.php?frdate=<?php echo urlencode($current_from_date); ?>&todate=<?php echo urlencode($current_to_date); ?>&target_range=<?php echo urlencode($current_target_range); ?>" class="btn btn-success btn-sm ms-1">
                                         <i class="material-icons" style="vertical-align:middle;font-size:16px">file_download</i> Export
                                     </a>
+                                    <a href="reward_points_tp_export_by_target_xlsx.php?frdate=<?php echo urlencode($current_from_date); ?>&todate=<?php echo urlencode($current_to_date); ?>" class="btn btn-info btn-sm ms-1">
+                                        <i class="material-icons" style="vertical-align:middle;font-size:16px">file_download</i> Category wise Excel
+                                    </a>
                                 </div>
                                 <div class="col-auto ms-auto">
                                     <small class="text-muted">

@@ -223,7 +223,7 @@ if (!empty($_dmCandidates)) {
             $_dmIdList = implode(',', $_dmTpIds);
             $_stmtDmInv = $db_conn->prepare(
                 "SELECT COALESCE(SUM(total),0) AS amt FROM user_invoice
-                 WHERE from_user_type='territory_partner' AND from_user_id IN ($_dmIdList)
+                 WHERE from_user_type='territory_partner' AND to_user_type='shop' AND from_user_id IN ($_dmIdList)
                    AND `date` BETWEEN ? AND ?"
             );
             $_stmtDmInv->bind_param('ss', $from, $to);
@@ -276,7 +276,7 @@ if (!empty($myDms)) {
             $_nodeIdList = implode(',', $_nodeTpIds);
             $_stmtNodeInv = $db_conn->prepare(
                 "SELECT COALESCE(SUM(total),0) AS amt FROM user_invoice
-                 WHERE from_user_type='territory_partner' AND from_user_id IN ($_nodeIdList)
+                 WHERE from_user_type='territory_partner' AND to_user_type='shop' AND from_user_id IN ($_nodeIdList)
                    AND `date` BETWEEN ? AND ?"
             );
             $_stmtNodeInv->bind_param('ss', $from, $to);
@@ -462,7 +462,7 @@ if (!empty($myDms)) {
             $_dmTpIdList = implode(',', $_dmTpIdsForWeekly);
             $_resDmInvDaily = $db_conn->query("
                 SELECT `date`, COALESCE(SUM(total),0) AS amt FROM user_invoice
-                WHERE from_user_type='territory_partner' AND from_user_id IN ($_dmTpIdList)
+                WHERE from_user_type='territory_partner' AND to_user_type='shop' AND from_user_id IN ($_dmTpIdList)
                   AND `date` BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
                 GROUP BY `date`
             ");
@@ -507,7 +507,7 @@ if (!empty($myDms)) {
             $_noDmTpIdList = implode(',', $_noDmTpIds);
             $_resNoDmInvDaily = $db_conn->query("
                 SELECT `date`, COALESCE(SUM(total),0) AS amt FROM user_invoice
-                WHERE from_user_type='territory_partner' AND from_user_id IN ($_noDmTpIdList)
+                WHERE from_user_type='territory_partner' AND to_user_type='shop' AND from_user_id IN ($_noDmTpIdList)
                   AND `date` BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
                 GROUP BY `date`
             ");
@@ -723,7 +723,7 @@ if (!empty($allTpIds)) {
 
     $stmtInv = $db_conn->prepare(
         "SELECT COALESCE(SUM(total),0) AS amt FROM user_invoice
-         WHERE from_user_type='territory_partner' AND from_user_id IN ($idList)
+         WHERE from_user_type='territory_partner' AND to_user_type='shop' AND from_user_id IN ($idList)
            AND `date` BETWEEN ? AND ?"
     );
     $stmtInv->bind_param('ss', $from, $to);
@@ -756,7 +756,7 @@ if (!empty($allTpIds)) {
          FROM user_invoice ui
          JOIN territory_partners tp ON tp.id = ui.from_user_id
          LEFT JOIN shop s ON s.temp_id = ui.to_user_id
-         WHERE ui.from_user_type='territory_partner' AND ui.from_user_id IN ($idList)
+         WHERE ui.from_user_type='territory_partner' AND ui.to_user_type='shop' AND ui.from_user_id IN ($idList)
            AND ui.`date` BETWEEN ? AND ?
          ORDER BY ui.date DESC, ui.inv_number DESC"
     );

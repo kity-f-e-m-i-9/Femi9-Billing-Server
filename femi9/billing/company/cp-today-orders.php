@@ -54,6 +54,7 @@ $stmt = $db_conn->prepare(
     "SELECT o.id, o.order_date, o.status, o.transfer_id, o.cp_invoice_id, o.cancel_reason, o.product_type, o.channel_partner_id,
             o.created_by_user_type,
             cp.name AS cp_name, cp.cp_id AS cp_code,
+            COALESCE(NULLIF(cp.delivery_district,''), cp.branch_district) AS cp_district,
             i.product_id, i.qty, i.price, i.amount, p.productName
      FROM channel_partner_purchase_orders o
      JOIN channel_partners cp ON cp.id = o.channel_partner_id
@@ -83,6 +84,7 @@ foreach ($rows as $r) {
             'cp_id'              => (int)$r['channel_partner_id'],
             'cp_name'            => $r['cp_name'],
             'cp_code'            => $r['cp_code'],
+            'cp_district'        => $r['cp_district'] ?: '—',
             'lines'              => [],
             'total'              => 0,
             'headroom'           => null, // computed lazily below, only for waiting orders
@@ -317,11 +319,13 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
                                             <th>#</th>
                                             <th>Date</th>
                                             <th>CP</th>
+                                            <th>District</th>
                                             <th>Type</th>
                                             <th>Products</th>
                                             <th>Total</th>
                                             <th>Headroom</th>
                                             <th>Status</th>
+                                            <th>Documents</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -341,6 +345,7 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
                                                 <br><span style="font-size:10px;font-weight:600;color:#7c3aed;">Created by Company</span>
                                                 <?php endif; ?>
                                             </td>
+                                            <td style="font-size:12.5px;color:#4b5563;"><?=htmlspecialchars($o['cp_district'])?></td>
                                             <td>
                                                 <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:<?=$tBg?>;color:<?=$tFg?>;"><?=htmlspecialchars(tpProductTypeLabel($poType))?></span>
                                             </td>
@@ -370,6 +375,14 @@ $cancelledCount = count(array_filter($orders, fn($o) => $o['status'] === 'cancel
                                                 <?php else: ?>
                                                 <span class="badge-waiting">Waiting</span>
                                                 <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <a href="cp-dispatch-slip-print.php?po_id=<?=(int)$o['po_id']?>" target="_blank" title="Print Dispatch Slip" style="display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;text-decoration:none;background:#eef2ff;color:#4338ca;white-space:nowrap;margin-bottom:4px;">
+                                                    <i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">local_shipping</i> Dispatch Slip
+                                                </a><br>
+                                                <a href="cp-shipping-label-print.php?po_id=<?=(int)$o['po_id']?>" target="_blank" title="Shipping Labels" style="display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;text-decoration:none;background:#fef3c7;color:#92400e;white-space:nowrap;">
+                                                    <i class="material-icons-outlined" style="font-size:13px;vertical-align:-2px;">label</i> Shipping Label
+                                                </a>
                                             </td>
                                             <td>
                                                 <?php if ($o['status'] === 'waiting'): ?>

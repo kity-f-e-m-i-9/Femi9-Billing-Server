@@ -88,6 +88,15 @@ foreach ($tpDetails as $tpId => $d) {
         .status-badge.inactive { background:#fee2e2; color:#dc2626; }
         .stock-qty-btn { font-weight:700; color:#2563eb; background:none; border:none; padding:0; cursor:pointer; text-decoration:underline dotted; }
         .stock-qty-btn:hover { color:#1d4ed8; }
+        .actual-stock-btn { font-size:11.5px; padding:3px 10px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#374151; white-space:nowrap; }
+        .actual-stock-btn:hover { background:#f3f4f6; }
+        .actual-stock-cat-card { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid #e1e0d9; cursor:pointer; }
+        .actual-stock-cat-card:hover { background:#f9fafb; }
+        .actual-qty-input { width:90px; margin:0 auto; text-align:center; }
+        .diff-badge { font-size:12px; padding:3px 10px; border-radius:12px; font-weight:700; display:inline-block; min-width:70px; }
+        .diff-badge.match { background:#dcfce7; color:#059669; }
+        .diff-badge.short { background:#fee2e2; color:#dc2626; }
+        .diff-badge.excess { background:#fef3c7; color:#b45309; }
     </style>
 </head>
 <body>
@@ -140,12 +149,14 @@ foreach ($tpDetails as $tpId => $d) {
                                             <th>Territory Partner</th>
                                             <th>Mobile</th>
                                             <th style="text-align:right;">Stock Qty</th>
+                                            <th style="text-align:center;">Actual Stock</th>
+                                            <th style="text-align:center;">Difference</th>
                                             <th style="text-align:center;">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                     <?php if (empty($rosterByDistrict[$dn])): ?>
-                                        <tr><td colspan="5" style="text-align:center;color:#6b7280;padding:20px;">No TP assigned in this district.</td></tr>
+                                        <tr><td colspan="7" style="text-align:center;color:#6b7280;padding:20px;">No TP assigned in this district.</td></tr>
                                     <?php else: $i = 0; foreach ($rosterByDistrict[$dn] as $tpId):
                                         $tp = $tpDetails[$tpId] ?? null;
                                         if (!$tp) continue;
@@ -157,6 +168,12 @@ foreach ($tpDetails as $tpId => $d) {
                                             <td><?php echo htmlspecialchars($tp['mobile'] ?? ''); ?></td>
                                             <td style="text-align:right;">
                                                 <button type="button" class="stock-qty-btn" onclick="showStockBreakdown(<?php echo $tpId; ?>, '<?php echo htmlspecialchars(addslashes($tp['name']), ENT_QUOTES); ?>')"><?php echo number_format((int)$tp['total_stock']); ?></button>
+                                            </td>
+                                            <td style="text-align:center;">
+                                                <button type="button" class="actual-stock-btn" onclick="openActualStockModal(<?php echo $tpId; ?>, '<?php echo htmlspecialchars(addslashes($tp['name']), ENT_QUOTES); ?>', 'edit')">Actual Stock</button>
+                                            </td>
+                                            <td style="text-align:center;">
+                                                <button type="button" class="actual-stock-btn" onclick="openActualStockModal(<?php echo $tpId; ?>, '<?php echo htmlspecialchars(addslashes($tp['name']), ENT_QUOTES); ?>', 'diff')">Difference</button>
                                             </td>
                                             <td style="text-align:center;">
                                                 <?php if ((int)$tp['is_active'] === 1): ?>
@@ -175,6 +192,21 @@ foreach ($tpDetails as $tpId => $d) {
                     <?php endif; ?>
 
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actual Stock modal: category list -> product qty entry -> save -->
+<div class="modal fade" id="actualStockModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" style="font-weight:700;" id="actualStockTitle">Actual Stock</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding:0;" id="actualStockBody">
+                <div style="padding:30px;text-align:center;color:#6b7280;">Loading…</div>
             </div>
         </div>
     </div>
@@ -232,6 +264,151 @@ function showStockBreakdown(tpId, tpName) {
         })
         .catch(function () {
             body.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#dc2626;padding:20px;">Failed to load.</td></tr>';
+        });
+}
+
+// ---- Actual Stock modal (category -> products -> save, or category -> difference) ----
+var actualStockTpId = null, actualStockTpName = '', actualStockMode = 'edit';
+
+function openActualStockModal(tpId, tpName, mode) {
+    actualStockTpId = tpId;
+    actualStockTpName = tpName;
+    actualStockMode = mode === 'diff' ? 'diff' : 'edit';
+    document.getElementById('actualStockTitle').textContent = (actualStockMode === 'diff' ? 'Stock Difference — ' : 'Actual Stock — ') + tpName;
+    var modal = new bootstrap.Modal(document.getElementById('actualStockModal'));
+    modal.show();
+    showActualStockCategories();
+}
+
+function showActualStockCategories() {
+    var body = document.getElementById('actualStockBody');
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#6b7280;">Loading…</div>';
+
+    fetch('get-tp-actual-stock-categories.php?tp_id=' + encodeURIComponent(actualStockTpId))
+        .then(function (r) { return r.json(); })
+        .then(function (cats) {
+            if (!cats.length) {
+                body.innerHTML = '<div style="padding:30px;text-align:center;color:#6b7280;">No product categories found.</div>';
+                return;
+            }
+            var html = '';
+            cats.forEach(function (c) {
+                var sub = c.product_count + ' product(s)';
+                if (c.last_updated) {
+                    sub += ' · Last counted ' + c.last_updated.substring(0, 16).replace('T', ' ');
+                    if (c.last_updated_by) sub += ' by ' + c.last_updated_by;
+                }
+                var action = actualStockMode === 'diff' ? 'loadActualStockDiff' : 'loadActualStockProducts';
+                var actionLabel = actualStockMode === 'diff' ? 'VIEW →' : (c.last_updated ? 'EDIT →' : 'ENTER →');
+                html += '<div class="actual-stock-cat-card" onclick="' + action + '(\'' + c.category + '\')">';
+                html += '  <div><b>' + c.label + '</b><div style="font-size:12px;color:#6b7280;margin-top:2px;">' + sub + '</div></div>';
+                html += '  <span style="color:#2563eb;font-weight:600;font-size:12px;">' + actionLabel + '</span>';
+                html += '</div>';
+            });
+            body.innerHTML = html;
+        })
+        .catch(function () {
+            body.innerHTML = '<div style="padding:30px;text-align:center;color:#dc2626;">Failed to load.</div>';
+        });
+}
+
+function loadActualStockProducts(category) {
+    var body = document.getElementById('actualStockBody');
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#6b7280;">Loading…</div>';
+
+    fetch('get-tp-actual-stock-products.php?tp_id=' + encodeURIComponent(actualStockTpId) + '&category=' + encodeURIComponent(category))
+        .then(function (r) { return r.json(); })
+        .then(function (products) {
+            var html = '<div style="padding:10px 18px 0;"><button type="button" class="btn btn-sm btn-light" onclick="showActualStockCategories()">&larr; Back</button></div>';
+            if (!products.length) {
+                html += '<div style="padding:30px;text-align:center;color:#6b7280;">No products in this category.</div>';
+                body.innerHTML = html;
+                return;
+            }
+            html += '<table class="tp-roster-plain" style="margin:10px 0 0;">';
+            html += '<thead><tr><th>Product</th><th style="width:110px;text-align:center;">Actual Qty</th></tr></thead><tbody>';
+            products.forEach(function (p) {
+                var val = (p.qty === null || p.qty === undefined) ? '' : p.qty;
+                html += '<tr><td>' + p.productName + '</td><td style="text-align:center;">';
+                html += '<input type="number" min="0" step="1" class="form-control form-control-sm actual-qty-input" data-product-id="' + p.product_id + '" value="' + val + '" placeholder="0" autocomplete="off">';
+                html += '</td></tr>';
+            });
+            html += '</tbody></table>';
+            html += '<div style="padding:14px 18px;text-align:right;border-top:1px solid #e1e0d9;margin-top:6px;">';
+            html += '<button type="button" class="btn btn-success" id="saveActualStockBtn" onclick="saveActualStock(\'' + category + '\')"><i class="material-icons" style="vertical-align:middle;font-size:18px;">save</i> Save</button>';
+            html += '</div>';
+            body.innerHTML = html;
+        })
+        .catch(function () {
+            body.innerHTML = '<div style="padding:30px;text-align:center;color:#dc2626;">Failed to load.</div>';
+        });
+}
+
+function saveActualStock(category) {
+    var btn = document.getElementById('saveActualStockBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    var params = new URLSearchParams();
+    params.append('tp_id', actualStockTpId);
+    params.append('category', category);
+    document.querySelectorAll('.actual-qty-input').forEach(function (inp) {
+        if (inp.value !== '') { params.append('qty[' + inp.dataset.productId + ']', inp.value); }
+    });
+
+    fetch('tp-actual-stock-action.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (res.success) {
+                showActualStockCategories();
+            } else {
+                alert(res.error || 'Failed to save.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="material-icons" style="vertical-align:middle;font-size:18px;">save</i> Save';
+            }
+        })
+        .catch(function () {
+            alert('Failed to save.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="material-icons" style="vertical-align:middle;font-size:18px;">save</i> Save';
+        });
+}
+
+function loadActualStockDiff(category) {
+    var body = document.getElementById('actualStockBody');
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:#6b7280;">Loading…</div>';
+
+    fetch('get-tp-actual-stock-diff.php?tp_id=' + encodeURIComponent(actualStockTpId) + '&category=' + encodeURIComponent(category))
+        .then(function (r) { return r.json(); })
+        .then(function (rows) {
+            var html = '<div style="padding:10px 18px 0;display:flex;justify-content:space-between;align-items:center;">';
+            html += '<button type="button" class="btn btn-sm btn-light" onclick="showActualStockCategories()">&larr; Back</button>';
+            html += '<button type="button" class="btn btn-sm btn-outline-primary" onclick="actualStockMode=\'edit\';loadActualStockProducts(\'' + category + '\')">Edit</button>';
+            html += '</div>';
+            if (!rows.length) {
+                html += '<div style="padding:30px;text-align:center;color:#6b7280;">Saved. No actual qty recorded for this category yet.</div>';
+                body.innerHTML = html;
+                return;
+            }
+            html += '<table class="tp-roster-plain" style="margin:10px 0 0;">';
+            html += '<thead><tr><th>Product</th><th style="text-align:center;">System Stock</th><th style="text-align:center;">Actual Stock</th><th style="text-align:center;">Difference</th></tr></thead><tbody>';
+            rows.forEach(function (r) {
+                var badgeClass = r.diff === 0 ? 'match' : (r.diff < 0 ? 'short' : 'excess');
+                var badgeText  = r.diff === 0 ? 'Match' : (r.diff < 0 ? (r.diff) + ' Short' : '+' + r.diff + ' Excess');
+                html += '<tr><td>' + r.productName + '</td>';
+                html += '<td style="text-align:center;">' + Number(r.system_qty).toLocaleString() + '</td>';
+                html += '<td style="text-align:center;font-weight:600;">' + Number(r.actual_qty).toLocaleString() + '</td>';
+                html += '<td style="text-align:center;"><span class="diff-badge ' + badgeClass + '">' + badgeText + '</span></td></tr>';
+            });
+            html += '</tbody></table>';
+            body.innerHTML = html;
+        })
+        .catch(function () {
+            body.innerHTML = '<div style="padding:30px;text-align:center;color:#dc2626;">Saved, but failed to load the difference.</div>';
         });
 }
 </script>

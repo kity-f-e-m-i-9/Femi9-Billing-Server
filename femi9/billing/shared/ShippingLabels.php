@@ -248,6 +248,119 @@ function invoiceShippingLabelsSeedIfEmpty(mysqli $db, string $invoiceId, array $
     $itemStmt->close();
 }
 
+/**
+ * Same per-box shipping label concept as shippingLabelsEnsureTables() etc.
+ * above, but for a Channel Partner Purchase Order (channel_partner_purchase_orders)
+ * instead of a TP Purchase Order — kept as its own pair of tables (not reused
+ * from po_shipping_labels) since channel_partner_purchase_orders.id and
+ * tp_purchase_orders.id are two independent auto-increment sequences, so the
+ * same numeric po_id could otherwise collide between a TP PO and a CP PO.
+ */
+function cpPoShippingLabelsEnsureTables(mysqli $db): void
+{
+    $db->query("
+        CREATE TABLE IF NOT EXISTS cp_po_shipping_labels (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          po_id INT UNSIGNED NOT NULL,
+          sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+          count_text VARCHAR(20) NOT NULL DEFAULT '',
+          source_text VARCHAR(100) NOT NULL DEFAULT '',
+          from_address TEXT NULL,
+          to_address TEXT NULL,
+          note_text VARCHAR(100) NOT NULL DEFAULT '',
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          KEY idx_cpsl_po (po_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+    $db->query("
+        CREATE TABLE IF NOT EXISTS cp_po_shipping_label_items (
+          id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          label_id INT UNSIGNED NOT NULL,
+          sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+          product_text VARCHAR(255) NOT NULL,
+          packs_count INT UNSIGNED NOT NULL DEFAULT 0,
+          KEY idx_cpsli_label (label_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    ");
+}
+
+/** Same seeding behavior as shippingLabelsSeedIfEmpty(), for a CP PO. */
+function cpPoShippingLabelsSeedIfEmpty(mysqli $db, int $poId, array $boxes, string $fromAddress, string $toAddress): void
+{
+    $existing = $db->query("SELECT COUNT(*) AS c FROM cp_po_shipping_labels WHERE po_id = " . (int)$poId)->fetch_assoc();
+    if ((int)($existing['c'] ?? 0) > 0) return;
+
+    if (empty($boxes)) $boxes = [['contents' => []]];
+    $total = count($boxes);
+
+    $stmt = $db->prepare("
+        INSERT INTO cp_po_shipping_labels (po_id, sort_order, count_text, from_address, to_address, note_text)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
+    $itemStmt = $db->prepare("
+        INSERT INTO cp_po_shipping_label_items (label_id, sort_order, product_text, packs_count)
+        VALUES (?, ?, ?, ?)
+    ");
+    $i = 0;
+    foreach ($boxes as $box) {
+        $i++;
+        $countText = $i . ' / ' . $total;
+        $noteText = ($i === $total) ? SHIPPING_LABEL_LAST_BOX_NOTE : '';
+        $stmt->bind_param('iissss', $poId, $i, $countText, $fromAddress, $toAddress, $noteText);
+        $stmt->execute();
+        $labelId = $stmt->insert_id;
+
+        $j = 0;
+        foreach (($box['contents'] ?? []) as $line) {
+            $j++;
+            $productText = shippingLabelShortProductName($line['product'] ?? '');
+            $packs = (int)($line['packs'] ?? 0);
+            $itemStmt->bind_param('iisi', $labelId, $j, $productText, $packs);
+            $itemStmt->execute();
+        }
+    }
+    $stmt->close();
+    $itemStmt->close();
+}
+
+/** Same shape as shippingLabelsFetchForPo(), for a CP PO. */
+function cpPoShippingLabelsFetchForPo(mysqli $db, int $poId): array
+{
+    $labels = [];
+    $stmt = $db->prepare("
+        SELECT id, sort_order, count_text, source_text, from_address, to_address, note_text
+        FROM cp_po_shipping_labels WHERE po_id = ? ORDER BY sort_order, id
+    ");
+    $stmt->bind_param('i', $poId);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    foreach ($rows as $r) {
+        $r['id'] = (int)$r['id'];
+        $r['sort_order'] = (int)$r['sort_order'];
+        $r['items'] = [];
+        $labels[$r['id']] = $r;
+    }
+    if (empty($labels)) return [];
+
+    $ids = implode(',', array_map('intval', array_keys($labels)));
+    $itemRows = $db->query("
+        SELECT id, label_id, product_text, packs_count
+        FROM cp_po_shipping_label_items WHERE label_id IN ($ids) ORDER BY sort_order, id
+    ")->fetch_all(MYSQLI_ASSOC);
+    foreach ($itemRows as $ir) {
+        $labels[(int)$ir['label_id']]['items'][] = [
+            'id'           => (int)$ir['id'],
+            'product_text' => $ir['product_text'],
+            'packs_count'  => (int)$ir['packs_count'],
+        ];
+    }
+
+    return array_values($labels);
+}
+
 /** Same shape as shippingLabelsFetchForPo(), keyed by invoice_id (string) instead of po_id. */
 function invoiceShippingLabelsFetchForInvoice(mysqli $db, string $invoiceId): array
 {

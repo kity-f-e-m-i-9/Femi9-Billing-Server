@@ -44,6 +44,49 @@ $result = $db_conn->query("
     ORDER BY cp.id
 ");
 $partners = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+
+// District/Division columns — a CP's own assigned node can sit at any depth
+// (confirmed: every existing channel_partner_locations row today is at
+// DIVISION depth 4, unlike a TP's own FIRKA-depth assignment), so this walks
+// up however many parent_id hops are needed based on the assigned node's OWN
+// depth (DISTRICT=3, DIVISION=4, TALUK=5, FIRKA=6) instead of assuming a
+// fixed depth like reward_points_tp_export_xlsx.php's TP-only query does. A
+// CP can have multiple locations, possibly spanning more than one
+// district/division, so all distinct names are joined together.
+$cpDistrictDivision = [];
+if (!empty($partners)) {
+    $cpIdList = implode(',', array_map(fn($p) => (int)$p['id'], $partners));
+    $resDD = $db_conn->query("
+        SELECT cpl.channel_partner_id AS cp_id,
+               GROUP_CONCAT(DISTINCT
+                   CASE leaf.depth
+                       WHEN 3 THEN leaf.name
+                       WHEN 4 THEN p1.name
+                       WHEN 5 THEN p2.name
+                       WHEN 6 THEN p3.name
+                       ELSE NULL
+                   END
+               ORDER BY leaf.name SEPARATOR ', ') AS district_names,
+               GROUP_CONCAT(DISTINCT
+                   CASE leaf.depth
+                       WHEN 4 THEN leaf.name
+                       WHEN 5 THEN p1.name
+                       WHEN 6 THEN p2.name
+                       ELSE NULL
+                   END
+               ORDER BY leaf.name SEPARATOR ', ') AS division_names
+        FROM channel_partner_locations cpl
+        JOIN partner_location_nodes leaf ON leaf.id = cpl.location_id
+        LEFT JOIN partner_location_nodes p1 ON p1.id = leaf.parent_id
+        LEFT JOIN partner_location_nodes p2 ON p2.id = p1.parent_id
+        LEFT JOIN partner_location_nodes p3 ON p3.id = p2.parent_id
+        WHERE cpl.channel_partner_id IN ($cpIdList)
+        GROUP BY cpl.channel_partner_id
+    ");
+    while ($row = $resDD->fetch_assoc()) {
+        $cpDistrictDivision[(int)$row['cp_id']] = $row;
+    }
+}
 $i = 0;
 ?>
 <!DOCTYPE html>
@@ -158,6 +201,8 @@ $i = 0;
                                                     <th>CP ID</th>
                                                     <th>Name</th>
                                                     <th>Mobile</th>
+                                                    <th>District</th>
+                                                    <th>Division</th>
                                                     <th>Locations</th>
                                                     <th>Total Deposit</th>
                                                     <th>Created By</th>
@@ -197,6 +242,8 @@ $i = 0;
                                                     <td><code style="font-size:12px;"><?php echo htmlspecialchars($cp['cp_id']); ?></code></td>
                                                     <td><strong><?php echo htmlspecialchars($cp['name']); ?></strong></td>
                                                     <td><?php echo htmlspecialchars($cp['mobile']); ?></td>
+                                                    <td style="font-size:12.5px;color:#374151;"><?php echo htmlspecialchars($cpDistrictDivision[$cp['id']]['district_names'] ?? '—'); ?></td>
+                                                    <td style="font-size:12.5px;color:#374151;"><?php echo htmlspecialchars($cpDistrictDivision[$cp['id']]['division_names'] ?? '—'); ?></td>
                                                     <td>
                                                         <?php if ($cp['location_count'] > 0): ?>
                                                             <button type="button" class="badge badge-primary loc-view-trigger"

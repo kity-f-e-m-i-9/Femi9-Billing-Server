@@ -128,9 +128,9 @@ $invNumberHeader = $isTracked ? 'Invoice Number* (or type NEXT)' : 'Invoice Numb
 if ($isTracked) {
     $fixedHeaders = [
         'Company Profile*', 'Warehouse Code', 'Category*', 'Date* (YYYY-MM-DD)', $invNumberHeader,
-        'Customer Name', 'Customer Mobile', 'Customer Address', 'District', 'Shipping Address',
+        'Customer Name', 'Customer Mobile', 'Customer Address', 'Shipping Address',
         'GST Number', 'Order Number',
-        'Courier Charges', 'State', 'Coupon Code',
+        'Courier Charges', 'District', 'State', 'Coupon Code',
         'Wallet Amount (Website/ID Concept only)',
         'Product*', 'Qty*', 'Rate*', 'Discount',
     ];
@@ -141,8 +141,8 @@ if ($isTracked) {
     // out entirely rather than shown blank.
     $fixedHeaders = [
         'Company Profile*', 'Warehouse Code', 'Category*', 'Date* (YYYY-MM-DD)', $invNumberHeader,
-        'Customer Name', 'Customer Address', 'District', 'Shipping Address',
-        'Order Number', 'Courier Charges', 'State',
+        'Customer Name', 'Customer Address', 'Shipping Address',
+        'Order Number', 'Courier Charges', 'District', 'State',
         'Product*', 'Qty*', 'Rate*', 'Discount',
     ];
 }
