@@ -16,7 +16,7 @@
  */
 
 if (!function_exists('compute_hsn_b2b_b2c')) {
-function compute_hsn_b2b_b2c($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_date, $to_date, array $tp_sls_lines) {
+function compute_hsn_b2b_b2c($db_conn, $Login_user_TYPEvl, $get_godown_id, $from_date, $to_date, array $tp_sls_lines, $shop_customer_only = false) {
     $rows = []; // "hsn|rate" => ['hsn','rate','uqc','b2b'=>[...],'b2c'=>[...]]
     $blank = function () { return ['qty' => 0.0, 'taxable' => 0.0, 'cgst' => 0.0, 'sgst' => 0.0, 'igst' => 0.0]; };
 
@@ -49,12 +49,14 @@ function compute_hsn_b2b_b2c($db_conn, $Login_user_TYPEvl, $get_godown_id, $from
 
     $run("select hsn, gst_percentage as rate, buyer_gsttype as bgt, gst_type, sum(qty) as qty, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from user_invoice_items where from_user_type='$Login_user_TYPEvl' and from_user_id='$get_godown_id' and date between '$from_date' and '$to_date' group by hsn, gst_percentage, buyer_gsttype, gst_type", 1, true);
     $run("select hsn, gst_percentage as rate, buyer_gsttype as bgt, gst_type, sum(qty) as qty, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from invoice_items where user_type='$Login_user_TYPEvl' and user_id='$get_godown_id' and date between '$from_date' and '$to_date' group by hsn, gst_percentage, buyer_gsttype, gst_type", 1, true);
+    if (!$shop_customer_only)
     $run("select hsn, gst as rate, buyer_gsttype as bgt, gst_type, sum(qty) as qty, sum(total-gst_amount) as taxable, sum(gst_amount) as gst_amt from ot_sales where godownid='$get_godown_id' and date between '$from_date' and '$to_date' group by hsn, gst, buyer_gsttype, gst_type", 1, true);
 
     // Returns / credit notes.
     $run("select hsn, gst_percentage as rate, buyer_gsttype as bgt, gst_type, sum(qty) as qty, sum(total-gstamount_total) as taxable, sum(gstamount_total) as gst_amt from user_return_stock_items where to_usertype='$Login_user_TYPEvl' and to_userid='$get_godown_id' and date between '$from_date' and '$to_date' group by hsn, gst_percentage, buyer_gsttype, gst_type", -1, false);
     // ot_sales_return stores a single total (no separate GST amount), so the
     // return reduces taxable value only, as in Table 7.
+    if (!$shop_customer_only)
     $run("select osr.hsn as hsn, p.gst as rate, osr.buyer_gsttype as bgt, osr.gst_type as gst_type, sum(osr.qty) as qty, sum(osr.total) as taxable, 0 as gst_amt from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$get_godown_id' and osr.return_date between '$from_date' and '$to_date' group by osr.hsn, p.gst, osr.buyer_gsttype, osr.gst_type", -1, false);
 
     foreach ($tp_sls_lines as $l) {

@@ -14,6 +14,8 @@ $from_date = date("Y-m-01", strtotime($from_month));
 $to_date   = date("Y-m-t", strtotime($to_month));
 
 $data = build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_date);
+// -1 = shortest round-trip repr (2971.43, not 2971.4299999999998...), regardless of php.ini
+ini_set('serialize_precision', '-1');
 $json = json_encode($data, JSON_UNESCAPED_SLASHES);
 
 $file = ($data['gstin'] ?: 'GSTR1') . '_GSTR1_' . strtoupper(date('M-Y', strtotime($to_date))) . '_' . date('dmY_His') . '.json';

@@ -161,6 +161,9 @@ $STName=$result_stateList12['st_name'];
            <input type="text" name="customer_mobile" onChange="showMobileNumber(this.value)" onkeypress="restrictnumber(event)" pattern="[1-9]{1}[0-9]{9}" class="form-control" maxlength="10" value="<?=htmlspecialchars((string)($result_Records['customer_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			<br/>
 			
+			<label class="form-label"><input type="checkbox" name="is_export" value="1"<?=!empty($result_Records['is_export']) ? ' checked' : '';?>> Export supply (GSTR-1 "exp", without payment of tax)</label>
+			<br/><br/>
+
 			<label class="form-label">District*</label>
             <input type="text" required="required" name="district" onkeypress="restrictSpecialChars(event)" class="form-control" maxlength="100" value="<?=htmlspecialchars((string)($result_Records['district'] ?? ''), ENT_QUOTES, 'ISO-8859-1', false);?>">
 			<br/>

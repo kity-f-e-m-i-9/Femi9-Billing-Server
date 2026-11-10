@@ -369,7 +369,9 @@ if ($from_month != '') {
                         <table style="width:100%;">
                         <tr>
                         <td><h1 style="margin-top:20px;">GSTR-1 Filing Summary</h1></td>
-                        <td align="right" valign="top"><a href="export_gstr1?frdate=<?=urlencode($from_month);?>&todate=<?=urlencode($to_month);?>" title="Export to Excel"><img src="../../assets/images/excel-3-32.png"></a></td>
+                        <td align="right" valign="top"><a href="export_gstr1?frdate=<?=urlencode($from_month);?>&todate=<?=urlencode($to_month);?>" title="Export Table 8 (CSV)"><img src="../../assets/images/excel-3-32.png"></a>
+                        &nbsp;<a href="export_gstr1_xlsx?frdate=<?=urlencode($from_month);?>&todate=<?=urlencode($to_month);?>" title="Export GSTR-1 Excel (GST offline tool format, with Summary sheet)" style="text-decoration:none;"><img src="../../assets/images/excel-3-32.png" style="filter:hue-rotate(90deg);"></a>
+                        &nbsp;<a href="export_gstr1_json?frdate=<?=urlencode($from_month);?>&todate=<?=urlencode($to_month);?>" title="Export GSTR-1 JSON (GST offline tool format)" style="text-decoration:none;vertical-align:top;"><span class="material-icons" style="font-size:32px;color:#f5a623;">data_object</span></a></td>
                         </tr>
                         </table>
                         <p style="color:#666;margin-top:-8px;">Standard GST portal table layout &mdash; Table 4 (B2B), Table 7 (B2C), Table 8 (Nil/Exempt/Non-GST), Table 12 (HSN Summary), Table 13 (Documents Issued).</p>
