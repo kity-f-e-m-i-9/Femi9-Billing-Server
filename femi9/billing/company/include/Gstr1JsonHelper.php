@@ -10,7 +10,7 @@
  *            supply type (INTRA/INTER), rate and place of supply, net of
  *            unregistered-buyer returns.
  *  - nil   : nil-rated (0%) value by INTRAB2B/INTRAB2C/INTRB2B/INTRB2C, net of
- *            returns, reported in expt_amt (same as the filed sample).
+ *            returns, reported in nil_amt (Table 8 "Nil Rated Supplies" column; expt_amt/ngsup_amt stay 0).
  *  - hsn   : include/HsnB2bB2cHelper.php (hsn_b2b / hsn_b2c).
  *  - doc_issue : invoice series ranges per channel.
  * exp    : OT sales ticked "Export supply" (ot_sales.is_export), WOPAY.
@@ -308,7 +308,7 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
     $out_nil = [];
     foreach ($nil as $sply => $v) {
         if (abs($v) < 0.005) continue;
-        $out_nil[] = ['sply_ty' => $sply, 'nil_amt' => 0, 'expt_amt' => $r2($v), 'ngsup_amt' => 0];
+        $out_nil[] = ['sply_ty' => $sply, 'nil_amt' => $r2($v), 'expt_amt' => 0, 'ngsup_amt' => 0];
     }
 
     // ---- exp: OT sales flagged "Export supply" (WOPAY = without payment of tax) ----

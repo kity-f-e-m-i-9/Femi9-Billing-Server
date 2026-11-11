@@ -55,14 +55,14 @@ foreach (($data['exp'] ?? []) as $g) foreach ($g['inv'] as $inv) foreach ($inv['
     $rows[] = [$g['exp_typ'], $inv['inum'], $inv['idt'], $n($inv['val']), '', null, null, $it['rt'], $n($it['txval']), 0];
 $fill('exp', $rows, [3]);
 
-// exemp (fixed 4 rows, in the tool's order; amounts go in the "Exempted" column like the JSON expt_amt)
+// exemp (fixed 4 rows, in the tool's order; amounts go in the "Nil Rated Supplies" column, like the JSON nil_amt)
 $nil = [];
-foreach ($data['nil']['inv'] as $x) $nil[$x['sply_ty']] = $n($x['expt_amt']);
+foreach ($data['nil']['inv'] as $x) $nil[$x['sply_ty']] = $n($x['nil_amt']);
 $fill('exemp', [
-    ['Inter-State supplies to registered persons',   0, $nil['INTRB2B']   ?? 0, 0],
-    ['Intra-State supplies to registered persons',   0, $nil['INTRAB2B']  ?? 0, 0],
-    ['Inter-State supplies to unregistered persons', 0, $nil['INTRB2C']   ?? 0, 0],
-    ['Intra-State supplies to unregistered persons', 0, $nil['INTRAB2C']  ?? 0, 0],
+    ['Inter-State supplies to registered persons',   $nil['INTRB2B']   ?? 0, 0, 0],
+    ['Intra-State supplies to registered persons',   $nil['INTRAB2B']  ?? 0, 0, 0],
+    ['Inter-State supplies to unregistered persons', $nil['INTRB2C']   ?? 0, 0, 0],
+    ['Intra-State supplies to unregistered persons', $nil['INTRAB2C']  ?? 0, 0, 0],
 ]);
 
 // hsn
