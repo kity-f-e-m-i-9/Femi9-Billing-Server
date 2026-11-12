@@ -17,7 +17,7 @@ require_once __DIR__ . '/include/db-connect.php';
 // reasoning). Never touches $_SESSION — it just resolves $result_LoGuserDtails
 // for THIS request, and config.php (included right after) picks it up
 // instead of re-querying by $_SESSION['LOGIN_USER'].
-$_msCompanyBridgeAllowedScripts = ['dashboard.php'];
+$_msCompanyBridgeAllowedScripts = ['dashboard.php', 'kpi.php'];
 if (in_array(basename($_SERVER['SCRIPT_NAME']), $_msCompanyBridgeAllowedScripts, true) && !empty($_COOKIE['femi9_company_ms_view'])) {
     $db_conn->query("CREATE TABLE IF NOT EXISTS company_ms_view_bridge (
         token VARCHAR(64) PRIMARY KEY,

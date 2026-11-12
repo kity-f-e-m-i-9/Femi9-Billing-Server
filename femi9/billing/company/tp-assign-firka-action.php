@@ -1,8 +1,15 @@
 <?php
-// Saves (or clears) which Territory Partner covers one Firka, from the
-// "Manage Daily Assign District TPs" drill-down page. territory_partner_
-// locations.location_id is UNIQUE (tp_tables.sql) -- a firka maps to at
-// most one TP -- so reassigning here just overwrites whoever had it.
+// Saves (or clears) which Territory Partner covers one Firka FOR THAT
+// CALENDAR DATE ONLY, from the "Manage Daily Assign District TPs"
+// drill-down page. This is a temporary day-by-day roster, kept solely in
+// tp_daily_assignments — it never writes to territory_partner_locations,
+// which is that TP's own PERMANENT Firka ownership (used everywhere else,
+// e.g. Manage Territory Partner / Monthly Target). Until 2026-11-11 this
+// endpoint also wrote the permanent table on every save, so a company/ASM
+// using this page daily was silently reassigning Firkas (and the target
+// amount that comes with them) between TPs for good, every single time —
+// not the "just today's roster" the page's own name implies. Permanent
+// reassignment still happens, just only through the actual TP edit page.
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
 header('Content-Type: application/json');
@@ -27,26 +34,9 @@ if (!$firka_id) {
     exit;
 }
 
-if ($tp_id === null) {
-    // "Vacant Area" selected — clear any existing assignment for this firka.
-    $stmt = $db_conn->prepare("DELETE FROM territory_partner_locations WHERE location_id = ?");
-    $stmt->bind_param('i', $firka_id);
-    $stmt->execute();
-    $stmt->close();
-} else {
-    $stmt = $db_conn->prepare("
-        INSERT INTO territory_partner_locations (territory_partner_id, location_id)
-        VALUES (?, ?)
-        ON DUPLICATE KEY UPDATE territory_partner_id = VALUES(territory_partner_id)
-    ");
-    $stmt->bind_param('ii', $tp_id, $firka_id);
-    $stmt->execute();
-    $stmt->close();
-}
-
-// Daily history log — one row per (date, firka), kept even after the
-// live mapping above is later overwritten, so past assignments can be
-// looked up by date range / month / DM on the report page.
+// One row per (date, firka) — this IS the record now, not just a history
+// log of some other live mapping. NULL territory_partner_id means "Vacant
+// Area" for that date.
 $stmt = $db_conn->prepare("
     INSERT INTO tp_daily_assignments (assign_date, location_id, territory_partner_id, assigned_by)
     VALUES (?, ?, ?, ?)

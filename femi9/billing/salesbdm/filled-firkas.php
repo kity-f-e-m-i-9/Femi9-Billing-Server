@@ -30,6 +30,13 @@ if (!empty($_companyBridgeView)) {
 $ffMonth = isset($_GET['month']) && preg_match('/^\d{4}-\d{2}$/', $_GET['month']) ? $_GET['month'] : date('Y-m');
 
 $dashboardUrl = 'dashboard.php' . ($viewBdmIdRaw !== '' ? '?view_bdm_id=' . urlencode($viewBdmIdRaw) : '');
+
+// Same embed convention as dashboard.php — reached by clicking the
+// "Weekly" button on an EMBEDDED dashboard (company's mis-report.php Sales
+// BDM tab iframe), which previously always linked here without carrying
+// that flag, so this page rendered its own full sidebar/header crammed
+// inside the small iframe instead of just the content.
+$embed = !empty($_GET['embed']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -59,15 +66,25 @@ $dashboardUrl = 'dashboard.php' . ($viewBdmIdRaw !== '' ? '?view_bdm_id=' . urle
         .ff-status-btn.active { background:#4b5563; color:#fff; border-color:#4b5563; }
         #ffTabs .nav-link { cursor: pointer; }
     </style>
+    <?php if ($embed): ?>
+    <style>
+        .app-sidebar { display: none !important; }
+        .app-container { margin-left: 0 !important; width: 100% !important; }
+        .app-content { margin-top: 0 !important; }
+        .app-content .page-description { padding: 15px 0 !important; margin-bottom: 15px !important; }
+    </style>
+    <?php endif; ?>
 </head>
-<body>
+<body<?php echo $embed ? ' class="sbdm-embed"' : ''; ?>>
 <div class="app align-content-stretch d-flex flex-wrap">
+    <?php if (!$embed): ?>
     <div class="app-sidebar">
         <?php include("logo.php"); ?>
         <?php include("femi_menu.php"); ?>
     </div>
+    <?php endif; ?>
     <div class="app-container">
-        <?php include("app-header.php"); ?>
+        <?php if (!$embed) include("app-header.php"); ?>
         <div class="app-content">
             <div class="content-wrapper">
                 <div class="container-fluid">
@@ -78,12 +95,14 @@ $dashboardUrl = 'dashboard.php' . ($viewBdmIdRaw !== '' ? '?view_bdm_id=' . urle
                                     <i class="material-icons-outlined" style="vertical-align:middle;margin-right:6px;color:#16a34a;">check_circle</i>
                                     Territory Partners in your Filled Firkas
                                 </h1>
+                                <?php if (!$embed): ?>
                                 <a href="<?php echo htmlspecialchars($dashboardUrl); ?>" class="btn btn-sm" style="border:1px solid var(--border);color:var(--text-secondary);"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">arrow_back</i> Back to Dashboard</a>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
 
-                    <?php if ($viewingOther): ?>
+                    <?php if ($viewingOther && !$embed): ?>
                         <div class="alert alert-info" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
                             <span><i class="material-icons-outlined" style="vertical-align:middle;font-size:17px;">visibility</i> Viewing <b><?php echo htmlspecialchars($viewBdmName); ?>'s</b> Filled Firkas (read-only).</span>
                         </div>

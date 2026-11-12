@@ -67,6 +67,7 @@ $tempidsEsc = implode(',', array_map(function ($t) { return "'" . db_esc($t) . "
 
 $salesByTempid = [];     // tempid => first ot_sales row (header fields)
 $qtyByTempidProd = [];   // tempid => [prid => qty]
+$discountByTempid = [];  // tempid => sum of discount across all product lines
 $invoiceMap = [];        // tempid => ot_sales_invoice row
 $stateMap = [];
 $productNames = [];
@@ -76,6 +77,10 @@ while ($row = mysqli_fetch_assoc($allSalesRes)) {
     $tid = $row['tempid'];
     if (!isset($salesByTempid[$tid])) { $salesByTempid[$tid] = $row; }
     $qtyByTempidProd[$tid][(int)$row['prid']] = (int)$row['qty'];
+    // discount is a per-line column (ot-sale-action.php writes/edits it per
+    // product row), not per-order — sum every line's discount for this
+    // order, not just the first row kept in $salesByTempid.
+    $discountByTempid[$tid] = ($discountByTempid[$tid] ?? 0) + (float)($row['discount'] ?? 0);
 }
 
 $invRes = mysqli_query($db_conn, "SELECT * FROM ot_sales_invoice WHERE tempid IN ($tempidsEsc)");
@@ -128,8 +133,16 @@ foreach ($byCategory as $cat => $tids) {
     $sheet = $spreadsheet->createSheet($sheetIndex++);
     $sheet->setTitle($sheetTitle);
 
-    $fixedHeaders = ['S.NO', 'DATE', 'BILLING RATE', 'NAME', 'DISTRICT', 'STATE', 'ORDER NO'];
-    $tailHeaders  = ['INVOICE NO', 'REMARKS'];
+    // Courier Charge / Total Amount / Discount are only meaningful for the
+    // WEBSITE category's own per-order economics — every other category
+    // (Amazon, Flipkart, WhatsApp Sales, ...) keeps the plain Invoice No +
+    // Remarks tail it already had.
+    $isWebsiteCat = (mb_strtoupper(trim($cat)) === 'WEBSITE');
+
+    $fixedHeaders = ['S.NO', 'DATE', 'BILLING RATE', 'NAME', 'MOBILE', 'DISTRICT', 'STATE', 'ORDER NO', 'INVOICE NO'];
+    $tailHeaders  = $isWebsiteCat
+        ? ['COURIER CHARGE', 'TOTAL AMOUNT', 'DISCOUNT', 'REMARKS']
+        : ['REMARKS'];
     $headers = array_merge($fixedHeaders, array_map(function ($prid) use ($productNames) {
         return $productNames[$prid] ?? ('Product #' . $prid);
     }, $prids), $tailHeaders);
@@ -146,6 +159,9 @@ foreach ($byCategory as $cat => $tids) {
 
     $row = 2;
     $productTotals = array_fill_keys($prids, 0);
+    $courierTotal = 0.0;
+    $amountTotal  = 0.0;
+    $discountTotal = 0.0;
     $sNo = 0;
     foreach ($tids as $tid) {
         $s = $salesByTempid[$tid] ?? null;
@@ -157,12 +173,14 @@ foreach ($byCategory as $cat => $tids) {
         $sheet->setCellValue('B' . $row, date('d-m-Y', strtotime($s['date'])));
         $sheet->setCellValue('C' . $row, (float)$s['price']);
         $sheet->setCellValue('D' . $row, $s['customer_name']);
-        $sheet->setCellValue('E' . $row, $s['district'] ?? '');
+        $sheet->setCellValue('E' . $row, $s['customer_mobile'] ?? '');
+        $sheet->setCellValue('F' . $row, $s['district'] ?? '');
         $stateId = (int)($s['state_id'] ?? 0);
-        $sheet->setCellValue('F' . $row, $stateId > 0 ? ($stateMap[$stateId] ?? '') : '');
-        $sheet->setCellValue('G' . $row, $s['order_number']);
+        $sheet->setCellValue('G' . $row, $stateId > 0 ? ($stateMap[$stateId] ?? '') : '');
+        $sheet->setCellValue('H' . $row, $s['order_number']);
+        $sheet->setCellValue('I' . $row, $inv['inv_number'] ?? '');
 
-        $col = 7;
+        $col = 9;
         foreach ($prids as $prid) {
             $qty = $qtyByTempidProd[$tid][$prid] ?? 0;
             if ($qty > 0) {
@@ -172,8 +190,21 @@ foreach ($byCategory as $cat => $tids) {
             $col++;
         }
 
-        $sheet->setCellValue($colLetter($col) . $row, $inv['inv_number'] ?? '');
-        $col++;
+        if ($isWebsiteCat) {
+            $courierCharge = (float)($inv['courier_charges'] ?? 0);
+            $totalAmount   = (float)($inv['total'] ?? 0);
+            $discount      = (float)($discountByTempid[$tid] ?? 0);
+            $courierTotal  += $courierCharge;
+            $amountTotal   += $totalAmount;
+            $discountTotal += $discount;
+
+            $sheet->setCellValue($colLetter($col) . $row, $courierCharge);
+            $col++;
+            $sheet->setCellValue($colLetter($col) . $row, $totalAmount);
+            $col++;
+            $sheet->setCellValue($colLetter($col) . $row, $discount);
+            $col++;
+        }
         $sheet->setCellValue($colLetter($col) . $row, '');
 
         $row++;
@@ -184,15 +215,23 @@ foreach ($byCategory as $cat => $tids) {
     $sheet->setCellValue('C' . $row, '');
     $sheet->setCellValue('D' . $row, '');
     $sheet->setCellValue('E' . $row, '');
-    $sheet->setCellValue('F' . $row, 'TOTAL');
-    $sheet->setCellValue('G' . $row, '');
-    $col = 7;
+    $sheet->setCellValue('F' . $row, '');
+    $sheet->setCellValue('G' . $row, 'TOTAL');
+    $sheet->setCellValue('H' . $row, '');
+    $sheet->setCellValue('I' . $row, '');
+    $col = 9;
     foreach ($prids as $prid) {
         $sheet->setCellValue($colLetter($col) . $row, $productTotals[$prid]);
         $col++;
     }
-    $sheet->setCellValue($colLetter($col) . $row, '');
-    $col++;
+    if ($isWebsiteCat) {
+        $sheet->setCellValue($colLetter($col) . $row, $courierTotal);
+        $col++;
+        $sheet->setCellValue($colLetter($col) . $row, $amountTotal);
+        $col++;
+        $sheet->setCellValue($colLetter($col) . $row, $discountTotal);
+        $col++;
+    }
     $sheet->setCellValue($colLetter($col) . $row, '');
 
     $totalRange = 'A' . $row . ':' . $colLetter($lastColIdx) . $row;
@@ -205,7 +244,21 @@ foreach ($byCategory as $cat => $tids) {
 
     $sheet->getColumnDimension('D')->setWidth(22);
     $sheet->getColumnDimension('E')->setWidth(16);
-    $sheet->getColumnDimension('G')->setWidth(22);
+    $sheet->getColumnDimension('F')->setWidth(16);
+    $sheet->getColumnDimension('H')->setWidth(22);
+    $sheet->getColumnDimension('I')->setWidth(18);
+
+    // Force these columns to plain Text format, not just on the rows filled
+    // in here but down the WHOLE column (not only $dataRange) — Mobile/Order
+    // No/Invoice No are numeric-looking strings a user may later type/paste
+    // into the sheet by hand; without this Excel's own "General" auto-format
+    // mangles them (strips a leading 0, flips a long number into scientific
+    // notation, or — if a value starts with '=' — tries to run it as a
+    // formula). Setting the column itself (not just the filled range) means
+    // it stays safe for any row added below the current data too.
+    foreach (['E', 'H', 'I'] as $textCol) {
+        $sheet->getStyle($textCol . '1:' . $textCol . '1048576')->getNumberFormat()->setFormatCode('@');
+    }
     $sheet->freezePane('A2');
 }
 

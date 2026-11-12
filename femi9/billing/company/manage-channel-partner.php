@@ -307,6 +307,11 @@ $i = 0;
                                                             <a href="edit-channel-partner?cpid=<?php echo $enc_id; ?>" class="action-link" title="Edit">
                                                                 <i class="material-icons-outlined" style="font-size:17px;color:#5c6bc0;">edit</i>
                                                             </a>
+                                                            <?php if ($cp['is_active']): ?>
+                                                            <a href="login-as-cp?cpid=<?php echo $enc_id; ?>" class="action-link" title="Login as this Channel Partner" target="_blank" rel="noopener">
+                                                                <i class="material-icons-outlined" style="font-size:17px;color:#059669;">login</i>
+                                                            </a>
+                                                            <?php endif; ?>
                                                             <button type="button" class="action-link toggle-status-btn"
                                                                     title="<?php echo $cp['is_active'] ? 'Deactivate' : 'Activate'; ?>"
                                                                     data-id="<?php echo $enc_id; ?>"

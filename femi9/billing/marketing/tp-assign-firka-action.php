@@ -5,6 +5,10 @@
 // logged-in ASM/DM's own subtree (self + every subordinate), so this can
 // never save against a Firka outside their team's territory even if the
 // client-side dropdowns were bypassed.
+//
+// Temporary day-by-day roster only (see company/tp-assign-firka-action.php's
+// own docblock) — writes solely to tp_daily_assignments, never to
+// territory_partner_locations (that TP's permanent Firka ownership).
 require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 require_once __DIR__ . '/include/AssignedLocations.php';
@@ -61,25 +65,9 @@ if ($firkaDistrictId === null || !isset($allowedDistrictIds[$firkaDistrictId])) 
     exit;
 }
 
-if ($tp_id === null) {
-    // "Vacant Area" selected — clear any existing assignment for this firka.
-    $stmt = $db_conn->prepare("DELETE FROM territory_partner_locations WHERE location_id = ?");
-    $stmt->bind_param('i', $firka_id);
-    $stmt->execute();
-    $stmt->close();
-} else {
-    $stmt = $db_conn->prepare("
-        INSERT INTO territory_partner_locations (territory_partner_id, location_id)
-        VALUES (?, ?)
-        ON DUPLICATE KEY UPDATE territory_partner_id = VALUES(territory_partner_id)
-    ");
-    $stmt->bind_param('ii', $tp_id, $firka_id);
-    $stmt->execute();
-    $stmt->close();
-}
-
-// Daily history log — same table the company page writes to, so both
-// pages' assignments show up together on daily-assign-report.php.
+// One row per (date, firka) — same table the company page writes to, so
+// both pages' assignments show up together on daily-assign-report.php.
+// NULL territory_partner_id means "Vacant Area" for that date.
 $stmt = $db_conn->prepare("
     INSERT INTO tp_daily_assignments (assign_date, location_id, territory_partner_id, assigned_by)
     VALUES (?, ?, ?, ?)

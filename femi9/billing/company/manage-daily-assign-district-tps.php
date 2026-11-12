@@ -126,6 +126,14 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
     }
     $('#selAssignDate').val(todayStr());
 
+    // Switching the date reloads whichever Firka is currently open, so its
+    // "Current" status/dropdown reflects THAT date's roster, not today's.
+    $('#selAssignDate').on('change', function () {
+        var firkaId = $('#selFirka').val();
+        var firkaName = $('#selFirka').find('option:selected').text();
+        if (firkaId) { loadFirkaDetail(firkaId, firkaName); }
+    });
+
     $('#selStaff, #selDistrict, #selDivision, #selFirka').select2({ width: '100%' });
 
     function fillSelect($sel, nodes, placeholder) {
@@ -214,7 +222,7 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
     function loadFirkaDetail(firkaId, firkaName) {
         var $panel = $('#datFirkaDetail');
         $panel.html('<div class="dat-loading">Loading&hellip;</div>');
-        $.getJSON('get-tp-assign-tp-for-firka.php?firka_id=' + firkaId, function (resp) {
+        $.getJSON('get-tp-assign-tp-for-firka.php?firka_id=' + firkaId + '&assign_date=' + $('#selAssignDate').val(), function (resp) {
             var statusHtml = resp.assigned_tp_id
                 ? '<span class="dat-filled">' + escHtml(resp.assigned_tp_name) + '</span>'
                 : '<span class="dat-vacant">Vacant Area</span>';

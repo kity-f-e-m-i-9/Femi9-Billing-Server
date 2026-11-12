@@ -11,7 +11,6 @@ declare(strict_types=1);
 require_once __DIR__ . "/checksession.php";
 require_once __DIR__ . "/../shared/TpProductType.php";
 require_once __DIR__ . "/../shared/TpOrderAgentService.php";
-require_once __DIR__ . "/../shared/TpEmergencyStockRequest.php";
 include __DIR__ . "/config.php";
 
 header('Content-Type: application/json');
@@ -98,24 +97,6 @@ try {
     $result = $service->interpret($message, $history, $catalog, $flow);
 } catch (\Throwable $e) {
     $result = ['success' => false, 'reply' => "Assistant isn't available right now.", 'lines' => [], 'message' => $e->getMessage()];
-}
-
-// Each emergency-flagged line becomes its own request row for Company to
-// manually review — never auto-approved/auto-ordered here. Only possible
-// when a CP is actually selected (that's the only place "emergency_lines"
-// can come from — see TpOrderAgentService::resolveLines()).
-if ($cpId > 0 && !empty($result['emergency_lines'])) {
-    foreach ($result['emergency_lines'] as $el) {
-        createTpEmergencyStockRequest(
-            $db_conn,
-            $tpId,
-            $cpId,
-            (int) $el['product_id'],
-            (int) $el['quantity'],
-            (int) $el['cp_available_qty'],
-            mb_substr($message, 0, 255)
-        );
-    }
 }
 
 echo json_encode($result);

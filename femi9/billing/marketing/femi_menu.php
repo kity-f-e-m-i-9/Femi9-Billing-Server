@@ -116,7 +116,14 @@ if($LoginPasswordCheck=="12345678")
                         <a href="my-firka-assignments"><i class="material-icons-two-tone">assignment_ind</i>Firka Assignments</a>
                     </li>
 
-					<?php if ($hasTeamMN): ?>
+					<?php if (empty($_SESSION['LOGGED_IN_VIA_COMPANY']) && empty($_companyBridgeView)): ?>
+					<li>
+                        <a href="kpi"><i class="material-icons-two-tone">insights</i>KPI</a>
+                    </li>
+					<?php endif; ?>
+
+					<?php // Hidden from sidebar for now, 2026-11-11 (user request) — page itself still works, just not linked. ?>
+					<?php if (false && $hasTeamMN): ?>
 					<li>
                         <a href="manage-daily-assign-district-tps"><i class="material-icons-two-tone">assignment_ind</i>Daily Assign District TPs</a>
                     </li>

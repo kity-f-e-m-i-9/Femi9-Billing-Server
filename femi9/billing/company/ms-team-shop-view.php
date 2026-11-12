@@ -146,20 +146,23 @@ foreach ($smRoots as $sm) {
 $kpiBalance = max(0, $kpiTarget - $kpiAchieved);
 $teamCount = count($allIds);
 
-function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, array &$subtreeCache, int $rank = 0, int $indentLevel = 0, string $dateParam = '', string $ordersDateParam = ''): string {
+function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, array &$subtreeCache, int $rank = 0, int $indentLevel = 0, string $dateParam = '', string $ordersDateParam = '', int $parentId = 0): string {
     $id = (int)$row['id'];
     $color = $levelColorMap[(int)$row['team_level_id']] ?? '#999999';
     [$sum, $ids] = subtreeSumAndIds($id, $byManager, $rawStats, $subtreeCache);
     $idsParam = implode(',', $ids);
     $indentPx = $indentLevel * 24;
 
-    $html = '<tr' . ($indentLevel === 0 ? ' style="background:#f8fafc;"' : '') . '>';
+    // data-id/data-parent let the Name/Target search box (below) walk a
+    // matching row's ancestor chain so a filtered match still shows in its
+    // real place in the hierarchy, instead of floating with no context.
+    $html = '<tr data-id="' . $id . '" data-parent="' . $parentId . '"' . ($indentLevel === 0 ? ' style="background:#f8fafc;"' : '') . '>';
     $html .= '<td>' . ($rank > 0 ? $rank : '') . '</td>';
     $nameLink = '<a href="login-as-ms.php?msid=' . base64_encode((string)$id) . '" target="_blank" rel="noopener" title="Login as this staff member" style="color:inherit;text-decoration:none;">' . htmlspecialchars($row['ms_name']) . '</a>';
-    $html .= '<td style="padding-left:' . (12 + $indentPx) . 'px;">' . ($indentLevel > 0 ? '&#8618;&nbsp;' : '') . ($indentLevel === 0 ? '<b>' : '') . $nameLink . ($indentLevel === 0 ? '</b>' : '') . '</td>';
+    $html .= '<td class="msv-name" style="padding-left:' . (12 + $indentPx) . 'px;">' . ($indentLevel > 0 ? '&#8618;&nbsp;' : '') . ($indentLevel === 0 ? '<b>' : '') . $nameLink . ($indentLevel === 0 ? '</b>' : '') . '</td>';
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
     $balance = max(0, $sum['target'] - $sum['achieved']);
-    $html .= '<td><span class="stat-pill">&#8377;' . number_format($sum['target'], 0) . '</span></td>';
+    $html .= '<td class="msv-target">' . '<span class="stat-pill">&#8377;' . number_format($sum['target'], 0) . '</span></td>';
     $html .= '<td><span class="stat-pill" style="color:#0ca30c;">&#8377;' . number_format($sum['achieved'], 0) . '</span></td>';
     $html .= '<td><span class="stat-pill" style="color:' . ($balance > 0 ? '#dc2626' : '#0ca30c') . ';">&#8377;' . number_format($balance, 0) . '</span></td>';
     $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['oldshops']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
@@ -187,6 +190,7 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
     // company follow-up (no TP has picked it up yet).
     $totalGetOrderHref = $ordersHref . (strpos($ordersHref, '?') !== false ? '&' : '?') . 'view=all';
     $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);" href="' . $totalGetOrderHref . '">Total Orders</a>';
+    $html .= '<a class="btn-view-shop-list" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#0ca3a3 0%,#0f766e 100%);" href="view-ms-kpi.php?ms_id=' . $id . '">KPI</a>';
     $html .= '</div>';
     $html .= '</td>';
     $html .= '</tr>';
@@ -194,11 +198,11 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
 }
 
 // Recursively render a person's row, then their direct reports' rows.
-function renderRowsRecursive(array $row, array $byManager, array $rawStats, array $levelColorMap, array &$subtreeCache, int $indentLevel, int $rank = 0, string $dateParam = '', string $ordersDateParam = ''): string {
-    $html = renderStatRow($row, $byManager, $rawStats, $levelColorMap, $subtreeCache, $rank, $indentLevel, $dateParam, $ordersDateParam);
+function renderRowsRecursive(array $row, array $byManager, array $rawStats, array $levelColorMap, array &$subtreeCache, int $indentLevel, int $rank = 0, string $dateParam = '', string $ordersDateParam = '', int $parentId = 0): string {
+    $html = renderStatRow($row, $byManager, $rawStats, $levelColorMap, $subtreeCache, $rank, $indentLevel, $dateParam, $ordersDateParam, $parentId);
     $kids = $byManager[(int)$row['id']] ?? [];
     foreach ($kids as $kid) {
-        $html .= renderRowsRecursive($kid, $byManager, $rawStats, $levelColorMap, $subtreeCache, $indentLevel + 1, 0, $dateParam, $ordersDateParam);
+        $html .= renderRowsRecursive($kid, $byManager, $rawStats, $levelColorMap, $subtreeCache, $indentLevel + 1, 0, $dateParam, $ordersDateParam, (int)$row['id']);
     }
     return $html;
 }
@@ -382,6 +386,9 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                             <div class="col">
                                 <div class="card">
                                     <div class="card-body">
+                                        <div class="mb-3">
+                                            <input type="text" id="msvSearchBox" class="form-control form-control-sm" style="max-width:320px;" placeholder="Search by Name or Target Amount...">
+                                        </div>
                                         <div style="overflow-x:auto;">
                                         <table class="mt">
                                             <thead>
@@ -426,5 +433,41 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
 <script src="../../assets/plugins/pace/pace.min.js"></script>
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
+<script>
+(function () {
+    var searchBox = document.getElementById('msvSearchBox');
+    if (!searchBox) return;
+    var rows = Array.prototype.slice.call(document.querySelectorAll('.mt tbody tr'));
+    var rowById = {};
+    rows.forEach(function (tr) { rowById[tr.getAttribute('data-id')] = tr; });
+
+    function showWithAncestors(tr) {
+        var cur = tr;
+        while (cur) {
+            cur.style.display = '';
+            var parentId = cur.getAttribute('data-parent');
+            cur = (parentId && parentId !== '0') ? rowById[parentId] : null;
+        }
+    }
+
+    searchBox.addEventListener('input', function () {
+        var q = searchBox.value.trim().toLowerCase();
+        if (q === '') {
+            rows.forEach(function (tr) { tr.style.display = ''; });
+            return;
+        }
+        rows.forEach(function (tr) { tr.style.display = 'none'; });
+        rows.forEach(function (tr) {
+            var nameCell = tr.querySelector('.msv-name');
+            var targetCell = tr.querySelector('.msv-target');
+            var nameText = nameCell ? nameCell.textContent.toLowerCase() : '';
+            var targetText = targetCell ? targetCell.textContent.toLowerCase().replace(/[₹,]/g, '') : '';
+            if (nameText.indexOf(q) !== -1 || targetText.indexOf(q.replace(/[₹,]/g, '')) !== -1) {
+                showWithAncestors(tr);
+            }
+        });
+    });
+})();
+</script>
 </body>
 </html>

@@ -4,6 +4,20 @@ if (session_status() === PHP_SESSION_NONE) {
     if (!is_dir(session_save_path()) || !is_writable(session_save_path())) {
         session_save_path(sys_get_temp_dir());
     }
+    // Set explicitly in code, not just via .htaccess's php_value session.name
+    // — confirmed on production that this directive is silently a no-op
+    // when PHP runs via a non-mod_php handler (e.g. cPanel's ea-phpNN
+    // FastCGI/suPHP handler, as opposed to Apache's php_module), since the
+    // .htaccess directive is wrapped in <IfModule php_module> and that
+    // module is simply never loaded under FastCGI. Without this, every
+    // channel-partner page silently fell back to the default PHPSESSID
+    // cookie — different from the femi9_channel_partner_sess cookie
+    // switch-login.php itself sets explicitly in code — so a session
+    // switch-login.php just wrote was invisible to every other page here
+    // (dashboard.php etc. immediately bounced back to the login page).
+    // Same fix already applied in company/checksession.php and
+    // territory-partner/checksession.php.
+    session_name('femi9_channel_partner_sess');
     session_start();
 }
 

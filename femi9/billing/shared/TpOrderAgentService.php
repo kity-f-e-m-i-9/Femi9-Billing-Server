@@ -68,12 +68,11 @@ class TpOrderAgentService {
             if ($cacheKey !== null) {
                 $cachedArgs = $this->getCachedArgs($cacheKey);
                 if ($cachedArgs !== null) {
-                    [$cachedLines, , $cachedEmergencyLines] = $this->resolveLines($cachedArgs, $catalog);
+                    [$cachedLines] = $this->resolveLines($cachedArgs, $catalog);
                     return [
                         'success' => true,
                         'reply' => (string)($cachedArgs['reply'] ?? ''),
                         'lines' => $cachedLines,
-                        'emergency_lines' => $cachedEmergencyLines,
                         'options' => $this->extractOptions($cachedArgs),
                         'message' => 'OK (cached)',
                     ];
@@ -123,7 +122,7 @@ class TpOrderAgentService {
                 $this->storeCachedArgs($cacheKey, $args);
             }
 
-            [$lines, $rejections, $emergencyLines] = $this->resolveLines($args, $catalog);
+            [$lines, $rejections] = $this->resolveLines($args, $catalog);
             $reply = (string)($args['reply'] ?? '');
             if (!empty($rejections)) {
                 $reply = trim($reply . ' ' . implode(' ', $rejections));
@@ -133,7 +132,6 @@ class TpOrderAgentService {
                 'success' => true,
                 'reply' => $reply,
                 'lines' => $lines,
-                'emergency_lines' => $emergencyLines,
                 'options' => $this->extractOptions($args),
                 'message' => 'OK',
             ];
@@ -161,7 +159,7 @@ class TpOrderAgentService {
     // against the real, CURRENT packs_per_carton value (not whatever it
     // was when a cached answer was first generated), rather than trusting
     // the model to multiply correctly or a stale cached number.
-    /** @return array{0: array, 1: string[], 2: array} [accepted lines, rejection notes to append to the reply, emergency-request lines] */
+    /** @return array{0: array, 1: string[]} [accepted lines, rejection notes to append to the reply] */
     private function resolveLines(array $args, array $catalog): array {
         $catalogById = [];
         foreach ($catalog as $c) {
@@ -176,12 +174,10 @@ class TpOrderAgentService {
 
         $lines = [];
         $rejections = [];
-        $emergencyLines = [];
         foreach ($args['lines'] ?? [] as $line) {
             $pid = (int)($line['product_id'] ?? 0);
             $rawQty = (int)($line['quantity'] ?? 0);
             $unit = ($line['unit'] ?? 'pieces') === 'cartons' ? 'cartons' : 'pieces';
-            $emergency = !empty($line['emergency']);
             if ($pid <= 0 || $rawQty <= 0 || !isset($catalogById[$pid])) continue;
 
             $entry = $catalogById[$pid];
@@ -192,31 +188,18 @@ class TpOrderAgentService {
             // prompt's stock numbers and tries to add more than this CP
             // actually has, the line is dropped here rather than silently
             // failing later in the page's own cart logic while the chat
-            // still claims it was added.
+            // still claims it was added. Always just a plain "out of stock"
+            // refusal — no emergency-request escalation path anymore.
             if ($entry['avail'] !== null && $finalQty > $entry['avail']) {
-                if ($emergency) {
-                    // The TP explicitly flagged this as urgent — instead of
-                    // just refusing, this becomes a request Company reviews
-                    // manually (see TpEmergencyStockRequest.php). Never
-                    // auto-approved here; the line itself is still NOT added
-                    // to the order until Company signs off.
-                    $emergencyLines[] = [
-                        'product_id' => $pid,
-                        'product_name' => $entry['name'],
-                        'quantity' => $finalQty,
-                        'cp_available_qty' => $entry['avail'],
-                    ];
-                } else {
-                    $rejections[] = $entry['avail'] > 0
-                        ? "({$entry['name']}: only {$entry['avail']} available at this CP, not {$finalQty} — not added.)"
-                        : "({$entry['name']}: this CP has no stock of this — not added.)";
-                }
+                $rejections[] = $entry['avail'] > 0
+                    ? "({$entry['name']}: only {$entry['avail']} available at this CP, not {$finalQty} — not added.)"
+                    : "({$entry['name']}: this CP has no stock of this — not added.)";
                 continue;
             }
 
             $lines[] = ['product_id' => $pid, 'quantity' => $finalQty, 'product_name' => $entry['name']];
         }
-        return [$lines, $rejections, $emergencyLines];
+        return [$lines, $rejections];
     }
 
     // Keyed on the message + flow + which products are on offer, each
@@ -321,17 +304,9 @@ class TpOrderAgentService {
   this CP doesn't have enough (or any) of it, giving the exact number
   available, e.g. "இந்த CP கிட்ட 330mm XL (SW-9 PCS) 5 மட்டும்தான் இருக்கு,
   9 இல்ல." Only include a line for a product when the requested quantity is
-  within that CP's actual stock.
-- EXCEPTION: if the TP explicitly says this is urgent — using a word like
-  "emergency", "urgent", "அவசரம்" — AND wants more than this CP's stock, set
-  "emergency": true on that line and report the FULL quantity they actually
-  need (do not cap it to the CP figure). This does NOT add the product to
-  the order — it is logged as a request for Company to manually approve. In
-  "reply", clearly say the request has been sent to Company for approval
-  and they need to wait, in Tamil script, e.g. "அவசர கோரிக்கை Company-க்கு
-  அனுப்பப்பட்டது, approval வரும்வரை காத்திருங்க." Without the word
-  emergency/urgent/அவசரம், never set this flag — just refuse normally as
-  above.
+  within that CP's actual stock. This applies even if the TP says it's
+  urgent/emergency/அவசரம் — there is no escalation path here; just state
+  plainly in "reply" that this CP doesn't have it.
 STOCK
             : '';
 
@@ -427,7 +402,6 @@ PROMPT;
                                 'product_id' => ['type' => 'integer'],
                                 'quantity' => ['type' => 'integer', 'description' => 'The number the TP said, as-is — do not multiply by carton size yourself.'],
                                 'unit' => ['type' => 'string', 'enum' => ['pieces', 'cartons'], 'description' => '"cartons" if the TP said box/carton/peti, otherwise "pieces".'],
-                                'emergency' => ['type' => 'boolean', 'description' => 'true only if the TP explicitly said emergency/urgent/அவசரம் AND wants more than the CP stock figure shown.'],
                             ],
                             'required' => ['product_id', 'quantity', 'unit'],
                         ],
@@ -493,7 +467,6 @@ PROMPT;
             'success' => false,
             'reply' => "Sorry, I couldn't process that right now.",
             'lines' => [],
-            'emergency_lines' => [],
             'options' => [],
             'message' => $message,
         ];
