@@ -137,12 +137,19 @@ foreach ($byCategory as $cat => $tids) {
     // WEBSITE category's own per-order economics — every other category
     // (Amazon, Flipkart, WhatsApp Sales, ...) keeps the plain Invoice No +
     // Remarks tail it already had.
-    $isWebsiteCat = (mb_strtoupper(trim($cat)) === 'WEBSITE');
+    $catUpper = mb_strtoupper(trim($cat));
+    $isWebsiteCat = ($catUpper === 'WEBSITE');
+    // Billing/Shipping Address only make sense for orders the company itself
+    // ships out — Website, ID Concept, WhatsApp Sales — not marketplace
+    // categories (Amazon/Flipkart/Myntra etc. ship from their own fulfilment,
+    // and ot_sales.shipping_address/customer_address are never filled for those).
+    $hasAddressCols = in_array($catUpper, ['WEBSITE', 'ID CONCEPT', 'WHATSAPP SALES'], true);
 
     $fixedHeaders = ['S.NO', 'DATE', 'BILLING RATE', 'NAME', 'MOBILE', 'DISTRICT', 'STATE', 'ORDER NO', 'INVOICE NO'];
-    $tailHeaders  = $isWebsiteCat
-        ? ['COURIER CHARGE', 'TOTAL AMOUNT', 'DISCOUNT', 'REMARKS']
-        : ['REMARKS'];
+    $tailHeaders  = [];
+    if ($isWebsiteCat) { $tailHeaders = array_merge($tailHeaders, ['COURIER CHARGE', 'TOTAL AMOUNT', 'DISCOUNT']); }
+    if ($hasAddressCols) { $tailHeaders = array_merge($tailHeaders, ['BILLING ADDRESS', 'SHIPPING ADDRESS']); }
+    $tailHeaders[] = 'REMARKS';
     $headers = array_merge($fixedHeaders, array_map(function ($prid) use ($productNames) {
         return $productNames[$prid] ?? ('Product #' . $prid);
     }, $prids), $tailHeaders);
@@ -171,7 +178,15 @@ foreach ($byCategory as $cat => $tids) {
 
         $sheet->setCellValue('A' . $row, $sNo);
         $sheet->setCellValue('B' . $row, date('d-m-Y', strtotime($s['date'])));
-        $sheet->setCellValue('C' . $row, (float)$s['price']);
+        // BILLING RATE = net per-unit rate after discount, not the raw
+        // entered rate — ot_sales.discount is a flat amount taken off that
+        // line's subtotal (rate * qty), same math as ot-sale-action.php's
+        // own $sub_total = $sub_total_rate - $discount_value.
+        $sQty = (float)($s['qty'] ?? 0);
+        $netRate = $sQty > 0
+            ? ((float)$s['price'] - ((float)($s['discount'] ?? 0) / $sQty))
+            : (float)$s['price'];
+        $sheet->setCellValue('C' . $row, $netRate);
         $sheet->setCellValue('D' . $row, $s['customer_name']);
         $sheet->setCellValue('E' . $row, $s['customer_mobile'] ?? '');
         $sheet->setCellValue('F' . $row, $s['district'] ?? '');
@@ -205,6 +220,12 @@ foreach ($byCategory as $cat => $tids) {
             $sheet->setCellValue($colLetter($col) . $row, $discount);
             $col++;
         }
+        if ($hasAddressCols) {
+            $sheet->setCellValue($colLetter($col) . $row, $s['customer_address'] ?? '');
+            $col++;
+            $sheet->setCellValue($colLetter($col) . $row, $s['shipping_address'] ?? '');
+            $col++;
+        }
         $sheet->setCellValue($colLetter($col) . $row, '');
 
         $row++;
@@ -232,6 +253,12 @@ foreach ($byCategory as $cat => $tids) {
         $sheet->setCellValue($colLetter($col) . $row, $discountTotal);
         $col++;
     }
+    if ($hasAddressCols) {
+        $sheet->setCellValue($colLetter($col) . $row, '');
+        $col++;
+        $sheet->setCellValue($colLetter($col) . $row, '');
+        $col++;
+    }
     $sheet->setCellValue($colLetter($col) . $row, '');
 
     $totalRange = 'A' . $row . ':' . $colLetter($lastColIdx) . $row;
@@ -247,6 +274,18 @@ foreach ($byCategory as $cat => $tids) {
     $sheet->getColumnDimension('F')->setWidth(16);
     $sheet->getColumnDimension('H')->setWidth(22);
     $sheet->getColumnDimension('I')->setWidth(18);
+    if ($hasAddressCols) {
+        $addrColIdx = array_search('BILLING ADDRESS', $headers, true);
+        $billCol = $colLetter($addrColIdx);
+        $shipCol = $colLetter($addrColIdx + 1);
+        $sheet->getColumnDimension($billCol)->setWidth(35);
+        $sheet->getColumnDimension($shipCol)->setWidth(35);
+        // Address text already carries its own line breaks (street / city,
+        // state, pincode) — without wrap text Excel crams it all onto one
+        // line past the column edge instead of showing those breaks.
+        $addrRange = $billCol . '2:' . $shipCol . $row;
+        $sheet->getStyle($addrRange)->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+    }
 
     // Force these columns to plain Text format, not just on the rows filled
     // in here but down the WHOLE column (not only $dataRange) — Mobile/Order

@@ -37,13 +37,17 @@ $statusFilter = $_GET['status_filter'] ?? 'all';
 $allowedStatusFilters = ['all', 'not_paid', 'partially_paid', 'fully_paid'];
 if (!in_array($statusFilter, $allowedStatusFilters, true)) $statusFilter = 'all';
 
+$categoryFilter = $_GET['category_filter'] ?? 'all';
+$allowedCategoryFilters = ['all', 'napkin', 'diaper', 'mixed'];
+if (!in_array($categoryFilter, $allowedCategoryFilters, true)) $categoryFilter = 'all';
+
 $searchTerm = trim($_GET['q'] ?? '');
 
 $uid   = (int)$Login_user_IDvl;
 $utype = $Login_user_TYPEvl;
 
 require_once __DIR__ . '/include/invoice-report-data.php';
-$report      = tp_invoice_report_fetch($db_conn, $uid, $utype, $from, $to, $typeFilter, $statusFilter, $searchTerm);
+$report      = tp_invoice_report_fetch($db_conn, $uid, $utype, $from, $to, $typeFilter, $statusFilter, $searchTerm, $categoryFilter);
 $filtered    = $report['rows'];
 $grand_total = $report['grand_total'];
 $grand_received = $report['grand_received'];
@@ -54,7 +58,7 @@ $cust_count  = $report['cust_count'];
 
 $exportQuery = http_build_query([
     'from' => $from, 'to' => $to, 'type_filter' => $typeFilter,
-    'status_filter' => $statusFilter, 'q' => $searchTerm,
+    'status_filter' => $statusFilter, 'category_filter' => $categoryFilter, 'q' => $searchTerm,
 ]);
 ?>
 <!DOCTYPE html>
@@ -199,6 +203,15 @@ $exportQuery = http_build_query([
                                     <option value="fully_paid"     <?php echo $statusFilter==='fully_paid'?'selected':''; ?>>Fully Paid</option>
                                     <option value="partially_paid" <?php echo $statusFilter==='partially_paid'?'selected':''; ?>>Partially Paid</option>
                                     <option value="not_paid"       <?php echo $statusFilter==='not_paid'?'selected':''; ?>>Not Paid</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>Category</label>
+                                <select name="category_filter" class="form-control form-control-sm" style="width:140px;">
+                                    <option value="all"    <?php echo $categoryFilter==='all'?'selected':''; ?>>All</option>
+                                    <option value="napkin" <?php echo $categoryFilter==='napkin'?'selected':''; ?>>Napkin</option>
+                                    <option value="diaper" <?php echo $categoryFilter==='diaper'?'selected':''; ?>>Diaper</option>
+                                    <option value="mixed"  <?php echo $categoryFilter==='mixed'?'selected':''; ?>>Mixed (both)</option>
                                 </select>
                             </div>
                             <div>

@@ -100,6 +100,34 @@ if (empty($tpIds)) {
     $stmt->execute();
     $tps = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
+
+    // Advance payment totals per TP — company/SS-approved, not scoped to this
+    // CP (tp_advance_payments has no CP column at all; a TP's advance is one
+    // running balance against the company, not per-source). Queried
+    // separately rather than another JOIN on the main query above, since two
+    // one-to-many JOINs (tp_invoices and tp_advance_payments) off the same
+    // tp.id would multiply rows and silently inflate both SUMs.
+    $advByTp = [];
+    $stmtAdv = $db_conn->prepare("
+        SELECT territory_partner_id,
+               COALESCE(SUM(amount), 0)         AS total_advance,
+               COALESCE(SUM(balance_amount), 0) AS advance_balance
+        FROM tp_advance_payments
+        WHERE territory_partner_id IN ($idPlaceholders) AND deleted_at IS NULL
+        GROUP BY territory_partner_id
+    ");
+    $stmtAdv->bind_param(str_repeat('i', count($tpIds)), ...$tpIds);
+    $stmtAdv->execute();
+    foreach ($stmtAdv->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+        $advByTp[(int)$r['territory_partner_id']] = $r;
+    }
+    $stmtAdv->close();
+
+    foreach ($tps as &$tp) {
+        $tp['total_advance']   = (float)($advByTp[(int)$tp['id']]['total_advance'] ?? 0);
+        $tp['advance_balance'] = (float)($advByTp[(int)$tp['id']]['advance_balance'] ?? 0);
+    }
+    unset($tp);
 }
 
 $total_tps     = count($tps);
@@ -359,7 +387,7 @@ $total_sales   = array_sum(array_column($tps, 'total_sales'));
                             <div class="stat-card orange">
                                 <div>
                                     <h3>&#8377;<?php echo inr_format($total_sales, 0); ?></h3>
-                                    <p>Total Sales</p>
+                                    <p>Total Purchase</p>
                                 </div>
                                 <div class="stat-icon-wrap">
                                     <i class="material-icons-outlined">payments</i>
@@ -411,7 +439,9 @@ $total_sales   = array_sum(array_column($tps, 'total_sales'));
                                                 <th>Territory Partner</th>
                                                 <th>Mobile</th>
                                                 <th style="text-align:center;">Invoices</th>
-                                                <th style="text-align:right;">Total Sales</th>
+                                                <th style="text-align:right;">Total Advance Paid</th>
+                                                <th style="text-align:right;">Total Purchase</th>
+                                                <th style="text-align:right;">Balance</th>
                                                 <th>Last Invoice</th>
                                                 <th style="text-align:center;">Status</th>
                                             </tr>
@@ -446,7 +476,17 @@ $total_sales   = array_sum(array_column($tps, 'total_sales'));
                                                 </td>
                                                 <td style="text-align:right;">
                                                     <span class="sales-amount">
+                                                        <span class="sales-currency">&#8377;</span><?php echo inr_format((float)$tp['total_advance'], 2); ?>
+                                                    </span>
+                                                </td>
+                                                <td style="text-align:right;">
+                                                    <span class="sales-amount">
                                                         <span class="sales-currency">&#8377;</span><?php echo inr_format((float)$tp['total_sales'], 2); ?>
+                                                    </span>
+                                                </td>
+                                                <td style="text-align:right;">
+                                                    <span class="sales-amount">
+                                                        <span class="sales-currency">&#8377;</span><?php echo inr_format((float)$tp['advance_balance'], 2); ?>
                                                     </span>
                                                 </td>
                                                 <td>

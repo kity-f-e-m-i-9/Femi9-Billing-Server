@@ -30,12 +30,15 @@ if (!in_array($typeFilter, ['all', 'shop', 'customer'], true)) $typeFilter = 'al
 $statusFilter = $_GET['status_filter'] ?? 'all';
 if (!in_array($statusFilter, ['all', 'not_paid', 'partially_paid', 'fully_paid'], true)) $statusFilter = 'all';
 
+$categoryFilter = $_GET['category_filter'] ?? 'all';
+if (!in_array($categoryFilter, ['all', 'napkin', 'diaper', 'mixed'], true)) $categoryFilter = 'all';
+
 $searchTerm = trim($_GET['q'] ?? '');
 
 $uid   = (int)$Login_user_IDvl;
 $utype = $Login_user_TYPEvl;
 
-$report = tp_invoice_report_fetch($db_conn, $uid, $utype, $from, $to, $typeFilter, $statusFilter, $searchTerm);
+$report = tp_invoice_report_fetch($db_conn, $uid, $utype, $from, $to, $typeFilter, $statusFilter, $searchTerm, $categoryFilter);
 $rows   = $report['rows'];
 
 ob_end_clean();
