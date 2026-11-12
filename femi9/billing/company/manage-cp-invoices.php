@@ -260,6 +260,15 @@ $i = 0;
                                 <span class="filter-active-badge">Filtered</span>
                                 <?php endif; ?>
                             </span>
+                            <a href="export-cp-invoices-xlsx.php?<?php echo http_build_query([
+                                    'cp_id'       => $filter_cp_id ?: '',
+                                    'date_from'   => $filter_date_from,
+                                    'date_to'     => $filter_date_to,
+                                    'type_filter' => $filter_type,
+                                ]); ?>" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:#10b981;color:#fff;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;">
+                                <i class="material-icons-outlined" style="font-size:16px;">download</i>
+                                Export Excel
+                            </a>
                         </div>
                         <div class="card-body">
                             <div style="overflow-x:auto;">
