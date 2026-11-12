@@ -10,10 +10,12 @@
  *            supply type (INTRA/INTER), rate and place of supply, net of
  *            unregistered-buyer returns.
  *  - nil   : nil-rated (0%) value by INTRAB2B/INTRAB2C/INTRB2B/INTRB2C, net of
- *            returns, reported in expt_amt (same as the filed sample).
+ *            returns, reported in nil_amt (Table 8 "Nil Rated Supplies" column; expt_amt/ngsup_amt stay 0).
  *  - hsn   : include/HsnB2bB2cHelper.php (hsn_b2b / hsn_b2c).
  *  - doc_issue : invoice series ranges per channel.
- * Not produced: exp (export invoices), cdnr (registered-buyer credit notes).
+ * exp    : OT sales ticked "Export supply" (ot_sales.is_export), WOPAY.
+ * cdnr   : credit notes (returns) of registered buyers with a valid GSTIN. Unregistered-buyer
+ *           returns are netted off b2cs/nil, not listed (portal rule; no b2cl so no cdnur).
  */
 require_once __DIR__ . '/TpGstHelper.php';
 require_once __DIR__ . '/B2bBuyerHelper.php';
@@ -32,13 +34,23 @@ function gstr1_state_code_from_name($name) {
 }
 
 if (!function_exists('build_gstr1_json')) {
-function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_date) {
+function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_date, $is_tp = false) {
+    // $is_tp: seller is a Territory Partner ($gid = territory_partners.id, $Login_user_TYPEvl = 'territory_partner') —
+    // only shop + customer sales and their returns apply; company-only channels (OT, TP invoices, internal transfer) are skipped.
     $gid_e = mysqli_real_escape_string($db_conn, (string)$gid);
-    $g = mysqli_fetch_assoc(mysqli_query($db_conn, "select gstin, state_code from company_godown where id='$gid_e'"));
+    if ($is_tp) {
+        $g = mysqli_fetch_assoc(mysqli_query($db_conn, "select gstin, branch_state from territory_partners where id='$gid_e'"));
+        $g['state_code'] = gstr1_state_code_from_name($g['branch_state'] ?? '');
+    } else {
+        $g = mysqli_fetch_assoc(mysqli_query($db_conn, "select gstin, state_code from company_godown where id='$gid_e'"));
+    }
     $own_gstin = $g['gstin'] ?? '';
     $own_code  = $g['state_code'] ?? '';
     if ($own_code === '' && b2b_gstin_state_code($own_gstin)) $own_code = b2b_gstin_state_code($own_gstin);
     $own_code = str_pad((string)$own_code, 2, '0', STR_PAD_LEFT);
+
+    $_ec = $is_tp ? null : mysqli_query($db_conn, "SHOW COLUMNS FROM ot_sales LIKE 'is_export'");
+    if ($_ec && mysqli_num_rows($_ec) === 0) mysqli_query($db_conn, "ALTER TABLE ot_sales ADD COLUMN is_export TINYINT(1) NOT NULL DEFAULT 0");
 
     $intra_fn = function ($gst_type) { return $gst_type == 'inner' || !in_array($gst_type, ['inner', 'outer']); };
 
@@ -79,6 +91,7 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         $push($r['inum'], $r['d'], $r['bgt'] === 'register', $r['gstin'], $intra_fn($r['gst_type']), $r['rate'], $r['taxable'], $r['gst'], $r['total']);
     }
 
+    if (!$is_tp) {
     // OT sales (state of supply from the sale's own state)
     $res = mysqli_query($db_conn, "
         SELECT COALESCE(i.inv_number, s.tempid) AS inum, MAX(s.date) AS d, s.gst AS rate, s.gst_type, s.buyer_gsttype AS bgt,
@@ -87,13 +100,17 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         FROM ot_sales s
         LEFT JOIN ot_sales_invoice i ON i.tempid = s.tempid
         LEFT JOIN state stt ON stt.id = s.state_id
-        WHERE s.godownid='$gid_e' AND s.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
+        WHERE s.is_export=0 AND s.godownid='$gid_e' AND s.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
         GROUP BY s.tempid, i.inv_number, s.gst, s.gst_type, s.buyer_gsttype, s.gst_number, stt.st_name");
     while ($r = mysqli_fetch_assoc($res)) {
         $push($r['inum'], $r['d'], $r['bgt'] === 'register', $r['gstin'], $intra_fn($r['gst_type']), $r['rate'], $r['taxable'], $r['gst'], $r['total'], $r['st_name']);
     }
 
+    }
+
     // Territory partner invoices
+    $tp_lines = [];
+    if (!$is_tp) {
     $tp_lines = tp_sales_gst_lines($db_conn, $from_date, $to_date, "tpi.source_godown_id = '$gid_e'");
     foreach ($tp_lines as $l) {
         $push($l['invoice_number'], $l['invoice_date'], !empty($l['is_registered']), $l['tp_gstin'] ?? '', !empty($l['is_intra']),
@@ -114,6 +131,7 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
     while ($r = mysqli_fetch_assoc($res)) {
         $fallback = strtolower(trim($r['to_state'])) == strtolower(trim($r['from_state']));
         $push($r['inum'], $r['d'], true, $r['gstin'], $fallback, $r['rate'], $r['taxable'], $r['gst'], $r['total']);
+    }
     }
 
     // ---- classify ----
@@ -176,13 +194,72 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         if ($is_reg) continue; // registered returns would be cdnr — not produced
         $add_b2cs($is_intra, (float)$r['rate'], $own_code, -(float)$r['taxable'], -(float)$r['gst']);
     }
-    $res = mysqli_query($db_conn, "select p.gst as rate, osr.gst_type, osr.buyer_gsttype as bgt, sum(osr.total) as taxable from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$gid_e' and osr.return_date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by p.gst, osr.gst_type, osr.buyer_gsttype");
-    while ($r = mysqli_fetch_assoc($res)) {
+    $res = $is_tp ? false : mysqli_query($db_conn, "select p.gst as rate, osr.gst_type, osr.buyer_gsttype as bgt, sum(osr.total) as taxable from ot_sales_return osr join products p on p.id=osr.prid where osr.godownid='$gid_e' and osr.return_date between '".db_esc($from_date)."' and '".db_esc($to_date)."' group by p.gst, osr.gst_type, osr.buyer_gsttype");
+    while ($res && $r = mysqli_fetch_assoc($res)) {
         $is_reg = ($r['bgt'] === 'register'); $is_intra = $intra_fn($r['gst_type']);
         $rate = (float)$r['rate']; $tx = (float)$r['taxable'];
         if ($rate <= 0) { $nil[($is_intra ? 'INTRA' : 'INTR') . ($is_reg ? 'B2B' : 'B2C')] -= $tx; continue; }
         if ($is_reg) continue;
         $add_b2cs($is_intra, $rate, $own_code, -$tx, -($tx * $rate / 100));
+    }
+
+    // ---- cdnr: credit notes (sales returns) against REGISTERED buyers with a valid GSTIN ----
+    // Unregistered-buyer returns are not listed here: they net off b2cs / nil above (portal rule).
+    // $notes: nt_num => ['ctin','dt','pos','items'=>[rate=>[txval,iamt,camt,samt]]]
+    $notes = [];
+    $add_note = function ($num, $date, $ctin, $is_intra, $rate, $taxable, $gst) use (&$notes, $own_code) {
+        $ctin = strtoupper(trim((string)$ctin)); $code = b2b_gstin_state_code($ctin);
+        if ($code === null || (float)$rate <= 0 || $date === null) return; // nil-rated notes stay in exemp
+        $is_intra = ($code === $own_code);
+        $k = $ctin . '|' . $num;
+        if (!isset($notes[$k])) $notes[$k] = ['num' => (string)$num, 'ctin' => $ctin, 'dt' => date('d-m-Y', strtotime($date)), 'pos' => $code, 'items' => []];
+        $rk = (string)(float)$rate;
+        if (!isset($notes[$k]['items'][$rk])) $notes[$k]['items'][$rk] = ['rt' => (float)$rate, 'txval' => 0.0, 'iamt' => 0.0, 'camt' => 0.0, 'samt' => 0.0];
+        $i =& $notes[$k]['items'][$rk];
+        $i['txval'] += $taxable;
+        if ($is_intra) { $i['camt'] += $gst / 2; $i['samt'] += $gst / 2; } else { $i['iamt'] += $gst; }
+        unset($i);
+    };
+    $from_e = db_esc($from_date); $to_e = db_esc($to_date); $ut_e = db_esc($Login_user_TYPEvl);
+    // network (SS/ST/DT/Shop)
+    $res = mysqli_query($db_conn, "
+        SELECT rsi.returnid AS num, MAX(rsi.date) AS d, rsi.gst_percentage AS rate, rsi.gst_type,
+               COALESCE(ss.gstin,st.gstin,dt.gstin,sh.gstin) AS gstin,
+               SUM(rsi.total-rsi.gstamount_total) AS taxable, SUM(rsi.gstamount_total) AS gst
+        FROM user_return_stock_items rsi
+        LEFT JOIN super_stockiest ss ON rsi.from_usertype='super_stockiest' AND ss.temp_id = rsi.from_userid
+        LEFT JOIN stockiest        st ON rsi.from_usertype='stockiest'       AND st.temp_id = rsi.from_userid
+        LEFT JOIN distributor      dt ON rsi.from_usertype='distributor'     AND dt.temp_id = rsi.from_userid
+        LEFT JOIN shop             sh ON rsi.from_usertype='shop'            AND sh.temp_id = rsi.from_userid
+        WHERE rsi.to_usertype='$ut_e' AND rsi.to_userid='$gid_e' AND rsi.buyer_gsttype='register'
+          AND rsi.from_usertype NOT IN ('customer','territory_partner') AND rsi.total > 0 AND rsi.date BETWEEN '$from_e' AND '$to_e'
+        GROUP BY rsi.returnid, rsi.gst_percentage, rsi.gst_type, ss.gstin, st.gstin, dt.gstin, sh.gstin");
+    while ($r = mysqli_fetch_assoc($res)) $add_note($r['num'], $r['d'], $r['gstin'], $intra_fn($r['gst_type']), $r['rate'], (float)$r['taxable'], (float)$r['gst']);
+    // customers
+    $res = mysqli_query($db_conn, "
+        SELECT rsi.returnid AS num, MAX(rsi.date) AS d, rsi.gst_percentage AS rate, rsi.gst_type, c.gstin AS gstin,
+               SUM(rsi.total-rsi.gstamount_total) AS taxable, SUM(rsi.gstamount_total) AS gst
+        FROM user_return_stock_items rsi LEFT JOIN customers c ON c.id = rsi.from_userid
+        WHERE rsi.to_usertype='$ut_e' AND rsi.to_userid='$gid_e' AND rsi.buyer_gsttype='register'
+          AND rsi.from_usertype='customer' AND rsi.total > 0 AND rsi.date BETWEEN '$from_e' AND '$to_e'
+        GROUP BY rsi.returnid, rsi.gst_percentage, rsi.gst_type, c.gstin");
+    while ($r = mysqli_fetch_assoc($res)) $add_note($r['num'], $r['d'], $r['gstin'], $intra_fn($r['gst_type']), $r['rate'], (float)$r['taxable'], (float)$r['gst']);
+    // territory partners
+    foreach ($is_tp ? [] : tp_credit_gst_lines($db_conn, $from_date, $to_date, "tpi.source_godown_id = '$gid_e'") as $l) {
+        if (empty($l['is_registered'])) continue;
+        $add_note($l['returnid'], $l['return_date'], $l['tp_gstin'] ?? '', !empty($l['is_intra']), $l['gst_percentage'], (float)$l['taxable_value'], (float)$l['gst_amount']);
+    }
+    // OT sales returns: no credit-note number of their own -> OTCN/<yymm>/<seq>, ordered by date then sale
+    $res = $is_tp ? false : mysqli_query($db_conn, "
+        SELECT osr.tempid, MAX(osr.return_date) AS d, p.gst AS rate, osr.gst_type, MAX(s.gst_number) AS gstin, SUM(osr.total) AS taxable
+        FROM ot_sales_return osr JOIN products p ON p.id = osr.prid LEFT JOIN ot_sales s ON s.tempid = osr.tempid
+        WHERE osr.godownid='$gid_e' AND osr.buyer_gsttype='register' AND osr.return_date BETWEEN '$from_e' AND '$to_e'
+        GROUP BY osr.tempid, p.gst, osr.gst_type ORDER BY MAX(osr.return_date), osr.tempid");
+    $ot_seq = []; 
+    while ($res && $r = mysqli_fetch_assoc($res)) {
+        if (!isset($ot_seq[$r['tempid']])) $ot_seq[$r['tempid']] = count($ot_seq) + 1;
+        $rate = (float)$r['rate']; $tx = (float)$r['taxable'];
+        $add_note(sprintf('OTCN/%s/%03d', date('ym', strtotime($to_date)), $ot_seq[$r['tempid']]), $r['d'], $r['gstin'], $intra_fn($r['gst_type']), $rate, $tx, $tx * $rate / 100);
     }
 
     $r2 = function ($v) { return round((float)$v, 2); };
@@ -203,6 +280,19 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         $out_b2b[] = ['ctin' => $ctin, 'inv' => $inv_list];
     }
 
+    // ---- cdnr ----
+    $cd = [];
+    foreach ($notes as $nt) {
+        $items = []; $n = 0; $val = 0.0;
+        foreach ($nt['items'] as $it) {
+            $n++; $val += $it['txval'] + $it['iamt'] + $it['camt'] + $it['samt'];
+            $items[] = ['num' => $n, 'itm_det' => ['txval' => $r2($it['txval']), 'rt' => $rt($it['rt']), 'iamt' => $r2($it['iamt']), 'camt' => $r2($it['camt']), 'samt' => $r2($it['samt']), 'csamt' => 0]];
+        }
+        $cd[$nt['ctin']][] = ['ntty' => 'C', 'nt_num' => $nt['num'], 'nt_dt' => $nt['dt'], 'val' => $r2($val), 'pos' => $nt['pos'], 'rchrg' => 'N', 'inv_typ' => 'R', 'itms' => $items];
+    }
+    $out_cdnr = [];
+    foreach ($cd as $ctin => $nts) $out_cdnr[] = ['ctin' => $ctin, 'nt' => $nts];
+
     // ---- b2cs ----
     $out_b2cs = [];
     foreach ($b2cs as $row) {
@@ -218,14 +308,31 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
     $out_nil = [];
     foreach ($nil as $sply => $v) {
         if (abs($v) < 0.005) continue;
-        $out_nil[] = ['sply_ty' => $sply, 'nil_amt' => 0, 'expt_amt' => $r2($v), 'ngsup_amt' => 0];
+        $out_nil[] = ['sply_ty' => $sply, 'nil_amt' => $r2($v), 'expt_amt' => 0, 'ngsup_amt' => 0];
     }
+
+    // ---- exp: OT sales flagged "Export supply" (WOPAY = without payment of tax) ----
+    $out_exp = [];
+    $eq = $is_tp ? false : mysqli_query($db_conn, "
+        SELECT COALESCE(i.inv_number, s.tempid) AS inum, MAX(s.date) AS d, s.gst AS rate,
+               SUM(s.total-s.gst_amount) AS taxable, SUM(s.gst_amount) AS gst, SUM(s.total) AS total
+        FROM ot_sales s LEFT JOIN ot_sales_invoice i ON i.tempid = s.tempid
+        WHERE s.is_export=1 AND s.godownid='$gid_e' AND s.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
+        GROUP BY s.tempid, i.inv_number, s.gst ORDER BY MAX(s.date), inum");
+    $exp_inv = [];
+    while ($eq && $e = mysqli_fetch_assoc($eq)) {
+        $k = $e['inum'];
+        if (!isset($exp_inv[$k])) $exp_inv[$k] = ['inum' => (string)$k, 'idt' => date('d-m-Y', strtotime($e['d'])), 'val' => 0.0, 'itms' => []];
+        $exp_inv[$k]['val'] += (float)$e['total'];
+        $exp_inv[$k]['itms'][] = ['txval' => $r2($e['taxable']), 'rt' => $rt($e['rate']), 'iamt' => $r2($e['gst']), 'csamt' => 0];
+    }
+    foreach ($exp_inv as $ei) { $ei['val'] = $r2($ei['val']); $out_exp[] = $ei; }
 
     // ---- hsn ----
     $desc = [];
     $pq = mysqli_query($db_conn, "select hsn, min(category) as cat from products group by hsn");
     while ($p = mysqli_fetch_assoc($pq)) { $desc[trim($p['hsn'])] = ($p['cat'] === 'diaper') ? 'Clinical Diapers' : (($p['cat'] === 'napkin') ? 'Sanitary Napkins' : ''); }
-    $hsn_rows = compute_hsn_b2b_b2c($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_date, $tp_lines);
+    $hsn_rows = compute_hsn_b2b_b2c($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_date, $tp_lines, $is_tp);
     $hsn_out = ['hsn_b2b' => [], 'hsn_b2c' => []];
     foreach (['b2b' => 'hsn_b2b', 'b2c' => 'hsn_b2c'] as $bk => $ok) {
         $n = 0;
@@ -245,6 +352,7 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         "select i.inv_number as num from ot_sales_invoice i join ot_sales s on s.tempid=i.tempid where s.godownid='$gid_e' and s.date between '$from_date' and '$to_date' group by i.inv_number order by min(s.date), i.inv_number",
         "select invoice_number as num from tp_invoices where source_godown_id='$gid_e' and invoice_date between '$from_date' and '$to_date' order by invoice_date, invoice_number",
     ];
+    if ($is_tp) $channels = array_slice($channels, 0, 2);
     $docs = []; $dn = 0;
     foreach ($channels as $sql) {
         $series = [];
@@ -263,6 +371,8 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
     }
 
     $out = ['gstin' => $own_gstin, 'fp' => date('mY', strtotime($to_date)), 'b2b' => $out_b2b, 'b2cs' => $out_b2cs, 'nil' => ['inv' => $out_nil], 'hsn' => $hsn_out];
+    if ($out_cdnr) $out['cdnr'] = $out_cdnr;
+    if ($out_exp) $out['exp'] = [['exp_typ' => 'WOPAY', 'inv' => $out_exp]];
     if ($docs) $out['doc_issue'] = ['doc_det' => [['doc_num' => 1, 'docs' => $docs]]];
     return $out;
 }

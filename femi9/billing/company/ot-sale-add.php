@@ -344,6 +344,10 @@ $stmt_states->close();
                                                 <br>
                                                 </div>
 
+                                                <!-- Export flag (feeds GSTR-1 JSON "exp") -->
+                                                <label class="form-label"><input type="checkbox" name="is_export" value="1"> Export supply (GSTR-1 "exp", without payment of tax)</label>
+                                                <br><br>
+
                                                 <!-- District -->
                                                 <label class="form-label">District *</label>
                                                 <input type="text" required name="district"

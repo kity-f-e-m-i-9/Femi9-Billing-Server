@@ -24,6 +24,10 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
     if ($_statusCol && $_statusCol->num_rows === 0) {
         $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
     }
+    $_expCol = $db_conn->query("SHOW COLUMNS FROM ot_sales LIKE 'is_export'");
+    if ($_expCol && $_expCol->num_rows === 0) {
+        $db_conn->query("ALTER TABLE ot_sales ADD COLUMN is_export TINYINT(1) NOT NULL DEFAULT 0");
+    }
     $_districtCol = $db_conn->query("SHOW COLUMNS FROM ot_sales LIKE 'district'");
     if ($_districtCol && $_districtCol->num_rows === 0) {
         $db_conn->query("ALTER TABLE ot_sales ADD COLUMN district VARCHAR(100) NULL DEFAULT NULL AFTER customer_address");
@@ -251,6 +255,7 @@ if (isset($_REQUEST['add-record']) || isset($_REQUEST['add-draft-record'])) {
             );
             $stmt->execute();
             $stmt->close();
+            $db_conn->query("UPDATE ot_sales SET is_export=" . (!empty($_POST['is_export']) ? 1 : 0) . " WHERE tempid='" . $db_conn->real_escape_string($tempid) . "'");
 
             // Deduct stock via StockService (FOR UPDATE lock + ledger entry)
             // — skipped entirely for a draft, which must never move stock.
@@ -445,6 +450,10 @@ if (isset($_REQUEST['updateRecord'])) {
     if ($_statusColUpd && $_statusColUpd->num_rows === 0) {
         $db_conn->query("ALTER TABLE ot_sales_invoice ADD COLUMN status ENUM('confirmed','draft') NOT NULL DEFAULT 'confirmed' AFTER cat");
     }
+    $_expColUpd = $db_conn->query("SHOW COLUMNS FROM ot_sales LIKE 'is_export'");
+    if ($_expColUpd && $_expColUpd->num_rows === 0) {
+        $db_conn->query("ALTER TABLE ot_sales ADD COLUMN is_export TINYINT(1) NOT NULL DEFAULT 0");
+    }
     $_districtColUpd = $db_conn->query("SHOW COLUMNS FROM ot_sales LIKE 'district'");
     if ($_districtColUpd && $_districtColUpd->num_rows === 0) {
         $db_conn->query("ALTER TABLE ot_sales ADD COLUMN district VARCHAR(100) NULL DEFAULT NULL AFTER customer_address");
@@ -558,6 +567,7 @@ if (isset($_REQUEST['updateRecord'])) {
         state_id=?, gst_type=?
         where tempid=?";
     db_q($db_conn,$Update_Records,[$catname,$date,$customer_name,$customer_mobile,$customer_address,$district,$order_number,$shipping_address,$gst_number,$order_date,$ship_date,$state_id,$gst_type,$tempid]);
+    db_q($db_conn,"update ot_sales set is_export=? where tempid=?",[!empty($_POST['is_export']) ? 1 : 0,$tempid]);
 
     $_SESSION['sucMessage'] = "Changes Saved Successfully!";
     echo "<script>window.location='ot-sale-view?Updated';</script>";

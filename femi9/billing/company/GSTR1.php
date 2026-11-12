@@ -382,7 +382,11 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 						   ?>
 						   
 						   <div align="right">
-						   <a href="export_GSTR1?t1=<?=$intra_reg_supplies_grand_total;?>&&t2=<?=$intra_unreg_supplies_grand_total;?>&&t3=<?=$inter_reg_supplies_grand_total;?>&&t4=<?=$inter_unreg_supplies_grand_total;?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
+						   <a href="export_GSTR1?t1=<?=$intra_reg_supplies_grand_total;?>&&t2=<?=$intra_unreg_supplies_grand_total;?>&&t3=<?=$inter_reg_supplies_grand_total;?>&&t4=<?=$inter_unreg_supplies_grand_total;?>" title="Export Table 8 (CSV)"><img src="../../assets/images/excel-3-32.png"></a>
+						   &nbsp;
+						   <a href="export_GSTR1_xlsx?frdate=<?=urlencode($from_date);?>&todate=<?=urlencode($to_date);?>&godown_id=<?=urlencode($get_godown_id);?>" title="Export GSTR-1 Excel (GST offline tool format, with Summary sheet)" style="text-decoration:none;"><img src="../../assets/images/excel-3-32.png" style="filter:hue-rotate(90deg);"></a>
+						   &nbsp;
+						   <a href="export_GSTR1_json?frdate=<?=urlencode($from_date);?>&todate=<?=urlencode($to_date);?>&godown_id=<?=urlencode($get_godown_id);?>" title="Export GSTR-1 JSON (GST offline tool format)" style="text-decoration:none;vertical-align:top;"><span class="material-icons" style="font-size:32px;color:#f5a623;">data_object</span></a>
 						   </div>
 						   
 						   <div style="clear:both;"></div>
@@ -560,7 +564,6 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 							<br/>
 							<div align="right">
 							<a href="export_GSTR1_hsn?frdate=<?=urlencode($from_date);?>&todate=<?=urlencode($to_date);?>&godown_id=<?=urlencode($get_godown_id);?>" title="Export HSN-wise B2B / B2C (CSV)"><b>Export HSN B2B / B2C (CSV)</b></a>
-							 &nbsp;|&nbsp; <a href="export_GSTR1_json?frdate=<?=urlencode($from_date);?>&todate=<?=urlencode($to_date);?>&godown_id=<?=urlencode($get_godown_id);?>" title="Export GSTR-1 JSON"><b>Export GSTR-1 JSON</b></a>
 							</div>
 							<h3>Table 4 &amp; 7 — Supplies B2B vs B2C, HSN-wise (Nil-rated included)</h3>
 							<?php
