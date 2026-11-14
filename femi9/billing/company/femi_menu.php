@@ -25,6 +25,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                             <li><a href="raw-material-bundles-report.php">Bundle Report</a></li>
                             <li><a href="manage-covers.php">Covers</a></li>
                             <li><a href="manage-cartons.php">Cartons</a></li>
+                            <li><a href="cover-carton-transfer.php">Covers &amp; Cartons Transfer</a></li>
                         </ul>
                     </li>
                     <li>
@@ -230,6 +231,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="raw-material-bundles-report.php">Bundle Report</a></li>
 						<li><a href="manage-covers.php">Manage Covers</a></li>
 						<li><a href="manage-cartons.php">Manage Cartons</a></li>
+						<li><a href="cover-carton-transfer.php">Covers &amp; Cartons Transfer</a></li>
 						<li><a href="neksomo-company-stock.php">Company Stock</a></li>
                         </ul>
                     </li>
