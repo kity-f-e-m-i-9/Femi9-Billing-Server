@@ -350,7 +350,7 @@ function build_gstr1_json($db_conn, $Login_user_TYPEvl, $gid, $from_date, $to_da
         "select ui.inv_number as num from user_invoice ui where ui.from_user_type='$Login_user_TYPEvl' and ui.from_user_id='$gid_e' and ui.date between '$from_date' and '$to_date' order by ui.date, ui.inv_number",
         "select i.inv_number as num from invoice i where i.user_type='$Login_user_TYPEvl' and i.user_id='$gid_e' and i.date between '$from_date' and '$to_date' order by i.date, i.inv_number",
         "select i.inv_number as num from ot_sales_invoice i join ot_sales s on s.tempid=i.tempid where s.godownid='$gid_e' and s.date between '$from_date' and '$to_date' group by i.inv_number order by min(s.date), i.inv_number",
-        "select invoice_number as num from tp_invoices where source_godown_id='$gid_e' and invoice_date between '$from_date' and '$to_date' order by invoice_date, invoice_number",
+        "select tpi.invoice_number as num from tp_invoices tpi where (".tp_gst_effective_godown_expr($db_conn).")='$gid_e' and tpi.invoice_date between '$from_date' and '$to_date' order by invoice_date, invoice_number",
     ];
     if ($is_tp) $channels = array_slice($channels, 0, 2);
     $docs = []; $dn = 0;

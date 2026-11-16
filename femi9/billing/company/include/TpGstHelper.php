@@ -3,9 +3,11 @@
  * GST totals for TP (territory partner) transfers/returns, for inclusion in the
  * company's GST reports (GST-report.php, GSTR1.php, GSTR3B_D31.php).
  *
- * Only tp_invoices with source_godown_id > 0 are company outward supply — TP
- * invoices sourced from a channel partner (source_cp_id) or neither are not the
- * company's own GST liability and are excluded.
+ * Company outward supply = tp_invoices with source_godown_id > 0, PLUS invoices
+ * sourced from a channel partner (source_cp_id > 0): a CP's stock is the
+ * company's own stock, so those sales are the company's sales and are reported
+ * under the FEMI NAYAN LLP profile (see tp_gst_effective_godown_expr()).
+ * Invoices with neither a godown nor a CP source are excluded.
  *
  * Neither tp_invoices/tp_invoice_items nor the TP branch of user_return_stock
  * store gst_type/buyer_gsttype/GST amount at write time (tp-cnote-action.php
@@ -61,10 +63,40 @@ function tp_line_taxable_and_gst($line_total, $gst_pct, $product_gst_type) {
 }
 }
 
+// Company profile that CP-sourced sales are reported under. CP stock has no
+// company-profile link of its own, so it is fixed to FEMI NAYAN LLP.
+if (!function_exists('tp_cp_gst_godown_id')) {
+function tp_cp_gst_godown_id($db_conn) {
+    static $id = false;
+    if ($id === false) {
+        $r = mysqli_query($db_conn, "SELECT id FROM company_godown WHERE gname = 'FEMI NAYAN LLP' LIMIT 1");
+        $row = $r ? mysqli_fetch_assoc($r) : null;
+        $id = $row ? (int)$row['id'] : 0;
+    }
+    return $id;
+}
+}
+
+// SQL expression (alias tpi = tp_invoices) giving the company godown an invoice
+// is reported under: its own source_godown_id, else the LLP profile when it is
+// CP-sourced, else 0 (not company supply). Godown-sourced rows are unchanged.
+if (!function_exists('tp_gst_effective_godown_expr')) {
+function tp_gst_effective_godown_expr($db_conn) {
+    $llp = tp_cp_gst_godown_id($db_conn);
+    if ($llp > 0) {
+        return "IF(tpi.source_godown_id > 0, tpi.source_godown_id, IF(tpi.source_cp_id > 0, $llp, 0))";
+    }
+    return "IF(tpi.source_godown_id > 0, tpi.source_godown_id, 0)";
+}
+}
+
 // $godown_where_sql: raw SQL boolean fragment on tpi.source_godown_id, e.g. "tpi.source_godown_id = '5'"
 // or "tpi.source_godown_id IN (SELECT id FROM company_godown WHERE ...)".
 if (!function_exists('tp_sales_gst_lines')) {
 function tp_sales_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
+    $eff = tp_gst_effective_godown_expr($db_conn);
+    // callers pass a fragment on tpi.source_godown_id; re-point it at the effective godown
+    $godown_where_sql = str_replace('tpi.source_godown_id', "($eff)", $godown_where_sql);
     $sql = "
         SELECT tpi.id AS tp_invoice_id, tpi.invoice_number, tpi.invoice_date,
                tp.name AS tp_name, tp.mobile AS tp_mobile,
@@ -74,9 +106,9 @@ function tp_sales_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
         JOIN territory_partners tp ON tp.id = tpi.territory_partner_id
         JOIN tp_invoice_items tpii ON tpii.tp_invoice_id = tpi.id
         JOIN products p ON p.id = tpii.product_id
-        JOIN company_godown cg ON cg.id = tpi.source_godown_id
+        JOIN company_godown cg ON cg.id = ($eff)
         WHERE tpi.invoice_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
-          AND tpi.source_godown_id > 0
+          AND ($eff) > 0
           AND ($godown_where_sql)
     ";
     $res = mysqli_query($db_conn, $sql);
@@ -100,6 +132,9 @@ function tp_sales_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
 // 'company', not a godown id, so it can't be used for godown scoping).
 if (!function_exists('tp_credit_gst_lines')) {
 function tp_credit_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) {
+    $eff = tp_gst_effective_godown_expr($db_conn);
+    // callers pass a fragment on tpi.source_godown_id; re-point it at the effective godown
+    $godown_where_sql = str_replace('tpi.source_godown_id', "($eff)", $godown_where_sql);
     $sql = "
         SELECT urs.returnid, urs.invnumber AS invoice_number, tpi.invoice_date AS invoice_date, ursi.date AS return_date,
                tp.name AS tp_name, tp.mobile AS tp_mobile,
@@ -109,14 +144,14 @@ function tp_credit_gst_lines($db_conn, $from_date, $to_date, $godown_where_sql) 
         JOIN user_return_stock urs ON urs.returnid = ursi.returnid
         JOIN tp_invoices tpi ON tpi.invoice_number = urs.invnumber COLLATE utf8mb4_unicode_ci
         JOIN territory_partners tp ON tp.id = tpi.territory_partner_id
-        JOIN company_godown cg ON cg.id = tpi.source_godown_id
+        JOIN company_godown cg ON cg.id = ($eff)
         JOIN products p ON p.id = ursi.prid
         WHERE urs.from_usertype = 'territory_partner'
           AND urs.status = 'accept'
           AND urs.deleted_at IS NULL
           AND ursi.deleted_at IS NULL
           AND ursi.date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
-          AND tpi.source_godown_id > 0
+          AND ($eff) > 0
           AND ($godown_where_sql)
     ";
     $res = mysqli_query($db_conn, $sql);

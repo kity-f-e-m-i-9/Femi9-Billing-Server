@@ -524,7 +524,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								//transfers, godown-sourced only) — tpii.amount is the gross line total,
 								//so the same inclusive/exclusive-aware helper used elsewhere is reused.
 								require_once __DIR__ . '/include/TpGstHelper.php';
-								$Total_HSN_sls_TP="select tpii.quantity, tpii.amount, p.gst as gst_percentage, p.gst_type as product_gst_type from tp_invoices tpi join tp_invoice_items tpii on tpii.tp_invoice_id=tpi.id join products p on p.id=tpii.product_id where p.hsn=? and p.gst$rate_filter and tpi.invoice_date between ? and ? and tpi.source_godown_id=?";
+								$Total_HSN_sls_TP="select tpii.quantity, tpii.amount, p.gst as gst_percentage, p.gst_type as product_gst_type from tp_invoices tpi join tp_invoice_items tpii on tpii.tp_invoice_id=tpi.id join products p on p.id=tpii.product_id where p.hsn=? and p.gst$rate_filter and tpi.invoice_date between ? and ? and (".tp_gst_effective_godown_expr($db_conn).")=?";
 								$fetch_HSN_sls_TP=db_q($db_conn,$Total_HSN_sls_TP,[$hsn_code,$from_date,$to_date,$get_godown_id]);
 								$show_HSN_sls_qty_TP=0; $show_HSN_sls_val_TP=0;
 								while($row_HSN_sls_TP=mysqli_fetch_array($fetch_HSN_sls_TP)){
@@ -688,7 +688,7 @@ $result_Godown_details=mysqli_fetch_array($fetch_Godown_details);
 								['label' => 'Network Sale (SS/ST/DT/Shop)', 'sql' => "select ui.inv_number as num, ui.date as d, (select max(x.buyer_gsttype='register') from user_invoice_items x where x.inv_id=ui.inv_id) as reg from user_invoice ui where ui.from_user_type='$Login_user_TYPEvl' and ui.from_user_id='".db_esc($get_godown_id)."' and ui.date between '$from_date' and '$to_date' order by ui.date asc, ui.inv_number asc"],
 								['label' => 'Customer Sale', 'sql' => "select i.inv_number as num, i.date as d, (select max(x.buyer_gsttype='register') from invoice_items x where x.inv_id=i.inv_id) as reg from invoice i where i.user_type='$Login_user_TYPEvl' and i.user_id='".db_esc($get_godown_id)."' and i.date between '$from_date' and '$to_date' order by i.date asc, i.inv_number asc"],
 								['label' => 'OT Sale', 'sql' => "select i.inv_number as num, min(s.date) as d, max(s.buyer_gsttype='register') as reg from ot_sales_invoice i join ot_sales s on s.tempid=i.tempid where s.godownid='".db_esc($get_godown_id)."' and s.date between '$from_date' and '$to_date' group by i.inv_number order by d asc, i.inv_number asc"],
-								['label' => 'Territory Partner', 'sql' => "select tpi.invoice_number as num, tpi.invoice_date as d, tp.gstin as tp_gstin from tp_invoices tpi left join territory_partners tp on tp.id=tpi.territory_partner_id where tpi.source_godown_id='".db_esc($get_godown_id)."' and tpi.invoice_date between '$from_date' and '$to_date' order by tpi.invoice_date asc, tpi.invoice_number asc", 'tp' => true],
+								['label' => 'Territory Partner', 'sql' => "select tpi.invoice_number as num, tpi.invoice_date as d, tp.gstin as tp_gstin from tp_invoices tpi left join territory_partners tp on tp.id=tpi.territory_partner_id where (".tp_gst_effective_godown_expr($db_conn).")='".db_esc($get_godown_id)."' and tpi.invoice_date between '$from_date' and '$to_date' order by tpi.invoice_date asc, tpi.invoice_number asc", 'tp' => true],
 							];
 							$doc_grand_total = 0;
 							foreach ($doc_channels as $dc) {
