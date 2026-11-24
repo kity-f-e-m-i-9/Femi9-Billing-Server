@@ -62,8 +62,8 @@ function getRawTargetAchievedStats($db_conn, array $ids, string $fromDate, strin
     // reimport/restore can recreate a table under the server's default
     // collation instead of the original utf8mb4_general_ci), which throws
     // "Illegal mix of collations" and 500s every page that calls this.
-    // Casting both sides to utf8mb4_general_ci costs the index use EXPLAIN
-    // showed without it, but a working query beats a fast crash.
+    // (Casts removed 2026-11-24: all columns are utf8mb4_general_ci again, and the casts forced full scans of user_invoice_items. Old note: casting cost the index use EXPLAIN
+    // showed, but a working query beat a fast crash.) If "Illegal mix of collations" returns, fix the column collation, not the query.
     $fromEsc = $db_conn->real_escape_string($fromDate);
     $toEsc   = $db_conn->real_escape_string($toDate);
     $resA = $db_conn->query("
@@ -76,7 +76,7 @@ function getRawTargetAchievedStats($db_conn, array $ids, string $fromDate, strin
               AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
               AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
         ) x
-        JOIN user_invoice_items uii ON uii.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
+        JOIN user_invoice_items uii ON uii.inv_id = x.invoiced_inv_id
         JOIN products p ON p.id = uii.pr_id
         WHERE COALESCE(p.category,'') != 'diaper'
         GROUP BY x.ms_id
@@ -115,8 +115,8 @@ function getRawAchievedDailyByMsId($db_conn, array $ids, string $fromDate, strin
               AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
               AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
         ) x
-        JOIN user_invoice ui ON ui.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
-        JOIN user_invoice_items uii ON uii.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
+        JOIN user_invoice ui ON ui.inv_id = x.invoiced_inv_id
+        JOIN user_invoice_items uii ON uii.inv_id = x.invoiced_inv_id
         JOIN products p ON p.id = uii.pr_id
         WHERE COALESCE(p.category,'') != 'diaper'
         GROUP BY x.ms_id, ui.date
@@ -206,7 +206,7 @@ function getTpOrderAchievedStats($db_conn, array $tpIds, string $fromDate, strin
               AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
               AND t.invoiced_inv_id IS NOT NULL AND t.invoiced_inv_id <> ''
         ) x
-        JOIN user_invoice_items uii ON uii.inv_id COLLATE utf8mb4_general_ci = x.invoiced_inv_id COLLATE utf8mb4_general_ci
+        JOIN user_invoice_items uii ON uii.inv_id = x.invoiced_inv_id
         JOIN products p ON p.id = uii.pr_id
         WHERE COALESCE(p.category,'') != 'diaper'
         GROUP BY x.tp_id
