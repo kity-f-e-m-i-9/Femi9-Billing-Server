@@ -117,6 +117,7 @@ $from_date = date ("Y-m-d", strtotime("-2 days", strtotime($to_date)));
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
+<a href="export-demofree-xlsx.php?frdate=<?=urlencode($from_date);?>&todate=<?=urlencode($to_date);?>" class="btn btn-success" style="margin-left:6px;"><i class="material-icons">file_download</i>Export Excel</a>
 </div>
 
 							</div>
