@@ -40,7 +40,7 @@ function ensure_auto_transfer_skip_table(mysqli $db_conn): void
     $db_conn->query("
         CREATE TABLE IF NOT EXISTS auto_transfer_skip_today (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            source_type ENUM('tp','ot','wa','cp') NOT NULL,
+            source_type ENUM('tp','ot','wa','cp','shop') NOT NULL,
             source_ref VARCHAR(64) NOT NULL,
             skip_date DATE NOT NULL,
             reason ENUM('excluded','transferred') NOT NULL DEFAULT 'excluded',
@@ -64,7 +64,16 @@ function ensure_auto_transfer_skip_table(mysqli $db_conn): void
     // Transfer demand source.
     $typeCol = $db_conn->query("SHOW COLUMNS FROM auto_transfer_skip_today LIKE 'source_type'")->fetch_assoc();
     if ($typeCol && strpos($typeCol['Type'], "'cp'") === false) {
-        $db_conn->query("ALTER TABLE auto_transfer_skip_today MODIFY COLUMN source_type ENUM('tp','ot','wa','cp') NOT NULL");
+        $db_conn->query("ALTER TABLE auto_transfer_skip_today MODIFY COLUMN source_type ENUM('tp','ot','wa','cp','shop') NOT NULL");
+    }
+
+    // Widen again for 'shop' — DM Get Orders Company-invoiced from LLP
+    // godown stock (company/ms-order-invoice-add.php's "no CP" path, draft
+    // user_invoice rows) joining TP/CP/OT as a fourth Auto Transfer demand
+    // source (2026-11-13, user request).
+    $typeCol2 = $db_conn->query("SHOW COLUMNS FROM auto_transfer_skip_today LIKE 'source_type'")->fetch_assoc();
+    if ($typeCol2 && strpos($typeCol2['Type'], "'shop'") === false) {
+        $db_conn->query("ALTER TABLE auto_transfer_skip_today MODIFY COLUMN source_type ENUM('tp','ot','wa','cp','shop') NOT NULL");
     }
 
     // How much of this specific order+product this ONE event actually
@@ -94,6 +103,7 @@ function ensure_auto_transfer_transferred_qty_columns(mysqli $db_conn): void
         'tp_purchase_order_items'          => 'qty',
         'channel_partner_purchase_order_items' => 'qty',
         'ot_sales'                          => 'qty',
+        'user_invoice_items'               => 'qty',
     ];
     foreach ($targets as $table => $afterCol) {
         $col = $db_conn->query("SHOW COLUMNS FROM `$table` LIKE 'transferred_qty'");
@@ -299,6 +309,12 @@ function record_auto_transfer_partial(mysqli $db_conn, string $sourceType, strin
             "UPDATE channel_partner_purchase_order_items SET transferred_qty = LEAST(qty, transferred_qty + ?) WHERE po_id = ? AND product_id = ?"
         );
         $stmt->bind_param('iii', $qtyMoved, $poId, $productId);
+    } elseif ($sourceType === 'shop') {
+        // $orderKey here is the user_invoice.inv_id (a string), not a PO id.
+        $stmt = $db_conn->prepare(
+            "UPDATE user_invoice_items SET transferred_qty = LEAST(qty, transferred_qty + ?) WHERE inv_id = ? AND pr_id = ?"
+        );
+        $stmt->bind_param('isi', $qtyMoved, $orderKey, $productId);
     } else {
         $poId = (int) $orderKey;
         $stmt = $db_conn->prepare(
@@ -309,6 +325,10 @@ function record_auto_transfer_partial(mysqli $db_conn, string $sourceType, strin
     $stmt->execute();
     $stmt->close();
 
+    if ($sourceType === 'shop') {
+        _auto_transfer_release_shop_invoice_line($db_conn, $orderKey, $productId, $qtyMoved, $createdBy);
+    }
+
     $logStmt = $db_conn->prepare(
         "INSERT INTO auto_transfer_skip_today (source_type, source_ref, skip_date, reason, transfer_tempid, qty, created_by)
          VALUES (?, ?, CURDATE(), 'transferred', ?, ?, ?)
@@ -317,6 +337,281 @@ function record_auto_transfer_partial(mysqli $db_conn, string $sourceType, strin
     $logStmt->bind_param('sssis', $sourceType, $sourceRef, $transferTempid, $qtyMoved, $createdBy);
     $logStmt->execute();
     $logStmt->close();
+}
+
+/**
+ * Performs the real stock-out + receipt creation for one Shop Invoice line,
+ * the moment Auto Transfer commits stock toward it. DM Get Order Shop
+ * Invoices no longer deduct/receipt at Submit (user request, 2026-11-17) —
+ * this is the one place that now happens, so every such invoice is
+ * guaranteed to pass through Auto Transfer's Shop Invoices list first. A
+ * plain local deduct (stock already sits in the invoice's own warehouse_id
+ * bucket; no multi-leg transfer needed for this part — that already
+ * happened for the LLP replenishment itself, in internal_transfer_auto_action.php).
+ */
+/**
+ * Shared receipt-insert for a Shop Invoice whose stock has fully moved —
+ * used by both _auto_transfer_release_shop_invoice_line() (the normal path)
+ * and _auto_transfer_backfill_stuck_shop_receipts() (the self-heal sweep),
+ * which previously carried two copies of this exact 12-column INSERT.
+ * CLAUDE.md documents two real bind_param bugs found in this exact code
+ * this same session (a type-string mismatch silently turning 'Cash' into
+ * '0', and a length mismatch that threw at runtime) — with two copies, a
+ * future fix applied to one and not the other silently reintroduces
+ * whichever bug, so this was consolidated into one place. 2026-11-21,
+ * code-review finding. Takes the already-fetched full user_invoice row;
+ * returns whether the insert succeeded.
+ */
+function _auto_transfer_write_shop_invoice_receipt(mysqli $db_conn, array $fullInv): bool
+{
+    $invId            = $fullInv['inv_id'];
+    $receivedAmount   = (float) ($fullInv['pending_received_amount'] ?? 0);
+    $receivableAmount = round((float) $fullInv['total'] - $receivedAmount);
+    $receiptMethod    = $fullInv['pending_receipt_method'] ?: 'Cash';
+    $receiptRemarks   = $fullInv['pending_receipt_remarks'] ?: '';
+
+    $stmtRcpt = $db_conn->prepare(
+        "INSERT INTO receipt (receiptid, inv_id, invoice_amount, received, receivable, date,
+            from_user_type, from_user_id, to_user_type, to_user_id, receipt_method, receipt_remarks)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    $stmtRcpt->bind_param(
+        'ssdddsssssss',
+        $invId, $invId, $fullInv['total'], $receivedAmount, $receivableAmount, $fullInv['date'],
+        $fullInv['from_user_type'], $fullInv['from_user_id'], $fullInv['to_user_type'], $fullInv['to_user_id'],
+        $receiptMethod, $receiptRemarks
+    );
+    $ok = $stmtRcpt->execute();
+    $stmtRcpt->close();
+    return $ok;
+}
+
+function _auto_transfer_release_shop_invoice_line(mysqli $db_conn, string $invId, int $productId, int $qtyMoved, ?string $createdBy): void
+{
+    require_once __DIR__ . '/StockService.php';
+    $invIdEsc = $db_conn->real_escape_string($invId);
+
+    $invRow = $db_conn->query(
+        "SELECT from_user_type, from_user_id, warehouse_id FROM user_invoice WHERE inv_id = '$invIdEsc' LIMIT 1"
+    )->fetch_assoc();
+    if (!$invRow) { return; }
+
+    $warehouseId = $invRow['warehouse_id'] !== null ? (int) $invRow['warehouse_id'] : null;
+    $stockService = new StockService($db_conn);
+    try {
+        $stockService->deduct(
+            $productId, $invRow['from_user_type'], $invRow['from_user_id'], $qtyMoved,
+            'user_invoice', $invId, (string) ($createdBy ?? 'system'), true, $warehouseId
+        );
+    } catch (\Throwable $e) {
+        error_log("Auto Transfer: shop invoice $invId stock deduct failed for product $productId — " . $e->getMessage());
+        return;
+    }
+
+    // Once every line of this invoice is fully covered, write the receipt —
+    // the one signal this file's own demand query (and the rest of the app)
+    // uses to treat a Shop Invoice as genuinely resolved. Uses the payment
+    // details already entered on Submit, stashed on the invoice row for
+    // exactly this moment (see shop-user-invoice-submit.php).
+    $remainingRow = $db_conn->query(
+        "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id = '$invIdEsc' AND qty > transferred_qty"
+    )->fetch_assoc();
+    if ((int) ($remainingRow['n'] ?? 1) !== 0) { return; }
+
+    $existingReceipt = $db_conn->query(
+        "SELECT COUNT(*) AS n FROM receipt WHERE receiptid = '$invIdEsc'"
+    )->fetch_assoc();
+    if ((int) ($existingReceipt['n'] ?? 0) !== 0) { return; }
+
+    $fullInv = $db_conn->query("SELECT * FROM user_invoice WHERE inv_id = '$invIdEsc' LIMIT 1")->fetch_assoc();
+    if (!$fullInv) { return; }
+
+    _auto_transfer_write_shop_invoice_receipt($db_conn, $fullInv);
+}
+
+/**
+ * Finds Company-fulfilled Shop Invoices where every line already has
+ * qty <= transferred_qty (stock for real already moved, confirmed by a
+ * stock_ledger 'deduct' entry — this never fabricates a deduct, only
+ * writes the receipt that should already have followed it) but no receipt
+ * exists yet, and creates that missing receipt using the same stashed
+ * pending_* payment fields _auto_transfer_release_shop_invoice_line() uses.
+ * Returns how many it fixed. See release_shop_invoices_from_existing_stock()
+ * for why this exists. $onlyInvIds, non-empty, restricts the sweep the same
+ * way it restricts that function's own release pass.
+ */
+function _auto_transfer_backfill_stuck_shop_receipts(mysqli $db_conn, array $onlyInvIds = []): int
+{
+    $invFilterSql = '';
+    if (!empty($onlyInvIds)) {
+        $invFilterSql = ' AND ui.inv_id IN (' . implode(',', array_map(
+            fn($v) => "'" . $db_conn->real_escape_string($v) . "'", $onlyInvIds
+        )) . ')';
+    }
+
+    $stuck = $db_conn->query(
+        "SELECT ui.inv_id FROM user_invoice ui
+         WHERE ui.status = 'draft' AND ui.from_user_type = 'company'
+           AND ui.source_ms_order_id IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM receipt r WHERE r.receiptid = ui.inv_id)
+           AND NOT EXISTS (SELECT 1 FROM user_invoice_items uii WHERE uii.inv_id = ui.inv_id AND uii.qty > uii.transferred_qty)
+           AND EXISTS (SELECT 1 FROM user_invoice_items uii2 WHERE uii2.inv_id = ui.inv_id)
+           $invFilterSql"
+    )->fetch_all(MYSQLI_ASSOC);
+
+    $fixed = 0;
+    foreach ($stuck as $row) {
+        $invId = $row['inv_id'];
+        $invIdEsc = $db_conn->real_escape_string($invId);
+
+        $fullInv = $db_conn->query("SELECT * FROM user_invoice WHERE inv_id = '$invIdEsc' LIMIT 1")->fetch_assoc();
+        if (!$fullInv) { continue; }
+
+        if (_auto_transfer_write_shop_invoice_receipt($db_conn, $fullInv)) { $fixed++; }
+    }
+    return $fixed;
+}
+
+/**
+ * Walks every still-outstanding Shop Invoice line (DM Get Order,
+ * Company-fulfilled, draft, un-receipted, not excluded today) and releases
+ * whatever it can straight from that invoice's own warehouse's CURRENT
+ * stock. Called from company/release-shop-invoice-stock-action.php —
+ * its own dedicated action/button, deliberately NOT wired into
+ * internal_transfer_auto_action.php's "Transfer Now" (TP/CP/OT
+ * replenishment into LLP). User request, 2026-11-17: Shop Invoice stock
+ * must never move as a side effect of an unrelated TP/CP/OT transfer click
+ * — only when staff explicitly asks to release it. $excludedSourceIds uses
+ * "shop:<inv_id>:<product_id>" keys, same shape as internal_transfer_auto_action.php's
+ * own TP/CP/OT exclusion set (not currently wired to any UI for this
+ * endpoint, but the parameter is kept for parity / future use).
+ *
+ * $onlyInvIds, when non-empty, restricts this to exactly those invoices —
+ * powers ms_prorders.php's per-row "Release Stock" checkboxes (2026-11-17,
+ * user request: pick which specific orders get released, not a blanket
+ * "release everything eligible"). Empty (the default) keeps the original
+ * blanket behavior used by internal_transfer_auto.php's own button.
+ */
+function release_shop_invoices_from_existing_stock(mysqli $db_conn, StockService $stockService, ?string $createdBy, string $transferTempid, array $excludedSourceIds = [], array $onlyInvIds = []): array
+{
+    // Returns a summary so the caller can tell staff exactly what happened —
+    // "released" (fully covered lines moved), "short" (nothing/not-enough
+    // stock, left pending), so a click that changes nothing still gets a
+    // clear reason instead of silently reloading. 2026-11-17, user request.
+    $summary = ['lines_considered' => 0, 'lines_released' => 0, 'lines_short' => 0, 'receipts_backfilled' => 0];
+    ensure_auto_transfer_skip_table($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
+
+    // Self-heal: an invoice can end up with every line already fully
+    // transferred_qty-covered (real stock really deducted — confirmed via
+    // stock_ledger on a stuck invoice this session) but still missing its
+    // receipt — found live, 2026-11-17: once every line matches qty =
+    // transferred_qty, that invoice's own `qty > transferred_qty` clause
+    // below stops matching it, so a repeat "Release Stock" click can never
+    // retry the receipt step and the invoice is stuck in "In Progress"
+    // forever with no stock left to move. Sweep for exactly that state
+    // every time this runs, so a stuck invoice heals itself on the very
+    // next click instead of needing a manual DB fix.
+    $summary['receipts_backfilled'] = _auto_transfer_backfill_stuck_shop_receipts($db_conn, $onlyInvIds);
+
+    $invFilterSql = '';
+    if (!empty($onlyInvIds)) {
+        $invFilterSql = ' AND ui.inv_id IN (' . implode(',', array_map(
+            fn($v) => "'" . $db_conn->real_escape_string($v) . "'", $onlyInvIds
+        )) . ')';
+    }
+
+    $stmt = $db_conn->prepare(
+        "SELECT ui.inv_id, ui.from_user_type, ui.from_user_id, ui.warehouse_id,
+                uii.pr_id AS product_id, (uii.qty - uii.transferred_qty) AS remaining_qty
+         FROM user_invoice_items uii
+         INNER JOIN user_invoice ui ON ui.inv_id = uii.inv_id
+         WHERE ui.status = 'draft' AND ui.from_user_type = 'company'
+           AND ui.source_ms_order_id IS NOT NULL
+           AND uii.qty > uii.transferred_qty
+           AND NOT EXISTS (SELECT 1 FROM receipt r WHERE r.receiptid = ui.inv_id)
+           $invFilterSql
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'shop' AND s.source_ref = CONCAT(ui.inv_id, ':', uii.pr_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
+           )"
+    );
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    // Prefetch every (user_type, user_id, warehouse_id, product_id) closing_qty
+    // this pass will need in 2 queries total (one for a NULL warehouse_id, one
+    // for a real one) instead of calling StockService::getClosingQty() once per
+    // line — a 50-line release previously cost 50+ individual round trips here
+    // alone. Falls back to the original per-line call for any key this batch
+    // somehow misses, so a gap in the grouping degrades to the old (correct,
+    // just slower) behaviour instead of silently reading a wrong quantity.
+    // 2026-11-21, code-review finding.
+    $closingQtyMap = [];
+    $nullWhKeys = []; $withWhTuples = [];
+    foreach ($rows as $row) {
+        $wh = $row['warehouse_id'] !== null ? (int) $row['warehouse_id'] : null;
+        $key = $row['from_user_type'] . '|' . $row['from_user_id'] . '|' . ($wh ?? 'NULL') . '|' . $row['product_id'];
+        if (isset($closingQtyMap[$key])) { continue; }
+        if ($wh === null) {
+            $nullWhKeys[$key] = ['user_type' => $row['from_user_type'], 'user_id' => $row['from_user_id'], 'product_id' => (int) $row['product_id']];
+        } else {
+            $withWhTuples[$key] = ['user_type' => $row['from_user_type'], 'user_id' => $row['from_user_id'], 'warehouse_id' => $wh, 'product_id' => (int) $row['product_id']];
+        }
+    }
+    if (!empty($nullWhKeys)) {
+        $byUser = [];
+        foreach ($nullWhKeys as $k) { $byUser[$k['user_type'] . '|' . $k['user_id']][] = $k['product_id']; }
+        foreach ($byUser as $userKey => $productIds) {
+            [$ut, $uid] = explode('|', $userKey, 2);
+            $pidList = implode(',', array_unique(array_map('intval', $productIds)));
+            $res = $db_conn->query(
+                "SELECT product_id, closing_qty FROM stock WHERE user_type = '" . $db_conn->real_escape_string($ut) . "'
+                   AND user_id = '" . $db_conn->real_escape_string($uid) . "' AND warehouse_id IS NULL AND product_id IN ($pidList)"
+            );
+            while ($r = $res->fetch_assoc()) {
+                $closingQtyMap[$ut . '|' . $uid . '|NULL|' . $r['product_id']] = (int) $r['closing_qty'];
+            }
+        }
+    }
+    if (!empty($withWhTuples)) {
+        $tupleSql = implode(',', array_map(
+            fn($t) => "('" . $db_conn->real_escape_string($t['user_type']) . "','" . $db_conn->real_escape_string($t['user_id']) . "'," . (int) $t['warehouse_id'] . "," . (int) $t['product_id'] . ")",
+            $withWhTuples
+        ));
+        $res = $db_conn->query(
+            "SELECT user_type, user_id, warehouse_id, product_id, closing_qty FROM stock
+             WHERE (user_type, user_id, warehouse_id, product_id) IN ($tupleSql)"
+        );
+        while ($r = $res->fetch_assoc()) {
+            $closingQtyMap[$r['user_type'] . '|' . $r['user_id'] . '|' . $r['warehouse_id'] . '|' . $r['product_id']] = (int) $r['closing_qty'];
+        }
+    }
+
+    foreach ($rows as $row) {
+        $sourceId = 'shop:' . $row['inv_id'] . ':' . $row['product_id'];
+        if (isset($excludedSourceIds[$sourceId])) { continue; }
+
+        $remaining = (int) $row['remaining_qty'];
+        if ($remaining <= 0) { continue; }
+
+        $summary['lines_considered']++;
+
+        $warehouseId = $row['warehouse_id'] !== null ? (int) $row['warehouse_id'] : null;
+        $closingQtyKey = $row['from_user_type'] . '|' . $row['from_user_id'] . '|' . ($warehouseId ?? 'NULL') . '|' . $row['product_id'];
+        $available = isset($closingQtyMap[$closingQtyKey])
+            ? $closingQtyMap[$closingQtyKey]
+            : (int) ($stockService->getClosingQty((int) $row['product_id'], $row['from_user_type'], $row['from_user_id'], $warehouseId) ?? 0);
+        $releaseQty = min($remaining, max(0, $available));
+        if ($releaseQty <= 0) { $summary['lines_short']++; continue; }
+
+        record_auto_transfer_partial($db_conn, 'shop', $row['inv_id'] . ':' . $row['product_id'], $releaseQty, $createdBy, $transferTempid);
+        $summary['lines_released']++;
+        if ($releaseQty < $remaining) { $summary['lines_short']++; }
+    }
+
+    return $summary;
 }
 
 /**
@@ -356,7 +651,7 @@ function record_auto_transfer_partial(mysqli $db_conn, string $sourceType, strin
 function get_auto_transfer_skipped_today(mysqli $db_conn, ?string $date = null): array
 {
     ensure_auto_transfer_skip_table($db_conn);
-    $skipped = ['tp' => [], 'ot' => [], 'cp' => []];
+    $skipped = ['tp' => [], 'ot' => [], 'cp' => [], 'shop' => []];
 
     // Defaults to today (the function's original, still-literal behavior)
     // but accepts any past date so the "Already Transferred Today" tab can
@@ -367,7 +662,7 @@ function get_auto_transfer_skipped_today(mysqli $db_conn, ?string $date = null):
 
     $stmt = $db_conn->prepare(
         "SELECT source_type, source_ref, reason, qty FROM auto_transfer_skip_today
-         WHERE skip_date = ? AND source_type IN ('tp', 'ot', 'cp') AND reason IN ('transferred', 'excluded') ORDER BY id"
+         WHERE skip_date = ? AND source_type IN ('tp', 'ot', 'cp', 'shop') AND reason IN ('transferred', 'excluded') ORDER BY id"
     );
     $stmt->bind_param('s', $date);
     $stmt->execute();
@@ -435,6 +730,28 @@ function get_auto_transfer_skipped_today(mysqli $db_conn, ?string $date = null):
                 "SELECT SUM(qty) AS qty FROM channel_partner_purchase_order_items WHERE po_id = ? AND product_id = ?"
             );
             $qtyStmt->bind_param('ii', $poId, $productId);
+            $qtyStmt->execute();
+            $derivedQty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
+            $qtyStmt->close();
+        } elseif ($sourceType === 'shop') {
+            // $orderKey is the user_invoice.inv_id (draft Shop Invoice,
+            // company/ms-order-invoice-add.php's "no CP" path).
+            $invStmt = $db_conn->prepare(
+                "SELECT ui.inv_number, s.name AS shop_name
+                 FROM user_invoice ui
+                 LEFT JOIN shop s ON s.temp_id = ui.to_user_id
+                 WHERE ui.inv_id = ? LIMIT 1"
+            );
+            $invStmt->bind_param('s', $orderKey);
+            $invStmt->execute();
+            $invRow = $invStmt->get_result()->fetch_assoc();
+            $invStmt->close();
+            $label = $invRow ? (($invRow['shop_name'] ?: 'Shop') . ' — Inv ' . $invRow['inv_number']) : ('Invoice ' . $orderKey);
+
+            $qtyStmt = $db_conn->prepare(
+                "SELECT SUM(qty) AS qty FROM user_invoice_items WHERE inv_id = ? AND pr_id = ?"
+            );
+            $qtyStmt->bind_param('si', $orderKey, $productId);
             $qtyStmt->execute();
             $derivedQty = (int) ($qtyStmt->get_result()->fetch_assoc()['qty'] ?? 0);
             $qtyStmt->close();
@@ -551,7 +868,7 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     $tpResult = $tpStmt->get_result();
     while ($row = $tpResult->fetch_assoc()) {
         $pid = (int) $row['product_id'];
-        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0];
+        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0, 'shop' => 0];
         $requirements[$pid]['tp'] += (int) $row['total_qty'];
     }
     $tpStmt->close();
@@ -576,10 +893,41 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     $cpResult = $cpStmt->get_result();
     while ($row = $cpResult->fetch_assoc()) {
         $pid = (int) $row['product_id'];
-        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0];
+        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0, 'shop' => 0];
         $requirements[$pid]['cp'] += (int) $row['total_qty'];
     }
     $cpStmt->close();
+
+    // Shop Invoice — DM Get Orders the company invoiced directly (company/
+    // ms-order-invoice-add.php's "no CP" path, draft user_invoice rows keyed
+    // by source_ms_order_id). Real, committed demand like TP/CP (never
+    // starved by OT drafts) — see cap_auto_transfer_qty_by_source()'s own
+    // comment for priority order. NOT restricted to the LLP godown — that
+    // path's own godownid dropdown lets any allowed godown be chosen, and
+    // the 2026-11-17 design note requires EVERY such invoice to show up
+    // here regardless of godown. 2026-11-21, code-review finding.
+    $shopStmt = $db_conn->prepare(
+        "SELECT uii.pr_id AS product_id, SUM(uii.qty - uii.transferred_qty) AS total_qty
+         FROM user_invoice_items uii
+         INNER JOIN user_invoice ui ON ui.inv_id = uii.inv_id
+         WHERE ui.status = 'draft' AND ui.from_user_type = 'company'
+           AND ui.source_ms_order_id IS NOT NULL
+           AND uii.qty > uii.transferred_qty
+           AND NOT EXISTS (SELECT 1 FROM receipt r WHERE r.receiptid = ui.inv_id)
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'shop' AND s.source_ref = CONCAT(ui.inv_id, ':', uii.pr_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
+           )
+         GROUP BY uii.pr_id"
+    );
+    $shopStmt->execute();
+    $shopResult = $shopStmt->get_result();
+    while ($row = $shopResult->fetch_assoc()) {
+        $pid = (int) $row['product_id'];
+        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0, 'shop' => 0];
+        $requirements[$pid]['shop'] += (int) $row['total_qty'];
+    }
+    $shopStmt->close();
 
     $otStmt = $db_conn->prepare(
         "SELECT os.prid AS product_id, SUM(os.qty - os.transferred_qty) AS total_qty
@@ -598,31 +946,34 @@ function get_auto_transfer_requirements(mysqli $db_conn, int $llpGodownId): arra
     $otResult = $otStmt->get_result();
     while ($row = $otResult->fetch_assoc()) {
         $pid = (int) $row['product_id'];
-        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0];
+        if (!isset($requirements[$pid])) $requirements[$pid] = ['tp' => 0, 'ot' => 0, 'cp' => 0, 'shop' => 0];
         $requirements[$pid]['ot'] += (int) $row['total_qty'];
     }
     $otStmt->close();
 
-    return array_filter($requirements, fn($r) => ($r['tp'] + $r['ot'] + $r['cp']) > 0);
+    return array_filter($requirements, fn($r) => ($r['tp'] + $r['ot'] + $r['cp'] + $r['shop']) > 0);
 }
 
 /**
- * Splits one product's available stock between TP, CP, and OT-draft
- * demand — TP first, then CP, then OT last. TP and CP are both real,
- * completable purchase orders (never starved by OT drafts that, until
- * confirmed, can sit indefinitely); TP keeps first claim ahead of CP
- * since that priority already existed before CP joined this split.
- * Returns ['tp' => qtyForTp, 'cp' => qtyForCp, 'ot' => qtyForOt], each
- * capped so tp+cp+ot never exceeds $available and no source gets a
- * negative share.
+ * Splits one product's available stock between TP, CP, Shop Invoice, and
+ * OT-draft demand — TP first, then CP, then Shop, then OT last. TP, CP and
+ * Shop are all real, committed orders (a DM's Get Order already has a real
+ * shop waiting on it, same as a TP/CP purchase order) — never starved by OT
+ * drafts that, until confirmed, can sit indefinitely. TP keeps first claim
+ * ahead of CP (pre-existing priority), Shop sits after CP since it joined
+ * last (2026-11-13).
+ * Returns ['tp' => qtyForTp, 'cp' => qtyForCp, 'shop' => qtyForShop,
+ * 'ot' => qtyForOt], each capped so the four never exceed $available and no
+ * source gets a negative share.
  */
-function cap_auto_transfer_qty_by_source(int $tpRequired, int $cpRequired, int $otRequired, int $available): array
+function cap_auto_transfer_qty_by_source(int $tpRequired, int $cpRequired, int $otRequired, int $available, int $shopRequired = 0): array
 {
     $available = max(0, $available);
-    $tpCapped  = max(0, min($tpRequired, $available));
-    $cpCapped  = max(0, min($cpRequired, $available - $tpCapped));
-    $otCapped  = max(0, min($otRequired, $available - $tpCapped - $cpCapped));
-    return ['tp' => $tpCapped, 'cp' => $cpCapped, 'ot' => $otCapped];
+    $tpCapped   = max(0, min($tpRequired, $available));
+    $cpCapped   = max(0, min($cpRequired, $available - $tpCapped));
+    $shopCapped = max(0, min($shopRequired, $available - $tpCapped - $cpCapped));
+    $otCapped   = max(0, min($otRequired, $available - $tpCapped - $cpCapped - $shopCapped));
+    return ['tp' => $tpCapped, 'cp' => $cpCapped, 'shop' => $shopCapped, 'ot' => $otCapped];
 }
 
 /**
@@ -643,7 +994,7 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     ensure_ot_sales_invoice_status_column($db_conn);
     ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
     ensure_auto_transfer_transferred_qty_columns($db_conn);
-    $breakdown = ['tp' => [], 'ot' => [], 'cp' => []];
+    $breakdown = ['tp' => [], 'ot' => [], 'cp' => [], 'shop' => []];
 
     // 'qty' here is each order's REMAINING qty (qty - transferred_qty),
     // same as get_auto_transfer_requirements() — a partially-transferred
@@ -707,6 +1058,36 @@ function get_auto_transfer_breakdown_for_product(mysqli $db_conn, int $productId
     }
     $cpStmt->close();
 
+    // Not restricted to the LLP godown — see
+    // get_auto_transfer_waiting_shop_count()'s comment. 2026-11-21.
+    $shopStmt = $db_conn->prepare(
+        "SELECT ui.inv_id, ui.inv_number, (uii.qty - uii.transferred_qty) AS qty, uii.transferred_qty AS already_transferred, s.name AS shop_name
+         FROM user_invoice_items uii
+         INNER JOIN user_invoice ui ON ui.inv_id = uii.inv_id
+         LEFT JOIN shop s ON s.temp_id = ui.to_user_id
+         WHERE ui.status = 'draft' AND ui.from_user_type = 'company'
+           AND ui.source_ms_order_id IS NOT NULL AND uii.pr_id = ?
+           AND uii.qty > uii.transferred_qty
+           AND NOT EXISTS (SELECT 1 FROM receipt r WHERE r.receiptid = ui.inv_id)
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today sk
+               WHERE sk.source_type = 'shop' AND sk.source_ref = CONCAT(ui.inv_id, ':', uii.pr_id) AND sk.skip_date = CURDATE() AND sk.reason = 'excluded'
+           )
+         ORDER BY ui.inv_id"
+    );
+    $shopStmt->bind_param('i', $productId);
+    $shopStmt->execute();
+    $res = $shopStmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $breakdown['shop'][] = [
+            'source_id'          => 'shop:' . $row['inv_id'] . ':' . $productId,
+            'label'              => (($row['shop_name'] ?: 'Shop')) . ' — Inv ' . $row['inv_number'],
+            'qty'                => (int) $row['qty'],
+            'already_transferred'=> (int) $row['already_transferred'],
+        ];
+    }
+    $shopStmt->close();
+
     $otStmt = $db_conn->prepare(
         "SELECT os.tempid, (os.qty - os.transferred_qty) AS qty, os.transferred_qty AS already_transferred, os.customer_name, osi.cat
          FROM ot_sales os
@@ -757,7 +1138,7 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     ensure_ot_sales_invoice_status_column($db_conn);
     ensure_tp_purchase_orders_preferred_cp_id_column($db_conn);
     ensure_auto_transfer_transferred_qty_columns($db_conn);
-    $overview = ['tp' => [], 'ot' => [], 'cp' => []];
+    $overview = ['tp' => [], 'ot' => [], 'cp' => [], 'shop' => []];
 
     // 'qty' is each line's REMAINING qty — see get_auto_transfer_requirements()'s
     // comment. Skip-matching is only against reason='excluded'.
@@ -839,6 +1220,52 @@ function get_auto_transfer_orders_overview(mysqli $db_conn, int $llpGodownId): a
     }
     $cpStmt->close();
     $overview['cp'] = array_values($cpByPo);
+
+    // Not restricted to the LLP godown — see
+    // get_auto_transfer_waiting_shop_count()'s comment. 2026-11-21.
+    $shopStmt = $db_conn->prepare(
+        "SELECT ui.inv_id, ui.inv_number, s.name AS shop_name,
+                uii.pr_id AS product_id, (uii.qty - uii.transferred_qty) AS qty, uii.transferred_qty AS already_transferred,
+                p.productName, p.category
+         FROM user_invoice_items uii
+         INNER JOIN user_invoice ui ON ui.inv_id = uii.inv_id
+         INNER JOIN products p ON p.id = uii.pr_id
+         LEFT JOIN shop s ON s.temp_id = ui.to_user_id
+         WHERE ui.status = 'draft' AND ui.from_user_type = 'company'
+           AND ui.source_ms_order_id IS NOT NULL
+           AND uii.qty > uii.transferred_qty
+           AND NOT EXISTS (SELECT 1 FROM receipt r WHERE r.receiptid = ui.inv_id)
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s2
+               WHERE s2.source_type = 'shop' AND s2.source_ref = CONCAT(ui.inv_id, ':', uii.pr_id) AND s2.skip_date = CURDATE() AND s2.reason = 'excluded'
+           )
+         ORDER BY ui.inv_id, uii.pr_id"
+    );
+    $shopStmt->execute();
+    $res = $shopStmt->get_result();
+    $shopByInv = [];
+    while ($row = $res->fetch_assoc()) {
+        $invId = $row['inv_id'];
+        if (!isset($shopByInv[$invId])) {
+            $shopByInv[$invId] = [
+                'order_key'  => $invId,
+                'label'      => (($row['shop_name'] ?: 'Shop')) . ' — Inv ' . $row['inv_number'],
+                // Shop Invoices have no single order-level product_type like
+                // a TP/CP PO does -- classified from its first line's own
+                // products.category, same convention OT drafts use below.
+                'order_type' => $row['category'] === 'diaper' ? 'diaper' : 'napkin',
+                'products'   => [],
+            ];
+        }
+        $shopByInv[$invId]['products'][] = [
+            'product_id'          => (int) $row['product_id'],
+            'product_name'        => $row['productName'],
+            'qty'                 => (int) $row['qty'],
+            'already_transferred' => (int) $row['already_transferred'],
+        ];
+    }
+    $shopStmt->close();
+    $overview['shop'] = array_values($shopByInv);
 
     $otStmt = $db_conn->prepare(
         "SELECT os.tempid, os.customer_name, osi.cat, os.prid AS product_id, (os.qty - os.transferred_qty) AS qty, os.transferred_qty AS already_transferred, p.productName, p.category
@@ -1012,6 +1439,82 @@ function get_auto_transfer_waiting_cp_count_by_type(mysqli $db_conn): array
     while ($row = $res->fetch_assoc()) {
         $type = $row['product_type'] === 'diaper' ? 'diaper' : 'napkin';
         $counts[$type] += (int) $row['n'];
+    }
+    $stmt->close();
+    return $counts;
+}
+
+/**
+ * Same as get_auto_transfer_waiting_po_count(), for draft Shop Invoices
+ * (company/ms-order-invoice-add.php's "no CP" path) — powers a "Total Shop
+ * Invoices" stat card alongside "Total PO" / "Total CP PO" (2026-11-13).
+ */
+function get_auto_transfer_waiting_shop_count(mysqli $db_conn): int
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
+    // NOT restricted to the LLP godown — company/ms-order-invoice-add.php's
+    // "no CP" path lets the user pick ANY allowed godown (its own $_POST
+    // ['godownid'] dropdown, validated via is_godown_allowed()), not just
+    // LLP, and the 2026-11-17 design note is explicit that EVERY DM Get
+    // Order Shop Invoice must show up in Auto Transfer before its stock
+    // moves, regardless of godown. Previously filtered to LLP only, which
+    // made release_shop_invoices_from_existing_stock() (itself correctly
+    // unrestricted) able to release an invoice this page's own button never
+    // even knew existed. 2026-11-21, code-review finding.
+    $stmt = $db_conn->prepare(
+        "SELECT COUNT(DISTINCT ui.inv_id) AS n
+         FROM user_invoice_items uii
+         INNER JOIN user_invoice ui ON ui.inv_id = uii.inv_id
+         WHERE ui.status = 'draft' AND ui.from_user_type = 'company'
+           AND ui.source_ms_order_id IS NOT NULL
+           AND uii.qty > uii.transferred_qty
+           AND NOT EXISTS (SELECT 1 FROM receipt r WHERE r.receiptid = ui.inv_id)
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'shop' AND s.source_ref = CONCAT(ui.inv_id, ':', uii.pr_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
+           )"
+    );
+    $stmt->execute();
+    $n = (int) ($stmt->get_result()->fetch_assoc()['n'] ?? 0);
+    $stmt->close();
+    return $n;
+}
+
+/**
+ * Same as get_auto_transfer_waiting_cp_count_by_type(), for draft Shop
+ * Invoices. Classified by the invoice's FIRST line's own products.category
+ * (a Shop Invoice has no single order-level product_type like a PO does —
+ * same convention get_auto_transfer_orders_overview() uses for this source).
+ * Returns ['napkin' => int, 'diaper' => int].
+ */
+function get_auto_transfer_waiting_shop_count_by_type(mysqli $db_conn): array
+{
+    ensure_auto_transfer_skip_table($db_conn);
+    ensure_auto_transfer_transferred_qty_columns($db_conn);
+    // See get_auto_transfer_waiting_shop_count()'s comment — not restricted
+    // to the LLP godown, same reasoning. 2026-11-21, code-review finding.
+    $stmt = $db_conn->prepare(
+        "SELECT ui.inv_id, MIN(p.category) AS category
+         FROM user_invoice_items uii
+         INNER JOIN user_invoice ui ON ui.inv_id = uii.inv_id
+         INNER JOIN products p ON p.id = uii.pr_id
+         WHERE ui.status = 'draft' AND ui.from_user_type = 'company'
+           AND ui.source_ms_order_id IS NOT NULL
+           AND uii.qty > uii.transferred_qty
+           AND NOT EXISTS (SELECT 1 FROM receipt r WHERE r.receiptid = ui.inv_id)
+           AND NOT EXISTS (
+               SELECT 1 FROM auto_transfer_skip_today s
+               WHERE s.source_type = 'shop' AND s.source_ref = CONCAT(ui.inv_id, ':', uii.pr_id) AND s.skip_date = CURDATE() AND s.reason = 'excluded'
+           )
+         GROUP BY ui.inv_id"
+    );
+    $stmt->execute();
+    $counts = ['napkin' => 0, 'diaper' => 0];
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $type = $row['category'] === 'diaper' ? 'diaper' : 'napkin';
+        $counts[$type]++;
     }
     $stmt->close();
     return $counts;

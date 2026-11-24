@@ -159,6 +159,17 @@ $tpList = [];
 $r = mysqli_query($db_conn, "SELECT id, name, branch_district FROM territory_partners WHERE is_active=1 ORDER BY name ASC");
 while ($t = mysqli_fetch_assoc($r)) $tpList[] = $t;
 
+// ── Active Channel Partners — for a Firka with no TP coverage (Vacant Area),
+// the DM picks a CP instead of a TP (2026-11-12, user request). Same district
+// free-text match convention as $tpList above. A CP with no delivery_district
+// falls back to branch_district, same COALESCE company/manage-cp-invoices.php
+// already uses for a CP's "district". The order itself is still handled and
+// invoiced by the company exactly as before (no TP/CP fulfillment pipeline
+// change) -- this is purely a record of which CP the order is attributed to.
+$cpList = [];
+$r = mysqli_query($db_conn, "SELECT id, name, COALESCE(NULLIF(delivery_district,''), branch_district) AS district FROM channel_partners WHERE is_active=1 ORDER BY name ASC");
+while ($c = mysqli_fetch_assoc($r)) $cpList[] = $c;
+
 // ── Which form to show ────────────────────────────────────────────────────────
 $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noorder12aedrftgop2we4mncl");
 ?>
@@ -324,10 +335,67 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <br/>
 
                                                     <label class="form-label">Marketing Tool*</label>
-                                                    <textarea name="marketing_tool" onkeypress="restrictSpecialChars(event)" class="form-control" required></textarea>
+                                                    <input type="hidden" name="marketing_tool" id="marketing_tool_value" value="">
+                                                    <div id="mtStatusToggle" style="display:flex;gap:10px;margin-bottom:10px;">
+                                                        <div class="mt-status-card" data-status="Available" onclick="setMtStatus('Available')" style="flex:1;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Available</div>
+                                                        <div class="mt-status-card" data-status="Not Available" onclick="setMtStatus('Not Available')" style="flex:1;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Not Available</div>
+                                                    </div>
+                                                    <style>
+                                                        .mt-status-card.selected { border-color:#4f6ef7 !important; background:#eef2ff; color:#4f46e5 !important; }
+                                                        #mtToolsBlock { display:none; border:1px solid #e5e7eb; border-radius:9px; padding:10px 14px; margin-bottom:10px; }
+                                                        #mtToolsBlock label { display:flex; align-items:center; gap:8px; font-weight:400; padding:5px 0; margin:0; cursor:pointer; }
+                                                        #mtToolsBlock input[type=checkbox] { width:16px; height:16px; }
+                                                        #mtToolsLabel { font-size:12px; color:#6b7280; font-weight:600; margin-bottom:4px; display:block; }
+                                                    </style>
+                                                    <div id="mtToolsBlock">
+                                                        <span id="mtToolsLabel">Which tools are at this shop?</span>
+                                                        <label style="border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:4px;font-weight:600;"><input type="checkbox" id="mtSelectAll" onchange="toggleMtSelectAll(this.checked)"> Select All</label>
+                                                        <?php $mtTools = ['Touch & Feel', 'Rack Sticker', 'Dangler', 'Medical Shop Backing Sheet - Femi9', 'Medical Shop Backing Sheet - Lumi9']; ?>
+                                                        <?php foreach ($mtTools as $mtIdx => $mtTool): ?>
+                                                        <label><input type="checkbox" class="mt-tool-check" value="<?=htmlspecialchars($mtTool)?>" onchange="updateMarketingToolValue()"><?=htmlspecialchars($mtTool)?></label>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                    <script>
+                                                        var mtCurrentStatus = '';
+                                                        function setMtStatus(status) {
+                                                            mtCurrentStatus = status;
+                                                            document.querySelectorAll('#mtStatusToggle .mt-status-card').forEach(function (c) {
+                                                                c.classList.toggle('selected', c.getAttribute('data-status') === status);
+                                                            });
+                                                            document.getElementById('mtToolsBlock').style.display = 'block';
+                                                            document.getElementById('mtToolsLabel').textContent = (status === 'Available')
+                                                                ? 'Which tools are at this shop?'
+                                                                : 'Which tools does this shop need?';
+                                                            // Switching Available <-> Not Available clears every tool
+                                                            // checkbox — the same tool list means two different things
+                                                            // depending on status, so a selection made under the old
+                                                            // status shouldn't silently carry over. 2026-11-30, user-requested.
+                                                            document.querySelectorAll('.mt-tool-check').forEach(function (c) { c.checked = false; });
+                                                            var selectAll = document.getElementById('mtSelectAll');
+                                                            if (selectAll) { selectAll.checked = false; }
+                                                            updateMarketingToolValue();
+                                                        }
+                                                        function toggleMtSelectAll(checked) {
+                                                            document.querySelectorAll('.mt-tool-check').forEach(function (c) { c.checked = checked; });
+                                                            updateMarketingToolValue();
+                                                        }
+                                                        function updateMarketingToolValue() {
+                                                            var all = document.querySelectorAll('.mt-tool-check');
+                                                            var checked = Array.prototype.slice.call(all).filter(function (c) { return c.checked; });
+                                                            var selectAll = document.getElementById('mtSelectAll');
+                                                            if (selectAll) { selectAll.checked = all.length > 0 && checked.length === all.length; }
+                                                            var val = mtCurrentStatus ? (mtCurrentStatus + ': ' + checked.map(function (c) { return c.value; }).join(', ')) : '';
+                                                            document.getElementById('marketing_tool_value').value = val;
+                                                        }
+                                                        function validateMarketingTool() {
+                                                            if (!mtCurrentStatus) { alert('Pick Available or Not Available for Marketing Tool.'); return false; }
+                                                            if (!document.querySelector('.mt-tool-check:checked')) { alert('Select at least one marketing tool.'); return false; }
+                                                            return true;
+                                                        }
+                                                    </script>
                                                     <br/>
 
-                                                    <button type="submit" name="add_order_no" onclick="return confirm('Please confirm');" class="btn btn-primary">
+                                                    <button type="submit" name="add_order_no" onclick="return validateMarketingTool() && confirm('Please confirm');" class="btn btn-primary">
                                                         <i class="material-icons">add</i> Add
                                                     </button>
 
@@ -337,7 +405,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
 
                                         <?php else: ?>
                                         <!-- ═══════════════ GET ORDER FORM ═══════════════ -->
-                                        <form action="order_action_get" method="post" enctype="multipart/form-data" id="uploadForm">
+                                        <form action="order_action_get" method="post" enctype="multipart/form-data" id="uploadForm" onsubmit="return validateMarketingTool();">
                                             <input type="hidden" name="ms_id"      value="<?=htmlspecialchars($markeingSTFID)?>">
                                             <input type="hidden" name="order_date" value="<?=htmlspecialchars($order_date)?>">
                                             <input type="hidden" name="order_id"   value="<?=htmlspecialchars($tempID)?>">
@@ -348,7 +416,7 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                 <div class="example-content">
 
                                                     <?php if (!$dmHasActiveTp): ?>
-                                                    <div style="margin-bottom:14px; font-size:12px; color:#374151; background:#f3f4f6; padding:8px 12px; border-radius:6px;">No active TP covers your assigned area — this order will be handled directly by the company.</div>
+                                                    <div style="margin-bottom:14px; font-size:12px; color:#374151; background:#f3f4f6; padding:8px 12px; border-radius:6px;">No active TP covers your assigned area — pick the Channel Partner handling it below, or "Company" if none.</div>
                                                     <?php endif; ?>
 
                                                     <label class="form-label">Category*</label>
@@ -447,7 +515,25 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                         </option>
                                                         <?php endforeach; ?>
                                                     </select>
-                                                    <div id="noTpHint" style="display:none; margin-top:4px; font-size:12px; color:#9a6b00;">No TP covers this area yet — this order will go to the company for review instead.</div>
+                                                    </div>
+
+                                                    <!-- Vacant Area (no TP covers this Firka) -- pick a Channel Partner
+                                                         instead of a TP. "Company" is always offered as a fallback, so
+                                                         there's never a dead end even if no CP matches the district text
+                                                         (2026-11-12, user request). Record-only: the order is still
+                                                         handled/invoiced by the company exactly as before. -->
+                                                    <div id="cpSelectBlock" style="<?=$dmHasActiveTp ? 'display:none;' : ''?>">
+                                                    <label class="form-label">No TP covers this area — Assign To CP</label>
+                                                    <select class="my-select form-control" name="assigned_cp_id" id="cp_select">
+                                                        <option value="" selected>Company</option>
+                                                        <?php foreach($cpList as $c): ?>
+                                                        <option value="<?=htmlspecialchars($c['id'])?>"
+                                                                data-district="<?=htmlspecialchars($c['district'])?>">
+                                                            <?=htmlspecialchars($c['name'])?>
+                                                        </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <div id="noTpHint" style="margin-top:4px; font-size:12px; color:#9a6b00;">No TP covers this area — pick the Channel Partner handling it, or "Company" if none.</div>
                                                     </div>
                                                     <br/>
 
@@ -456,7 +542,64 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     <br/>
 
                                                     <label class="form-label">Marketing Tool*</label>
-                                                    <textarea name="marketing_tool" onkeypress="restrictSpecialChars(event)" class="form-control" required></textarea>
+                                                    <input type="hidden" name="marketing_tool" id="marketing_tool_value" value="">
+                                                    <div id="mtStatusToggle" style="display:flex;gap:10px;margin-bottom:10px;">
+                                                        <div class="mt-status-card" data-status="Available" onclick="setMtStatus('Available')" style="flex:1;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Available</div>
+                                                        <div class="mt-status-card" data-status="Not Available" onclick="setMtStatus('Not Available')" style="flex:1;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Not Available</div>
+                                                    </div>
+                                                    <style>
+                                                        .mt-status-card.selected { border-color:#4f6ef7 !important; background:#eef2ff; color:#4f46e5 !important; }
+                                                        #mtToolsBlock { display:none; border:1px solid #e5e7eb; border-radius:9px; padding:10px 14px; margin-bottom:10px; }
+                                                        #mtToolsBlock label { display:flex; align-items:center; gap:8px; font-weight:400; padding:5px 0; margin:0; cursor:pointer; }
+                                                        #mtToolsBlock input[type=checkbox] { width:16px; height:16px; }
+                                                        #mtToolsLabel { font-size:12px; color:#6b7280; font-weight:600; margin-bottom:4px; display:block; }
+                                                    </style>
+                                                    <div id="mtToolsBlock">
+                                                        <span id="mtToolsLabel">Which tools are at this shop?</span>
+                                                        <label style="border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:4px;font-weight:600;"><input type="checkbox" id="mtSelectAll" onchange="toggleMtSelectAll(this.checked)"> Select All</label>
+                                                        <?php $mtTools = ['Touch & Feel', 'Rack Sticker', 'Dangler', 'Medical Shop Backing Sheet - Femi9', 'Medical Shop Backing Sheet - Lumi9']; ?>
+                                                        <?php foreach ($mtTools as $mtIdx => $mtTool): ?>
+                                                        <label><input type="checkbox" class="mt-tool-check" value="<?=htmlspecialchars($mtTool)?>" onchange="updateMarketingToolValue()"><?=htmlspecialchars($mtTool)?></label>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                    <script>
+                                                        var mtCurrentStatus = '';
+                                                        function setMtStatus(status) {
+                                                            mtCurrentStatus = status;
+                                                            document.querySelectorAll('#mtStatusToggle .mt-status-card').forEach(function (c) {
+                                                                c.classList.toggle('selected', c.getAttribute('data-status') === status);
+                                                            });
+                                                            document.getElementById('mtToolsBlock').style.display = 'block';
+                                                            document.getElementById('mtToolsLabel').textContent = (status === 'Available')
+                                                                ? 'Which tools are at this shop?'
+                                                                : 'Which tools does this shop need?';
+                                                            // Switching Available <-> Not Available clears every tool
+                                                            // checkbox — the same tool list means two different things
+                                                            // depending on status, so a selection made under the old
+                                                            // status shouldn't silently carry over. 2026-11-30, user-requested.
+                                                            document.querySelectorAll('.mt-tool-check').forEach(function (c) { c.checked = false; });
+                                                            var selectAll = document.getElementById('mtSelectAll');
+                                                            if (selectAll) { selectAll.checked = false; }
+                                                            updateMarketingToolValue();
+                                                        }
+                                                        function toggleMtSelectAll(checked) {
+                                                            document.querySelectorAll('.mt-tool-check').forEach(function (c) { c.checked = checked; });
+                                                            updateMarketingToolValue();
+                                                        }
+                                                        function updateMarketingToolValue() {
+                                                            var all = document.querySelectorAll('.mt-tool-check');
+                                                            var checked = Array.prototype.slice.call(all).filter(function (c) { return c.checked; });
+                                                            var selectAll = document.getElementById('mtSelectAll');
+                                                            if (selectAll) { selectAll.checked = all.length > 0 && checked.length === all.length; }
+                                                            var val = mtCurrentStatus ? (mtCurrentStatus + ': ' + checked.map(function (c) { return c.value; }).join(', ')) : '';
+                                                            document.getElementById('marketing_tool_value').value = val;
+                                                        }
+                                                        function validateMarketingTool() {
+                                                            if (!mtCurrentStatus) { alert('Pick Available or Not Available for Marketing Tool.'); return false; }
+                                                            if (!document.querySelector('.mt-tool-check:checked')) { alert('Select at least one marketing tool.'); return false; }
+                                                            return true;
+                                                        }
+                                                    </script>
                                                     <br/>
 
                                                     <p>
@@ -627,6 +770,11 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
 
     $(document).ready(function() {
         if (document.getElementById('shopTpMatchHint')) { initShopSelect2(); }
+        // Assign To CP — plain <select class="my-select"> with no select2 of
+        // its own was rendering as a tiny content-width pill instead of a
+        // full-width dropdown like Shop/Product, since nothing here ever
+        // sets its width. Matching the Shop select's own init, 2026-11-13.
+        if (document.getElementById('cp_select')) { $('#cp_select').select2({ width: '100%' }); }
         var tbl = document.getElementById('dataTable');
         if (tbl && tbl.rows.length > 1) {
             // Row 0 is just the header labels row (no real <select> in it since
@@ -782,7 +930,54 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
             if ($('#tp_select').next('.select2-container').css('pointer-events') === 'none') { return; }
             var opt = this.options[this.selectedIndex];
             rebuildTPs(opt ? opt.getAttribute('data-district') : '');
+            rebuildCPs(opt ? opt.getAttribute('data-district') : '');
         });
+    }
+
+    // ── Vacant Area (no TP covers the selected Firka): Assign To CP instead
+    // of a TP, same district free-text match as rebuildTPs above. "Company"
+    // is always kept as the first/default option regardless of match results
+    // -- never a dead end even if no CP's district text matches
+    // (2026-11-12, user request). ──
+    var allCPs = [];
+    document.querySelectorAll('#cp_select option[data-district]').forEach(function(opt) {
+        allCPs.push({
+            id:       opt.value,
+            text:     opt.textContent.trim(),
+            district: (opt.getAttribute('data-district') || '').trim().toLowerCase()
+        });
+    });
+
+    function rebuildCPs(district) {
+        var select = $('#cp_select');
+        if (!select.length) { return; }
+        var currentVal = select.val();
+        select.empty();
+        select.append('<option value="" selected>Company</option>');
+
+        var normDistrict = (district || '').trim().toLowerCase();
+        allCPs.forEach(function(c) {
+            if (!normDistrict || c.district === normDistrict) {
+                select.append($('<option>', { value: c.id, text: c.text }));
+            }
+        });
+
+        if (currentVal && select.find('option[value="' + currentVal + '"]').length) {
+            select.val(currentVal);
+        }
+        select.trigger('change.select2');
+    }
+
+    function showCpBlock() {
+        document.getElementById('tpSelectBlock').style.display = 'none';
+        document.getElementById('cpSelectBlock').style.display = '';
+    }
+    function hideCpBlock() {
+        var block = document.getElementById('cpSelectBlock');
+        if (block) { block.style.display = 'none'; }
+        if (<?php echo $dmHasActiveTp ? 'true' : 'false'; ?>) {
+            document.getElementById('tpSelectBlock').style.display = '';
+        }
     }
 
     function resetFirkaAndTp() {
@@ -898,7 +1093,30 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         var $tp = $('#tp_select');
         if (!$tp.length) { return; }
         var tp = firkaTpData[firkaId];
-        if (!tp) { unlockTpSelect(); return; }
+        if (!tp) {
+            // Vacant Area — no TP covers this Firka. Assign To CP instead of
+            // letting the DM manually pick a TP (2026-11-12, user request).
+            unlockTpSelect();
+            // unlockTpSelect() -> rebuildTPs('') deliberately restores
+            // whatever TP was selected before (so re-picking the same firka
+            // doesn't lose it) — but that means a TP chosen for an EARLIER,
+            // TP-covered firka silently survives in this hidden field even
+            // though the visible form now shows the CP/Company dropdown.
+            // order_action_get.php trusts $_POST['tp_id'] alone, so without
+            // this it still bridges the order to that stale TP (2026-11-20
+            // bug report: picked a TP-covered firka, switched to a vacant
+            // one, chose Company, but the order still showed "Pending with
+            // TP"). Clear it so an empty firka can never submit a TP id.
+            $tp.val('').trigger('change.select2');
+            showCpBlock();
+            var shopOpt = document.getElementById('shop_select').selectedOptions[0];
+            rebuildCPs(shopOpt ? shopOpt.getAttribute('data-district') : '');
+            return;
+        }
+        hideCpBlock();
+        // Symmetric case: a CP (or "Company") picked for an earlier vacant
+        // firka must not survive into this TP-covered one either.
+        $('#cp_select').val('').trigger('change.select2');
 
         // Auto-detect the TP covering this firka and lock the field — the DM
         // no longer picks a TP manually once a firka is chosen. The select

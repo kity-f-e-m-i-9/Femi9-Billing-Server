@@ -728,22 +728,24 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
                             <li><a href="ms_add">Add Marketing Staff</a></li>
                             <li><a href="ms_manage">Manage Marketing Staff</a></li>
-                            <li><a href="ms-daily-visit-report">MS Daily Visit Report</a></li>
                             <li>
                                 <a href="#">Manage Team<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                                 <ul class="sub-menu">
                                     <li><a href="manage-marketing-team-levels">Manage Team Levels</a></li>
                                     <li><a href="ms-team-view">Tree View</a></li>
                                     <li><a href="ms-team-shop-view">Shop View</a></li>
+                                    <li><a href="ms-location-assignment-report">Location Assignment Report</a></li>
                                 </ul>
                             </li>
-							<li><a href="ms_prorders">Product Orders Report</a></li>
-							<li><a href="ms_noorders">No Orders Report</a></li>
+							<?php // "No Orders Report" hidden from menu, 2026-11-12 (user request) -- still reachable by direct URL (used by the Sales BDM bridge + ms-order-invoice-add.php's redirects, so not hard-blocked), file kept on disk. "Product Orders Report" restored below as "DM Shop Invoices" (2026-11-13) -- it's the entry point for Invoice-ing a DM's CP/Company-assigned Get Order (ms-order-invoice-add.php). ?>
+							<li><a href="ms_prorders">DM Shop Invoices</a></li>
 							<li><a href="ms-shop-coverage-report">New Shop Coverage</a></li>
 							<li><a href="sm-asm-tp-monthly-sales-export">District TP Monthly Sales</a></li>
 							<li><a href="ms_expenses">Expenses Report</a></li>
 							<li><a href="manage-daily-assign-district-tps">Daily Assign District TPs</a></li>
 							<li><a href="daily-assign-report">Daily Assign Report</a></li>
+							<li><a href="work-start-requests">Work Start Requests</a></li>
+							<li><a href="ms-daily-visit-report">MS Daily Visit Report</a></li>
                         </ul>
                     </li>
 
@@ -1246,21 +1248,23 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
                         <ul class="sub-menu">
                             <li><a href="ms_add">Add Marketing Staff</a></li>
                             <li><a href="ms_manage">Manage Marketing Staff</a></li>
-                            <li><a href="ms-daily-visit-report">MS Daily Visit Report</a></li>
                             <li>
                                 <a href="#">Manage Team<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
                                 <ul class="sub-menu">
                                     <li><a href="manage-marketing-team-levels">Manage Team Levels</a></li>
                                     <li><a href="ms-team-view">Tree View</a></li>
                                     <li><a href="ms-team-shop-view">Shop View</a></li>
+                                    <li><a href="ms-location-assignment-report">Location Assignment Report</a></li>
                                 </ul>
                             </li>
-							<li><a href="ms_prorders">Product Orders Report</a></li>
-							<li><a href="ms_noorders">No Orders Report</a></li>
+							<?php // "No Orders Report" hidden from menu, 2026-11-12 (user request). "Product Orders Report" restored below as "DM Shop Invoices" (2026-11-13). ?>
+							<li><a href="ms_prorders">DM Shop Invoices</a></li>
 							<li><a href="ms-shop-coverage-report">New Shop Coverage</a></li>
 							<li><a href="sm-asm-tp-monthly-sales-export">District TP Monthly Sales</a></li>
 							<li><a href="manage-daily-assign-district-tps">Daily Assign District TPs</a></li>
 							<li><a href="daily-assign-report">Daily Assign Report</a></li>
+							<li><a href="work-start-requests">Work Start Requests</a></li>
+							<li><a href="ms-daily-visit-report">MS Daily Visit Report</a></li>
                         </ul>
                     </li>
 					<?php }?>

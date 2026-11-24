@@ -223,9 +223,14 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
         var $panel = $('#datFirkaDetail');
         $panel.html('<div class="dat-loading">Loading&hellip;</div>');
         $.getJSON('get-tp-assign-tp-for-firka.php?firka_id=' + firkaId + '&assign_date=' + $('#selAssignDate').val(), function (resp) {
-            var statusHtml = resp.assigned_tp_id
-                ? '<span class="dat-filled">' + escHtml(resp.assigned_tp_name) + '</span>'
-                : '<span class="dat-vacant">Vacant Area</span>';
+            var statusHtml;
+            if (resp.assigned_tp_id && resp.is_permanent) {
+                statusHtml = '<span class="dat-filled">' + escHtml(resp.assigned_tp_name) + '</span> <span style="color:#9ca3af;font-weight:400;">(permanent — no daily change recorded for today)</span>';
+            } else if (resp.assigned_tp_id) {
+                statusHtml = '<span class="dat-filled">' + escHtml(resp.assigned_tp_name) + '</span>';
+            } else {
+                statusHtml = '<span class="dat-vacant">Vacant Area</span>';
+            }
             var $html = $('<div class="dat-firka-panel"></div>');
             $html.append('<div style="margin-bottom:10px;font-weight:600;">' + escHtml(firkaName) + '</div>');
             $html.append('<div style="margin-bottom:10px;">Current: ' + statusHtml + '</div>');

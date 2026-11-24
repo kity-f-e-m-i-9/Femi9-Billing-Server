@@ -66,6 +66,8 @@ $waitingPoCount = get_auto_transfer_waiting_po_count($db_conn);
 $waitingPoCountByType = get_auto_transfer_waiting_po_count_by_type($db_conn);
 $waitingCpCount = get_auto_transfer_waiting_cp_count($db_conn);
 $waitingCpCountByType = get_auto_transfer_waiting_cp_count_by_type($db_conn);
+$waitingShopCount = get_auto_transfer_waiting_shop_count($db_conn);
+$waitingShopCountByType = get_auto_transfer_waiting_shop_count_by_type($db_conn);
 
 $rows = [];
 if (!empty($requirements)) {
@@ -121,6 +123,7 @@ if (!empty($requirements)) {
         $tpRequired      = (int) $required['tp'];
         $otRequired      = (int) $required['ot'];
         $cpRequired      = (int) ($required['cp'] ?? 0);
+        $shopRequired    = (int) ($required['shop'] ?? 0);
         $neksomoAvail    = $neksomoAvailByProduct[$pid] ?? 0;
         $healthcareAvail = $healthcareAvailByProduct[$pid] ?? 0;
         // Capped by Neksomo (leg 1 source) alone — Healthcare's own balance
@@ -128,20 +131,22 @@ if (!empty($requirements)) {
         // newly move today; adding it in was inflating the capped qty past
         // what Neksomo actually has to send.
         $available       = $neksomoAvail;
-        $split           = cap_auto_transfer_qty_by_source($tpRequired, $cpRequired, $otRequired, $available);
-        $cappedQty       = $split['tp'] + $split['cp'] + $split['ot'];
+        $split           = cap_auto_transfer_qty_by_source($tpRequired, $cpRequired, $otRequired, $available, $shopRequired);
+        $cappedQty       = $split['tp'] + $split['cp'] + $split['shop'] + $split['ot'];
 
         $rows[] = [
             'product_id'      => $pid,
             'product_name'    => $productNames[$pid] ?? "Product #$pid",
-            'required'        => $tpRequired + $otRequired + $cpRequired,
+            'required'        => $tpRequired + $otRequired + $cpRequired + $shopRequired,
             'required_tp'     => $tpRequired,
             'required_ot'     => $otRequired,
             'required_cp'     => $cpRequired,
+            'required_shop'   => $shopRequired,
             'capped'          => $cappedQty,
             'capped_tp'       => $split['tp'],
             'capped_ot'       => $split['ot'],
             'capped_cp'       => $split['cp'],
+            'capped_shop'     => $split['shop'],
             'neksomo_avail'   => $neksomoAvail,
             'healthcare_avail'=> $healthcareAvail,
             'rate_healthcare' => $defaultRates[$pid]['healthcare'] ?? null,
@@ -435,6 +440,29 @@ foreach ($rows as $r) {
                                             </div>
                                         </div>
                                         <?php endif; ?>
+                                        <?php if ($waitingShopCount > 0): ?>
+                                        <div class="ata-stat ata-stat-hoverable" tabindex="0">
+                                            <div class="num"><?php echo $waitingShopCount; ?></div>
+                                            <div class="lbl">Total Shop Invoices</div>
+                                            <div class="ata-stat-tooltip">
+                                                <div class="ata-stat-tooltip-summary">
+                                                    <span class="ata-stat-chip ata-stat-chip-napkin">Napkin: <b><?php echo (int) $waitingShopCountByType['napkin']; ?></b> Invoice(s)</span>
+                                                    <span class="ata-stat-chip ata-stat-chip-diaper">Lumi Diaper: <b><?php echo (int) $waitingShopCountByType['diaper']; ?></b> Invoice(s)</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- Deliberately separate from "Transfer Now" below (which only
+                                             replenishes TP/CP/OT into LLP) -- Shop Invoices (DM Get Orders)
+                                             only ever release their stock when this is explicitly clicked,
+                                             never automatically. Releases straight from each invoice's own
+                                             warehouse's CURRENT stock (whatever it has right now), not tied
+                                             to this page's TP/CP/OT replenishment math. 2026-11-17, user request. -->
+                                        <form method="post" action="release-shop-invoice-stock-action.php" style="display:inline-block;align-self:center;margin-left:8px;" onsubmit="return confirm('Release stock for every Shop Invoice whose own warehouse currently has enough? Invoices still short on stock are left untouched.');">
+                                            <button type="submit" class="btn" style="background:#9a3412;color:#fff;">
+                                                <i class="material-icons" style="font-size:16px;vertical-align:middle;">local_shipping</i> Release Shop Invoice Stock
+                                            </button>
+                                        </form>
+                                        <?php endif; ?>
                                         <div class="ata-stat ata-stat-hoverable" tabindex="0">
                                             <div class="num"><?php echo $totalProducts; ?></div>
                                             <div class="lbl">Products</div>
@@ -535,6 +563,9 @@ foreach ($rows as $r) {
                                                                 <?php if ((int) $row['required_cp'] > 0): ?>
                                                                 <span class="ata-tag ata-tag-tp" style="background:#ecfdf5;color:#065f46;" title="CP purchase order demand, capped by available stock"><span class="ata-tag-dot"></span>CP <b id="capped_cp_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['capped_cp']; ?></b>/<?php echo (int) $row['required_cp']; ?></span>
                                                                 <?php endif; ?>
+                                                                <?php if ((int) $row['required_shop'] > 0): ?>
+                                                                <span class="ata-tag ata-tag-tp" style="background:#fff7ed;color:#9a3412;" title="Shop Invoice demand, capped by available stock"><span class="ata-tag-dot"></span>Shop <b id="capped_shop_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['capped_shop']; ?></b>/<?php echo (int) $row['required_shop']; ?></span>
+                                                                <?php endif; ?>
                                                                 <span class="ata-tag ata-tag-ot" title="OT channel draft demand, capped by available stock"><span class="ata-tag-dot"></span>OT <b id="capped_ot_<?php echo (int) $row['product_id']; ?>"><?php echo (int) $row['capped_ot']; ?></b>/<?php echo (int) $row['required_ot']; ?></span>
                                                                 <span id="req_<?php echo (int) $row['product_id']; ?>" style="display:none;"><?php echo (int) $row['required']; ?></span>
                                                             </div>
@@ -547,7 +578,7 @@ foreach ($rows as $r) {
                                                     <div class="ata-route-row">
                                                         <div class="ata-route-field">
                                                             <label>Source</label>
-                                                            <select class="form-control ata-source-warehouse" name="warehouse_source[]" data-product-id="<?php echo (int) $row['product_id']; ?>" data-required-tp="<?php echo (int) $row['required_tp']; ?>" data-required-ot="<?php echo (int) $row['required_ot']; ?>" data-required-cp="<?php echo (int) $row['required_cp']; ?>">
+                                                            <select class="form-control ata-source-warehouse" name="warehouse_source[]" data-product-id="<?php echo (int) $row['product_id']; ?>" data-required-tp="<?php echo (int) $row['required_tp']; ?>" data-required-ot="<?php echo (int) $row['required_ot']; ?>" data-required-cp="<?php echo (int) $row['required_cp']; ?>" data-required-shop="<?php echo (int) $row['required_shop']; ?>">
                                                                 <option value="">—</option>
                                                                 <?php foreach ($sourceWarehouseOptions as $wh): ?>
                                                                 <option value="<?php echo (int) $wh['id']; ?>" <?php echo ((int) $wh['id'] === $defaultSourceWarehouseId) ? 'selected' : ''; ?>><?php echo htmlspecialchars($wh['code'], ENT_QUOTES, 'UTF-8'); ?></option>
@@ -642,6 +673,7 @@ foreach ($rows as $r) {
                 <ul class="nav nav-tabs ata-nav-tabs" role="tablist">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#bdTpPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-tp-1);margin-right:6px;"></span>TP Purchase Orders</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#bdCpPane" type="button"><span class="ata-tag-dot" style="background:#059669;margin-right:6px;"></span>CP Purchase Orders</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#bdShopPane" type="button"><span class="ata-tag-dot" style="background:#9a3412;margin-right:6px;"></span>Shop Invoices</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#bdOtPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-ot-1);margin-right:6px;"></span>OT Channel Orders</button></li>
                 </ul>
                 <div class="ata-bulk-row">
@@ -652,6 +684,7 @@ foreach ($rows as $r) {
                 <div class="tab-content" style="padding-top:10px;">
                     <div class="tab-pane fade show active" id="bdTpPane"><div id="bdTpList"></div></div>
                     <div class="tab-pane fade" id="bdCpPane"><div id="bdCpList"></div></div>
+                    <div class="tab-pane fade" id="bdShopPane"><div id="bdShopList"></div></div>
                     <div class="tab-pane fade" id="bdOtPane"><div id="bdOtList"></div></div>
                 </div>
             </div>
@@ -690,6 +723,7 @@ foreach ($rows as $r) {
                 <ul class="nav nav-tabs ata-nav-tabs" role="tablist">
                     <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ovTpPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-tp-1);margin-right:6px;"></span>TP Purchase Orders</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovCpPane" type="button"><span class="ata-tag-dot" style="background:#059669;margin-right:6px;"></span>CP Purchase Orders</button></li>
+                    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovShopPane" type="button"><span class="ata-tag-dot" style="background:#9a3412;margin-right:6px;"></span>Shop Invoices</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovOtPane" type="button"><span class="ata-tag-dot" style="background:var(--ata-ot-1);margin-right:6px;"></span>OT Channel Orders</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovExcludedPane" type="button" onclick="loadExcludedAndDeletedToday()">Already Transferred Today</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ovDeletedPane" type="button" onclick="loadExcludedAndDeletedToday()">Deleted</button></li>
@@ -711,6 +745,7 @@ foreach ($rows as $r) {
                 <div class="tab-content" style="padding-top:10px;">
                     <div class="tab-pane fade show active" id="ovTpPane"><div id="ovTpList"></div></div>
                     <div class="tab-pane fade" id="ovCpPane"><div id="ovCpList"></div></div>
+                    <div class="tab-pane fade" id="ovShopPane"><div id="ovShopList"></div></div>
                     <div class="tab-pane fade" id="ovOtPane"><div id="ovOtList"></div></div>
                     <div class="tab-pane fade" id="ovExcludedPane">
                         <p class="text-muted small">
@@ -825,14 +860,16 @@ foreach ($rows as $r) {
     }
 
     // Mirrors AutoTransferDemand.php's cap_auto_transfer_qty_by_source():
-    // TP demand is capped/prioritized first, then CP, then OT gets
-    // whatever's left.
-    function capQtyBySource(tpRequired, cpRequired, otRequired, available) {
+    // TP demand is capped/prioritized first, then CP, then Shop Invoice,
+    // then OT gets whatever's left.
+    function capQtyBySource(tpRequired, cpRequired, otRequired, available, shopRequired) {
+        shopRequired = shopRequired || 0;
         available = Math.max(0, available);
         var tpCapped = Math.max(0, Math.min(tpRequired, available));
         var cpCapped = Math.max(0, Math.min(cpRequired, available - tpCapped));
-        var otCapped = Math.max(0, Math.min(otRequired, available - tpCapped - cpCapped));
-        return { tp: tpCapped, cp: cpCapped, ot: otCapped };
+        var shopCapped = Math.max(0, Math.min(shopRequired, available - tpCapped - cpCapped));
+        var otCapped = Math.max(0, Math.min(otRequired, available - tpCapped - cpCapped - shopCapped));
+        return { tp: tpCapped, cp: cpCapped, shop: shopCapped, ot: otCapped };
     }
 
     // Recomputes one row's Neksomo/Healthcare availability + capped
@@ -851,10 +888,10 @@ foreach ($rows as $r) {
     // refreshRowAvailability() silently wiped out an exclusion the moment
     // the Source warehouse picker changed afterward (qty_<pid> reset back
     // to the full unfiltered requirement).
-    function effectiveRequiredForProduct(productId, rawRequiredTp, rawRequiredOt, rawRequiredCp) {
+    function effectiveRequiredForProduct(productId, rawRequiredTp, rawRequiredOt, rawRequiredCp, rawRequiredShop) {
         var suffix = ':' + productId;
         var touched = false;
-        var tp = 0, ot = 0, cp = 0;
+        var tp = 0, ot = 0, cp = 0, shop = 0;
         Object.keys(lineState).forEach(function (sourceId) {
             if (sourceId.slice(-suffix.length) !== suffix) return;
             touched = true;
@@ -862,9 +899,10 @@ foreach ($rows as $r) {
             if (!line.checked) return;
             if (sourceId.indexOf('tp:') === 0) { tp += line.qty; }
             else if (sourceId.indexOf('cp:') === 0) { cp += line.qty; }
+            else if (sourceId.indexOf('shop:') === 0) { shop += line.qty; }
             else { ot += line.qty; }
         });
-        return touched ? { tp: tp, ot: ot, cp: cp } : { tp: rawRequiredTp, ot: rawRequiredOt, cp: rawRequiredCp };
+        return touched ? { tp: tp, ot: ot, cp: cp, shop: shop } : { tp: rawRequiredTp, ot: rawRequiredOt, cp: rawRequiredCp, shop: rawRequiredShop || 0 };
     }
 
     function refreshRowAvailability(rowEl) {
@@ -874,10 +912,12 @@ foreach ($rows as $r) {
         var rawRequiredTp = parseInt(sourceSelect.getAttribute('data-required-tp'), 10) || 0;
         var rawRequiredOt = parseInt(sourceSelect.getAttribute('data-required-ot'), 10) || 0;
         var rawRequiredCp = parseInt(sourceSelect.getAttribute('data-required-cp'), 10) || 0;
-        var effectiveRequired = effectiveRequiredForProduct(productId, rawRequiredTp, rawRequiredOt, rawRequiredCp);
+        var rawRequiredShop = parseInt(sourceSelect.getAttribute('data-required-shop'), 10) || 0;
+        var effectiveRequired = effectiveRequiredForProduct(productId, rawRequiredTp, rawRequiredOt, rawRequiredCp, rawRequiredShop);
         var requiredTp = effectiveRequired.tp;
         var requiredOt = effectiveRequired.ot;
         var requiredCp = effectiveRequired.cp;
+        var requiredShop = effectiveRequired.shop;
         var sourceWarehouseId = sourceSelect.value;
         var intermediateWarehouseId = intermediateSelect.value;
 
@@ -904,15 +944,17 @@ foreach ($rows as $r) {
                 // PHP-side comment above; Healthcare's own balance no longer
                 // inflates how much leg 1 can newly move.
                 var available = neksomoAvail;
-                var split = capQtyBySource(requiredTp, requiredCp, requiredOt, available);
-                var cappedTotal = split.tp + split.cp + split.ot;
+                var split = capQtyBySource(requiredTp, requiredCp, requiredOt, available, requiredShop);
+                var cappedTotal = split.tp + split.cp + split.shop + split.ot;
 
                 var cappedTpEl = document.getElementById('capped_tp_' + productId);
                 var cappedOtEl = document.getElementById('capped_ot_' + productId);
                 var cappedCpEl = document.getElementById('capped_cp_' + productId);
+                var cappedShopEl = document.getElementById('capped_shop_' + productId);
                 if (cappedTpEl) cappedTpEl.textContent = split.tp;
                 if (cappedOtEl) cappedOtEl.textContent = split.ot;
                 if (cappedCpEl) cappedCpEl.textContent = split.cp;
+                if (cappedShopEl) cappedShopEl.textContent = split.shop;
 
                 var qtyInput = document.getElementById('qty_' + productId);
                 if (qtyInput) qtyInput.value = cappedTotal;
@@ -1091,9 +1133,10 @@ foreach ($rows as $r) {
     // above/below), the visible bold total (#req_<pid>_num), and the
     // TP/OT tag pair's own "x/y" counts — all three must move together
     // whenever a breakdown/overview Apply changes what's checked.
-    function updateRequiredDisplay(pid, tpCapped, otCapped, cpCapped) {
+    function updateRequiredDisplay(pid, tpCapped, otCapped, cpCapped, shopCapped) {
         cpCapped = cpCapped || 0;
-        var total = tpCapped + otCapped + cpCapped;
+        shopCapped = shopCapped || 0;
+        var total = tpCapped + otCapped + cpCapped + shopCapped;
         var hidden = document.getElementById('req_' + pid);
         if (hidden) hidden.textContent = total;
         var num = document.getElementById('req_' + pid + '_num');
@@ -1103,6 +1146,7 @@ foreach ($rows as $r) {
             var tpTag = rowEl.querySelector('.ata-tag-tp');
             var otTag = rowEl.querySelector('.ata-tag-ot');
             var cpTag = rowEl.querySelector('#capped_cp_' + pid);
+            var shopTag = rowEl.querySelector('#capped_shop_' + pid);
             if (tpTag) {
                 var tpMax = (tpTag.textContent.split('/')[1] || '').trim();
                 tpTag.innerHTML = '<span class="ata-tag-dot"></span>TP ' + tpCapped + '/' + tpMax;
@@ -1112,6 +1156,7 @@ foreach ($rows as $r) {
                 otTag.innerHTML = '<span class="ata-tag-dot"></span>OT ' + otCapped + '/' + otMax;
             }
             if (cpTag) { cpTag.textContent = cpCapped; }
+            if (shopTag) { shopTag.textContent = shopCapped; }
         }
     }
 
@@ -1120,7 +1165,7 @@ foreach ($rows as $r) {
     // shared by the plain "Apply" button.
     function recomputeCurrentRowFromCheckboxes() {
         if (currentBreakdownPid === null) return;
-        var tpTotal = 0, otTotal = 0, cpTotal = 0;
+        var tpTotal = 0, otTotal = 0, cpTotal = 0, shopTotal = 0;
         document.querySelectorAll('.bd-check:checked').forEach(function (chk) {
             var sourceId = chk.getAttribute('data-source-id');
             var qtyInput = document.querySelector('.bd-qty-input[data-source-id="' + sourceId.replace(/"/g, '') + '"]');
@@ -1129,10 +1174,12 @@ foreach ($rows as $r) {
             if (isNaN(val) || val < 0) val = 0;
             if (val > maxQty) val = maxQty; // never more than that order actually needs
             if (qtyInput) qtyInput.value = val;
-            // source_id is "tp:..." / "cp:..." / "ot:..." — classify by that
-            // prefix so this stays consistent with the server-side TP/CP/OT cap.
+            // source_id is "tp:..." / "cp:..." / "shop:..." / "ot:..." —
+            // classify by that prefix so this stays consistent with the
+            // server-side TP/CP/Shop/OT cap.
             if (sourceId.indexOf('tp:') === 0) { tpTotal += val; }
             else if (sourceId.indexOf('cp:') === 0) { cpTotal += val; }
+            else if (sourceId.indexOf('shop:') === 0) { shopTotal += val; }
             else { otTotal += val; }
         });
         var pid = currentBreakdownPid;
@@ -1140,10 +1187,10 @@ foreach ($rows as $r) {
         // Capped by Neksomo (leg 1 source) alone — see refreshRowAvailability().
         var available = currentNeksomoAvail;
         if (available < 0) available = 0;
-        var split = capQtyBySource(tpTotal, cpTotal, otTotal, available);
-        updateRequiredDisplay(pid, split.tp, split.ot, split.cp);
+        var split = capQtyBySource(tpTotal, cpTotal, otTotal, available, shopTotal);
+        updateRequiredDisplay(pid, split.tp, split.ot, split.cp, split.shop);
         var qtyEl = document.getElementById('qty_' + pid);
-        var totalCapped = split.tp + split.cp + split.ot;
+        var totalCapped = split.tp + split.cp + split.shop + split.ot;
         if (qtyEl) qtyEl.value = totalCapped;
         var rowEl = qtyEl ? qtyEl.closest('.auto-transfer-row') : null;
         if (rowEl) rowEl.style.display = totalCapped > 0 ? '' : 'none';
@@ -1157,16 +1204,19 @@ foreach ($rows as $r) {
         var loading = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
         document.getElementById('bdTpList').innerHTML = loading;
         document.getElementById('bdCpList').innerHTML = loading;
+        document.getElementById('bdShopList').innerHTML = loading;
         document.getElementById('bdOtList').innerHTML = loading;
 
         $.getJSON('get-auto-transfer-breakdown.php', { product_id: pid }, function (data) {
             renderBreakdownTab('bdTpList', data.tp, 'No Territory Partner orders for this product today.');
             renderBreakdownTab('bdCpList', data.cp, 'No Channel Partner orders for this product today.');
+            renderBreakdownTab('bdShopList', data.shop, 'No Shop Invoices for this product today.');
             renderBreakdownTab('bdOtList', data.ot, 'No OT channel draft orders for this product today.');
         }).fail(function () {
             var failMsg = '<div class="text-danger small" style="padding:10px 4px;">Could not load breakdown.</div>';
             document.getElementById('bdTpList').innerHTML = failMsg;
             document.getElementById('bdCpList').innerHTML = failMsg;
+            document.getElementById('bdShopList').innerHTML = failMsg;
             document.getElementById('bdOtList').innerHTML = failMsg;
         });
 
@@ -1200,7 +1250,7 @@ foreach ($rows as $r) {
             el.innerHTML = '<div class="text-muted small" style="padding:10px 4px;">' + emptyMsg + '</div>';
             return;
         }
-        var sourceType = containerId === 'ovTpList' ? 'tp' : (containerId === 'ovCpList' ? 'cp' : 'ot');
+        var sourceType = containerId === 'ovTpList' ? 'tp' : (containerId === 'ovCpList' ? 'cp' : (containerId === 'ovShopList' ? 'shop' : 'ot'));
         var html = '';
         orders.forEach(function (order) {
             var productsHtml = order.products.map(function (p) {
@@ -1364,6 +1414,7 @@ foreach ($rows as $r) {
         var tpTotalsByProduct = {};
         var otTotalsByProduct = {};
         var cpTotalsByProduct = {};
+        var shopTotalsByProduct = {};
         var seenProductIds = {};
 
         function accumulate(sourceType, orders) {
@@ -1384,6 +1435,8 @@ foreach ($rows as $r) {
                         tpTotalsByProduct[pid] = (tpTotalsByProduct[pid] || 0) + qty;
                     } else if (sourceType === 'cp') {
                         cpTotalsByProduct[pid] = (cpTotalsByProduct[pid] || 0) + qty;
+                    } else if (sourceType === 'shop') {
+                        shopTotalsByProduct[pid] = (shopTotalsByProduct[pid] || 0) + qty;
                     } else {
                         otTotalsByProduct[pid] = (otTotalsByProduct[pid] || 0) + qty;
                     }
@@ -1392,6 +1445,7 @@ foreach ($rows as $r) {
         }
         accumulate('tp', ovLastData.tp);
         accumulate('cp', ovLastData.cp);
+        accumulate('shop', ovLastData.shop);
         accumulate('ot', ovLastData.ot);
 
         document.querySelectorAll('.auto-transfer-row').forEach(function (row) {
@@ -1400,14 +1454,15 @@ foreach ($rows as $r) {
             var tpTotal = tpTotalsByProduct[pid] || 0;
             var otTotal = otTotalsByProduct[pid] || 0;
             var cpTotal = cpTotalsByProduct[pid] || 0;
+            var shopTotal = shopTotalsByProduct[pid] || 0;
             var neksomoAvail = parseInt(row.getAttribute('data-neksomo-avail'), 10) || 0;
             // Capped by Neksomo (leg 1 source) alone — see refreshRowAvailability().
             var available = neksomoAvail;
             if (available < 0) available = 0;
-            var split = capQtyBySource(tpTotal, cpTotal, otTotal, available);
-            updateRequiredDisplay(pid, split.tp, split.ot, split.cp);
+            var split = capQtyBySource(tpTotal, cpTotal, otTotal, available, shopTotal);
+            updateRequiredDisplay(pid, split.tp, split.ot, split.cp, split.shop);
             var qtyEl = document.getElementById('qty_' + pid);
-            var totalCapped = split.tp + split.cp + split.ot;
+            var totalCapped = split.tp + split.cp + split.shop + split.ot;
             if (qtyEl) qtyEl.value = totalCapped;
             row.style.display = totalCapped > 0 ? '' : 'none';
         });
@@ -1420,7 +1475,7 @@ foreach ($rows as $r) {
     // Last-fetched TP/OT/CP overview data, cached so the Napkin/Lumi Diaper
     // filter (ovSetTypeFilter) can re-render instantly client-side instead
     // of refetching from the server every time it's toggled.
-    var ovLastData = { tp: [], ot: [], cp: [] };
+    var ovLastData = { tp: [], ot: [], cp: [], shop: [] };
     // 'all' | 'napkin' | 'diaper' — which order_type ovRenderOrderList()
     // keeps. Resets to 'all' on every fresh openOrdersOverview() open, same
     // as lineState/reAddedGroupKeys resetting on page reload.
@@ -1433,18 +1488,21 @@ foreach ($rows as $r) {
         var loading = '<div class="text-muted small" style="padding:10px 4px;">Loading&hellip;</div>';
         document.getElementById('ovTpList').innerHTML = loading;
         document.getElementById('ovCpList').innerHTML = loading;
+        document.getElementById('ovShopList').innerHTML = loading;
         document.getElementById('ovOtList').innerHTML = loading;
 
         return $.getJSON('get-auto-transfer-orders-overview.php', {}, function (data) {
             ovLastData = data;
             ovRenderOrderList('ovTpList', data.tp, 'No Territory Partner orders contributing today.');
             ovRenderOrderList('ovCpList', data.cp, 'No Channel Partner orders contributing today.');
+            ovRenderOrderList('ovShopList', data.shop, 'No Shop Invoices contributing today.');
             ovRenderOrderList('ovOtList', data.ot, 'No OT channel draft orders contributing today.');
             ovUpdateTypeCounts();
         }).fail(function () {
             var failMsg = '<div class="text-danger small" style="padding:10px 4px;">Could not load orders.</div>';
             document.getElementById('ovTpList').innerHTML = failMsg;
             document.getElementById('ovCpList').innerHTML = failMsg;
+            document.getElementById('ovShopList').innerHTML = failMsg;
             document.getElementById('ovOtList').innerHTML = failMsg;
         });
     }
@@ -1459,6 +1517,7 @@ foreach ($rows as $r) {
         btn.classList.add('active');
         ovRenderOrderList('ovTpList', ovLastData.tp, 'No Territory Partner orders contributing today.');
         ovRenderOrderList('ovCpList', ovLastData.cp, 'No Channel Partner orders contributing today.');
+        ovRenderOrderList('ovShopList', ovLastData.shop, 'No Shop Invoices contributing today.');
         ovRenderOrderList('ovOtList', ovLastData.ot, 'No OT channel draft orders contributing today.');
         if (ovExcludedLastData) {
             renderTransferredToday(ovExcludedLastData);
@@ -1514,13 +1573,15 @@ foreach ($rows as $r) {
             counts = ovCountOrdersByType(ovLastData.tp);
         } else if (activePane.id === 'ovCpPane') {
             counts = ovCountOrdersByType(ovLastData.cp);
+        } else if (activePane.id === 'ovShopPane') {
+            counts = ovCountOrdersByType(ovLastData.shop);
         } else if (activePane.id === 'ovOtPane') {
             counts = ovCountOrdersByType(ovLastData.ot);
         } else if (activePane.id === 'ovExcludedPane') {
-            var items = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.cp || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason !== 'excluded'; }) : [];
+            var items = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.cp || []).concat(ovExcludedLastData.shop || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason !== 'excluded'; }) : [];
             counts = ovCountGroupsByType(items);
         } else if (activePane.id === 'ovDeletedPane') {
-            var delItems = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.cp || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason === 'excluded'; }) : [];
+            var delItems = ovExcludedLastData ? (ovExcludedLastData.tp || []).concat(ovExcludedLastData.cp || []).concat(ovExcludedLastData.shop || []).concat(ovExcludedLastData.ot || []).filter(function (item) { return item.reason === 'excluded'; }) : [];
             counts = ovCountGroupsByType(delItems);
         }
         document.getElementById('ovCountAll').textContent = counts.all;
@@ -1668,7 +1729,7 @@ foreach ($rows as $r) {
 
     function renderTransferredToday(data) {
         var el = document.getElementById('ovExcludedList');
-        var items = (data.tp || []).concat(data.cp || []).concat(data.ot || []).filter(function (item) {
+        var items = (data.tp || []).concat(data.cp || []).concat(data.shop || []).concat(data.ot || []).filter(function (item) {
             return item.reason !== 'excluded' && (ovTypeFilter === 'all' || item.order_type === ovTypeFilter);
         });
         if (!items.length) {
@@ -1688,7 +1749,7 @@ foreach ($rows as $r) {
 
     function renderDeletedToday(data) {
         var el = document.getElementById('ovDeletedList');
-        var items = (data.tp || []).concat(data.cp || []).concat(data.ot || []).filter(function (item) {
+        var items = (data.tp || []).concat(data.cp || []).concat(data.shop || []).concat(data.ot || []).filter(function (item) {
             return item.reason === 'excluded' && (ovTypeFilter === 'all' || item.order_type === ovTypeFilter);
         });
         if (!items.length) {

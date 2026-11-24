@@ -1,5 +1,20 @@
 <?php require_once __DIR__ . '/../shared/db-helpers.php'; include("checksession.php"); error_reporting(0);
-require_once("include/PermissionCheck.php"); requirePermission('ms');?>
+require_once("include/PermissionCheck.php"); requirePermission('ms');
+
+// Single source of truth for the 3-state Pending / In Progress / Completed
+// rule used by the summary cards, the row badge, and (as a SQL mirror —
+// can't share PHP code with a WHERE clause) the status filter further down.
+// Previously re-derived independently in all three places; keeping this one
+// function is what the summary cards and the row badge now both call, so a
+// future rule change only needs to happen here for those two. 2026-11-21,
+// code-review finding (the SQL filter at $whereExtra below must still be
+// kept in sync by hand — flagged there with a comment pointing back here).
+function msProrderStatus(bool $hasInvoice, bool $isCpFulfilled, bool $hasReceipt): string {
+    if (!$hasInvoice) { return 'pending'; }
+    if ($isCpFulfilled || $hasReceipt) { return 'completed'; }
+    return 'in_progress';
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -86,12 +101,41 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
             <div class="app-content">
                 <div class="content-wrapper">
                     <div class="container-fluid">
-                        <?php if (isset($_SESSION['successMessage'])): ?>
-                        <div class="row"><div class="col"><div class="alert alert-success"><?=htmlspecialchars($_SESSION['successMessage']); unset($_SESSION['successMessage']);?></div></div></div>
+                        <?php if (isset($_SESSION['successMessage'])): $msSuccessMsg = $_SESSION['successMessage']; unset($_SESSION['successMessage']); ?>
+                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.1/dist/sweetalert2.min.css">
+                        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.1"></script>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            Swal.fire({
+                                title: 'Success',
+                                html: '<div style="font-size:16px;color:#374151;"><?=addslashes(htmlspecialchars($msSuccessMsg))?></div>',
+                                icon: 'success',
+                                confirmButtonText: 'OK',
+                                confirmButtonColor: '#16a34a',
+                                customClass: { popup: 'ms-notify-popup' }
+                            });
+                        });
+                        </script>
                         <?php endif; ?>
-                        <?php if (isset($_SESSION['errorMessage'])): ?>
-                        <div class="row"><div class="col"><div class="alert alert-danger"><?=htmlspecialchars($_SESSION['errorMessage']); unset($_SESSION['errorMessage']);?></div></div></div>
+                        <?php if (isset($_SESSION['errorMessage'])): $msErrorMsg = $_SESSION['errorMessage']; unset($_SESSION['errorMessage']); ?>
+                        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.1/dist/sweetalert2.min.css">
+                        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.1"></script>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            Swal.fire({
+                                title: 'Error',
+                                html: '<div style="font-size:16px;color:#374151;"><?=addslashes(htmlspecialchars($msErrorMsg))?></div>',
+                                icon: 'error',
+                                confirmButtonText: 'OK',
+                                confirmButtonColor: '#dc2626',
+                                customClass: { popup: 'ms-notify-popup' }
+                            });
+                        });
+                        </script>
                         <?php endif; ?>
+                        <style>
+                        .ms-notify-popup { border-radius: 20px !important; padding: 28px !important; }
+                        </style>
                         <div class="row">
                             <div class="col">
                                 <div class="page-description">
@@ -141,6 +185,12 @@ require_once("include/PermissionCheck.php"); requirePermission('ms');?>
 						// or not, and that TP's invoice status — instead of just the ones still
 						// needing company follow-up (the default/"Orders" link's tp_id IS NULL view).
 						$showAllOrders = (($_REQUEST['view'] ?? '') === 'all');
+						// Status filter -- "Completed" = already invoiced (a user_invoice row
+						// exists for this order), "Pending" = not yet. Same binary signal the
+						// Invoice column's own "Invoice"/"View Invoice" button already shows
+						// per row, just surfaced as its own filterable column/dropdown too.
+						$filterStatus = $_REQUEST['status'] ?? 'all';
+						if (!in_array($filterStatus, ['all', 'completed', 'in_progress', 'pending'], true)) { $filterStatus = 'all'; }
 						//
 						$select_msDetails12="select * from marketing_staff where id=?";
 $fetch_msDetails12=db_q($db_conn,$select_msDetails12,[$se_msid]);
@@ -289,8 +339,80 @@ if (!empty($se_msids)) {
     $targetAchievedAmt = $totalInvoiceValue;
     $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetForPeriod) * 100) : 0;
 }
+
+// ── Pending / In Progress / Completed amount cards, CP vs Company ──────────
+// Same 3-state rule as the Status column/filter further down (no invoice =
+// Pending; Company-fulfilled + not yet receipted = In Progress; CP-fulfilled
+// or receipted = Completed), but as a summed ₹ amount instead of a per-row
+// badge, split by who it's going through. In Progress is always 100%
+// Company — a CP-fulfilled invoice deducts the CP's own stock immediately
+// at creation and is Completed from the moment it exists, so it never
+// passes through this bucket. Pending has no invoice yet, so its amount is
+// the same product-price estimate used elsewhere on this page, split by the
+// DM's own assigned_cp_id choice instead of actual fulfillment (unknown
+// until invoiced). Deliberately NOT nested inside the `if (!empty($se_msids))`
+// block above (unlike the older KPI cards) — the "All DMs (Company)" view
+// (View dropdown's default) has an empty $se_msids and skips that whole
+// block, which would otherwise make these 3 cards vanish in the one view
+// most staff actually use day to day. 2026-11-17, user request + follow-up
+// bug report ("entha page la vechu iruka" — cards weren't showing here).
+$whereExtraForCards = $showAllOrders ? "" : " AND tp_id IS NULL";
+$msIdFilterForCards = !empty($se_msids) ? " AND ms_id IN ($msIdListSql)" : "";
+$resCardOrders = mysqli_query($db_conn, "
+    SELECT DISTINCT order_id, assigned_cp_id FROM ms_orders
+    WHERE new_order='yes'
+      AND order_date BETWEEN '".db_esc($from_date)."' AND '".db_esc($to_date)."'
+      $msIdFilterForCards
+      $whereExtraForCards
+");
+$cardOrderIds = []; $cardOrderCpMap = [];
+while ($cor = mysqli_fetch_assoc($resCardOrders)) {
+    $cardOrderIds[] = $cor['order_id'];
+    $cardOrderCpMap[$cor['order_id']] = (int)($cor['assigned_cp_id'] ?? 0);
+}
+
+$pendingAmtCp = 0.0; $pendingAmtCompany = 0.0;
+$inProgressAmtCompany = 0.0;
+$completedAmtCp = 0.0; $completedAmtCompany = 0.0;
+
+if (!empty($cardOrderIds)) {
+    $cardOidList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $cardOrderIds)) . "'";
+
+    $cardInvoicedOrderIds = [];
+    $resCardInv = mysqli_query($db_conn, "
+        SELECT ui.source_ms_order_id, ui.total, ui.fulfilled_by_cp_id,
+               (SELECT COUNT(*) FROM receipt r WHERE r.receiptid = ui.inv_id) has_receipt
+        FROM user_invoice ui WHERE ui.source_ms_order_id IN ($cardOidList)
+    ");
+    while ($cir = mysqli_fetch_assoc($resCardInv)) {
+        $cardInvoicedOrderIds[$cir['source_ms_order_id']] = true;
+        $isCp  = !empty($cir['fulfilled_by_cp_id']);
+        $status = msProrderStatus(true, $isCp, (int)$cir['has_receipt'] > 0);
+        $amt = (float)$cir['total'];
+        if ($status === 'completed') {
+            if ($isCp) { $completedAmtCp += $amt; } else { $completedAmtCompany += $amt; }
+        } else {
+            $inProgressAmtCompany += $amt;
+        }
+    }
+
+    $pendingOrderIds = array_diff($cardOrderIds, array_keys($cardInvoicedOrderIds));
+    if (!empty($pendingOrderIds)) {
+        $pendingOidList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $pendingOrderIds)) . "'";
+        $resCardPend = mysqli_query($db_conn, "
+            SELECT mo.order_id, SUM(mo.qty * p.outlet_price * (1 - mo.discount_percentage/100)) val
+            FROM ms_orders mo LEFT JOIN products p ON p.id = mo.pr_id
+            WHERE mo.order_id IN ($pendingOidList)
+            GROUP BY mo.order_id
+        ");
+        while ($pr2 = mysqli_fetch_assoc($resCardPend)) {
+            $val = (float)($pr2['val'] ?? 0);
+            if (($cardOrderCpMap[$pr2['order_id']] ?? 0) > 0) { $pendingAmtCp += $val; } else { $pendingAmtCompany += $val; }
+        }
+    }
+}
 						?>
-						
+
                                     <h1>
 									<table class="headertble">
 									<tr>
@@ -323,6 +445,15 @@ if (!empty($se_msids)) {
 <select id="viewModeSelect" class="form-control" onchange="onViewModeChange(this.value)">
     <option value="company" <?=($se_msid==NULL)?'selected':''?>>All DMs (Company)</option>
     <option value="dm" <?=($se_msid!=NULL)?'selected':''?>>Specific DM</option>
+</select>
+</div>
+<div id="searchleftcont">
+<label class="form-label">Status</label>
+<select name="status" class="form-control">
+    <option value="all" <?=($filterStatus==='all')?'selected':''?>>All</option>
+    <option value="pending" <?=($filterStatus==='pending')?'selected':''?>>Pending</option>
+    <option value="in_progress" <?=($filterStatus==='in_progress')?'selected':''?>>In Progress</option>
+    <option value="completed" <?=($filterStatus==='completed')?'selected':''?>>Completed</option>
 </select>
 </div>
 <?php if ($isTeamMode): ?>
@@ -483,6 +614,7 @@ while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 							        </div>
 							    </div>
 							</div>
+							<?php endif; ?>
 							<style>
 							    .mskpi-card {
 							        background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
@@ -544,7 +676,39 @@ while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 							    document.querySelectorAll('.mskpi-detail-panel.show').forEach(function(p) { p.classList.remove('show'); });
 							});
 							</script>
-							<?php endif; ?>
+
+							<!-- Pending / In Progress / Completed amount cards — unconditional
+							     (not nested in the $se_msids-only block above), so these show in
+							     the default "All DMs (Company)" view too, not only when a
+							     specific DM is picked. 2026-11-17, user request. -->
+							<div class="row mb-3">
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card" style="--kpi-accent:#f59e0b;">
+							            <i class="material-icons-outlined mskpi-ico">hourglass_empty</i>
+							            <div class="mskpi-t">Pending (no invoice yet)</div>
+							            <div class="mskpi-v">&#8377;<?php echo inr_format($pendingAmtCp + $pendingAmtCompany, 2); ?></div>
+							            <div class="mskpi-sub">CP: &#8377;<?php echo inr_format($pendingAmtCp, 2); ?> &middot; Company: &#8377;<?php echo inr_format($pendingAmtCompany, 2); ?> <span style="color:#9ca3af;">(estimated)</span></div>
+							        </div>
+							    </div>
+
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card" style="--kpi-accent:#0ea5e9;">
+							            <i class="material-icons-outlined mskpi-ico">sync</i>
+							            <div class="mskpi-t">In Progress (stock pending)</div>
+							            <div class="mskpi-v">&#8377;<?php echo inr_format($inProgressAmtCompany, 2); ?></div>
+							            <div class="mskpi-sub">CP: &#8377;0.00 &middot; Company: &#8377;<?php echo inr_format($inProgressAmtCompany, 2); ?></div>
+							        </div>
+							    </div>
+
+							    <div class="col-md-3 col-sm-6 mb-3">
+							        <div class="mskpi-card" style="--kpi-accent:#16a34a;">
+							            <i class="material-icons-outlined mskpi-ico">verified</i>
+							            <div class="mskpi-t">Completed</div>
+							            <div class="mskpi-v">&#8377;<?php echo inr_format($completedAmtCp + $completedAmtCompany, 2); ?></div>
+							            <div class="mskpi-sub">CP: &#8377;<?php echo inr_format($completedAmtCp, 2); ?> &middot; Company: &#8377;<?php echo inr_format($completedAmtCompany, 2); ?></div>
+							        </div>
+							    </div>
+							</div>
 
 <?php
 //----Continuos Serial Number In Next Page.......................
@@ -560,9 +724,12 @@ $i= $start_from;
                                 <div class="card">
                                     <div class="card-body">
                               <div style="overflow-x:scroll;">
+                                         <form method="post" action="release-shop-invoice-stock-action.php" id="releaseStockForm" onsubmit="return msOrdersConfirmRelease();">
+                                         <input type="hidden" name="return_to" value="ms_prorders.php">
                                          <table id="datatable1" style="width:100%;">
                                             <thead>
                                                 <tr>
+                                                    <th onclick="event.stopPropagation(); event.stopImmediatePropagation();"><input type="checkbox" id="msReleaseSelectAll" title="Select all" onclick="event.stopPropagation(); event.stopImmediatePropagation();"></th>
                                                     <th>#</th>
 													<th>Marketing Staff</th>
 													<th>Shop Name</th>
@@ -574,6 +741,8 @@ $i= $start_from;
 													<th>Assigned TP</th>
 													<th>TP Invoice Status</th>
 													<?php endif; ?>
+													<th>Fulfilled By</th>
+													<th>Status</th>
 													<th>Invoice</th>
                                                 </tr>
                                             </thead>
@@ -592,6 +761,30 @@ $i= $start_from;
 $whereExtra = $showAllOrders ? "" : " and tp_id IS NULL";
 if ($from_date != NULL) { $whereExtra = " and order_date between '$from_date' and '$to_date'" . $whereExtra; }
 if (!empty($se_msids))  { $whereExtra .= " and ms_id IN ($msIdListSql)"; }
+// Same 3-state rule as msProrderStatus() above (used by the summary cards
+// and the row badge) — kept as a hand-written SQL mirror here since a
+// WHERE clause can't call a PHP function; if that rule ever changes, this
+// block must be updated to match by hand. no invoice yet = Pending;
+// invoice exists but Company-fulfilled and not yet receipted = In Progress;
+// CP-fulfilled (deducts immediately) or already receipted = Completed.
+// 2026-11-17, user request — filter dropdown needed a 3rd "In Progress"
+// bucket matching what the badge already shows, instead of lumping both
+// "In Progress" and "Completed" rows under one "Completed" filter.
+if ($filterStatus === 'pending') {
+    $whereExtra .= " and NOT EXISTS (SELECT 1 FROM user_invoice ui_stat WHERE ui_stat.source_ms_order_id = ms_orders.order_id)";
+} elseif ($filterStatus === 'in_progress') {
+    $whereExtra .= " and EXISTS (
+        SELECT 1 FROM user_invoice ui_stat WHERE ui_stat.source_ms_order_id = ms_orders.order_id
+        AND ui_stat.fulfilled_by_cp_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM receipt r_stat WHERE r_stat.receiptid = ui_stat.inv_id)
+    )";
+} elseif ($filterStatus === 'completed') {
+    $whereExtra .= " and EXISTS (
+        SELECT 1 FROM user_invoice ui_stat WHERE ui_stat.source_ms_order_id = ms_orders.order_id
+        AND (ui_stat.fulfilled_by_cp_id IS NOT NULL
+             OR EXISTS (SELECT 1 FROM receipt r_stat WHERE r_stat.receiptid = ui_stat.inv_id))
+    )";
+}
 
 $allProducts = [];
 $resAllProd = mysqli_query($db_conn, "SELECT id, productName FROM products ORDER BY id ASC");
@@ -629,11 +822,67 @@ if (!empty($msIds)) {
 }
 
 // Has this order already been picked up and invoiced directly by the company?
+// Also carries fulfilled_by_cp_id so the table can show whether it actually
+// went to Company stock or a CP's own stock (2026-11-17, user request — the
+// Fulfilled By column below).
 $invoicedMap = [];
+$invoiceFulfilledCpMap = [];
+$invoiceIdMap = [];        // order_id -> inv_id
+$receiptedMap = [];        // order_id -> true, once its invoice's stock has actually been released
 if (!empty($orderIdsInRange)) {
     $oidList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $orderIdsInRange)) . "'";
-    $resInvoiced = mysqli_query($db_conn, "SELECT source_ms_order_id FROM user_invoice WHERE source_ms_order_id IN ($oidList)");
-    while ($ir = mysqli_fetch_assoc($resInvoiced)) { $invoicedMap[$ir['source_ms_order_id']] = true; }
+    $resInvoiced = mysqli_query($db_conn, "SELECT inv_id, source_ms_order_id, fulfilled_by_cp_id FROM user_invoice WHERE source_ms_order_id IN ($oidList)");
+    $invIdsToCheck = [];
+    while ($ir = mysqli_fetch_assoc($resInvoiced)) {
+        $invoicedMap[$ir['source_ms_order_id']] = true;
+        $invoiceIdMap[$ir['source_ms_order_id']] = $ir['inv_id'];
+        $invIdsToCheck[] = $ir['inv_id'];
+        if (!empty($ir['fulfilled_by_cp_id'])) { $invoiceFulfilledCpMap[$ir['source_ms_order_id']] = (int)$ir['fulfilled_by_cp_id']; }
+    }
+    // Company-fulfilled DM order invoices no longer deduct/receipt stock at
+    // Submit (2026-11-17, user request) — a receipt only gets written once
+    // "Release Shop Invoice Stock" actually transfers the stock (see
+    // release_shop_invoices_from_existing_stock() in AutoTransferDemand.php).
+    // So "has an invoice" alone no longer means "fully done" the way it used
+    // to -- this table's Status column and the release checkboxes below both
+    // need the real, separate receipt signal.
+    if (!empty($invIdsToCheck)) {
+        $invIdList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $invIdsToCheck)) . "'";
+        $resReceipted = mysqli_query($db_conn, "SELECT DISTINCT inv_id FROM receipt WHERE receiptid IN ($invIdList)");
+        $receiptedInvIds = [];
+        while ($rr = mysqli_fetch_assoc($resReceipted)) { $receiptedInvIds[$rr['inv_id']] = true; }
+        foreach ($invoiceIdMap as $oid => $iid) {
+            if (isset($receiptedInvIds[$iid])) { $receiptedMap[$oid] = true; }
+        }
+    }
+}
+
+// CP names for the Fulfilled By column — covers both an order's actual
+// invoiced fulfiller (fulfilled_by_cp_id above) and, for not-yet-invoiced
+// orders, the DM's original Assign-To-CP pick (ms_orders.assigned_cp_id).
+$fulfilledByCpNameMap = [];
+$cpIdsNeeded = [];
+foreach ($invoiceFulfilledCpMap as $cpId) { $cpIdsNeeded[$cpId] = true; }
+foreach ($orderIdsInRange as $oid) {
+    $acp = $orderMeta[$oid]['assigned_cp_id'] ?? null;
+    if (!empty($acp)) { $cpIdsNeeded[(int)$acp] = true; }
+}
+if (!empty($cpIdsNeeded)) {
+    $cpIdList = implode(',', array_map('intval', array_keys($cpIdsNeeded)));
+    $resCpNames = mysqli_query($db_conn, "SELECT id, name FROM channel_partners WHERE id IN ($cpIdList)");
+    while ($cnr = mysqli_fetch_assoc($resCpNames)) { $fulfilledByCpNameMap[(int)$cnr['id']] = $cnr['name']; }
+}
+
+// Has a CP or Company edited this order's qty/price before invoicing?
+// (shared/MsOrderEdits.php, 2026-11-13, user request) -- shown as a
+// "Changes" link on vacant-area (no TP) orders only.
+require_once(__DIR__ . '/../shared/MsOrderEdits.php');
+msOrderEditsEnsureSchema($db_conn);
+$editedMap = [];
+if (!empty($orderIdsInRange)) {
+    $oidList2 = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $orderIdsInRange)) . "'";
+    $resEdited = mysqli_query($db_conn, "SELECT DISTINCT order_id FROM ms_order_edits WHERE order_id IN ($oidList2)");
+    while ($er = mysqli_fetch_assoc($resEdited)) { $editedMap[$er['order_id']] = true; }
 }
 
 // "Total Get Order" view only — which TP (if any) picked up each order, and
@@ -691,6 +940,22 @@ $orderTotalQty = array_sum($orderProducts);
 ?>
 
                                                <tr>
+					<td>
+						<?php
+						// Only Company-fulfilled DM order invoices go through the
+						// release gate — a CP-fulfilled one deducts the CP's own
+						// stock immediately at creation and never needs this
+						// (2026-11-17, user request: checkbox-select which specific
+						// orders' stock gets released, instead of the Auto Transfer
+						// page's blanket "release everything that can" button).
+						$releaseEligible = isset($invoicedMap[$orderid]) && empty($invoiceFulfilledCpMap[$orderid]) && !isset($receiptedMap[$orderid]);
+						if ($releaseEligible):
+						?>
+						<input type="checkbox" name="inv_ids[]" value="<?=htmlspecialchars($invoiceIdMap[$orderid], ENT_QUOTES)?>" class="ms-release-checkbox">
+						<?php else: ?>
+						<span class="text-muted">&mdash;</span>
+						<?php endif; ?>
+					</td>
                     <td><?php echo ++$i; ?></td>
 					<td><?=htmlspecialchars($result_msDetails['ms_name'] ?? '');?><br/>
 					<?=htmlspecialchars($result_msDetails['ms_mobile'] ?? '');?>
@@ -733,22 +998,106 @@ $orderTotalQty = array_sum($orderProducts);
 					</td>
 					<?php endif; ?>
 					<td>
-						<?php if (isset($invoicedMap[$orderid])): ?>
+						<?php
+						$invoicedCpId = $invoiceFulfilledCpMap[$orderid] ?? null;
+						$assignedCpId = $result_product_list['assigned_cp_id'] ?? null;
+						if (isset($invoicedMap[$orderid])):
+							// Order already invoiced — show what it ACTUALLY went to.
+							if (!empty($invoicedCpId)):
+						?>
+						<span class="badge badge-style-bordered badge-info">CP: <?=htmlspecialchars($fulfilledByCpNameMap[$invoicedCpId] ?? ('#' . $invoicedCpId));?></span>
+						<?php else: ?>
+						<span class="badge badge-style-bordered badge-secondary">Company</span>
+						<?php
+							endif;
+						elseif (!empty($assignedCpId)):
+						?>
+						<span class="badge badge-style-bordered badge-warning">CP: <?=htmlspecialchars($fulfilledByCpNameMap[(int)$assignedCpId] ?? ('#' . $assignedCpId));?> (pending)</span>
+						<?php else: ?>
+						<span class="text-muted">&mdash;</span>
+						<?php endif; ?>
+					</td>
+					<td>
+						<?php
+						$rowStatus = msProrderStatus(
+							isset($invoicedMap[$orderid]),
+							!empty($invoiceFulfilledCpMap[$orderid]),
+							isset($receiptedMap[$orderid])
+						);
+						?>
+						<?php if ($rowStatus === 'completed'): ?>
+						<span class="badge badge-style-bordered badge-success">Completed</span>
+						<?php elseif ($rowStatus === 'in_progress'): ?>
+						<span class="badge badge-style-bordered badge-info">In Progress</span>
+						<?php else: ?>
+						<span class="badge badge-style-bordered badge-warning">Pending</span>
+						<?php endif; ?>
+					</td>
+					<td style="white-space:nowrap;">
+						<?php if (isset($receiptedMap[$orderid]) || !empty($invoiceFulfilledCpMap[$orderid])): ?>
+						<?php // CP-fulfilled invoices deduct the CP's own stock immediately at
+						// creation and never get a receipt row (that's only written once a
+						// Company-fulfilled draft's stock is actually released) — gating this
+						// button on $receiptedMap alone sent every CP-fulfilled "View Invoice"
+						// click into ms-order-invoice-add.php's create-flow instead of the
+						// actual invoice. 2026-11-20, user-reported. ?>
+						<a href="shop-user-invoice-print?invoiceid=<?=base64_encode($invoiceIdMap[$orderid])?>" class="btn btn-sm btn-outline-secondary" target="_blank">View Invoice</a>
+						<?php elseif (isset($invoicedMap[$orderid])): ?>
 						<a href="ms-order-invoice-add.php?order_id=<?=urlencode($orderid)?>" class="btn btn-sm btn-outline-secondary">View Invoice</a>
 						<?php else: ?>
 						<a href="ms-order-invoice-add.php?order_id=<?=urlencode($orderid)?>" class="btn btn-sm btn-primary"><i class="material-icons" style="font-size:14px;vertical-align:middle;">receipt_long</i> Invoice</a>
+						<?php if (empty($result_product_list['tp_id'])): ?>
+						<button type="button" class="btn btn-sm btn-outline-secondary ms-order-edit-btn" data-order-id="<?=htmlspecialchars($orderid, ENT_QUOTES)?>" title="Edit qty/price before invoicing">
+							<i class="material-icons" style="font-size:14px;vertical-align:middle;">edit</i>
+						</button>
+						<?php endif; ?>
+						<?php endif; ?>
+						<?php if (isset($editedMap[$orderid])): ?>
+						<button type="button" class="btn btn-sm btn-outline-warning ms-order-changes-btn" data-order-id="<?=htmlspecialchars($orderid, ENT_QUOTES)?>" title="View edit history">
+							<i class="material-icons" style="font-size:14px;vertical-align:middle;">history</i>
+						</button>
 						<?php endif; ?>
 					</td>
                                                 </tr>
-                                           
+
 										<?php }?>
-										
+
 										 </tbody>
                                         </table>
+                                        <div style="margin-top:10px;">
+                                            <button type="submit" class="btn btn-sm" style="background:#9a3412;color:#fff;">
+                                                <i class="material-icons" style="font-size:16px;vertical-align:middle;">local_shipping</i> Release Stock for Selected Orders
+                                            </button>
+                                            <span class="text-muted" style="font-size:12px;margin-left:8px;">Only checked orders' stock is released — pick which ones to convert, instead of releasing every eligible order at once.</span>
+                                        </div>
+                                        </form>
+                                        <script>
+                                        (function () {
+                                            var selectAll = document.getElementById('msReleaseSelectAll');
+                                            if (!selectAll) { return; }
+                                            var boxes = document.querySelectorAll('#releaseStockForm input[name="inv_ids[]"]');
+                                            selectAll.addEventListener('change', function () {
+                                                boxes.forEach(function (b) { b.checked = selectAll.checked; });
+                                            });
+                                            boxes.forEach(function (b) {
+                                                b.addEventListener('change', function () {
+                                                    selectAll.checked = Array.prototype.every.call(boxes, function (x) { return x.checked; });
+                                                });
+                                            });
+                                        })();
+                                        function msOrdersConfirmRelease() {
+                                            var checked = document.querySelectorAll('#releaseStockForm input[name="inv_ids[]"]:checked');
+                                            if (checked.length === 0) {
+                                                alert('Select at least one order to release stock for.');
+                                                return false;
+                                            }
+                                            return confirm('Release stock for ' + checked.length + ' selected order(s)? Any line still short on stock is left pending.');
+                                        }
+                                        </script>
                                     </div>
 									</div>
                                 </div>
-                                
+
                             </div>
                         </div>
                     </div>
@@ -796,6 +1145,122 @@ $orderTotalQty = array_sum($orderProducts);
         }
         document.querySelectorAll('.kpi-detail-panel.show').forEach(function(p) { p.classList.remove('show'); });
     });
+    </script>
+
+    <!-- Edit / Changes modal (shared) for vacant-area (CP/Company) orders -->
+    <div class="modal fade" id="msOrderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="msOrderModalTitle">Order</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="msOrderEditSection" style="display:none;">
+                        <table class="table table-bordered" id="msOrderEditTable">
+                            <thead><tr><th>Product</th><th>Qty</th><th>Price</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                        <label class="form-label">Reason for edit (required)</label>
+                        <textarea id="msOrderEditReason" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div id="msOrderChangesSection" style="display:none;">
+                        <div id="msOrderChangesList"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="msOrderSaveBtn" style="display:none;">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function ($) {
+        var $modal = new bootstrap.Modal(document.getElementById('msOrderModal'));
+        var activeOrderId = null;
+
+        function escHtml(s) { return $('<div>').text(s == null ? '' : s).html(); }
+
+        function openEditModal(orderId) {
+            activeOrderId = orderId;
+            $.getJSON('get-ms-order-lines.php', { order_id: orderId }, function (resp) {
+                if (!resp || !resp.success) { alert('Could not load this order.'); return; }
+                if (resp.invoiced) { alert('This order has already been invoiced.'); return; }
+                $('#msOrderModalTitle').text('Edit Order');
+                $('#msOrderEditSection').show();
+                $('#msOrderChangesSection').hide();
+                $('#msOrderSaveBtn').show();
+                $('#msOrderEditReason').val('');
+                var $tb = $('#msOrderEditTable tbody').empty();
+                resp.lines.forEach(function (ln) {
+                    $tb.append(
+                        '<tr data-pr-id="' + ln.pr_id + '">' +
+                        '<td>' + escHtml(ln.name) + '</td>' +
+                        '<td><input type="number" min="0" class="form-control ms-edit-qty" value="' + ln.qty + '"></td>' +
+                        '<td><input type="number" min="0" step="0.01" class="form-control ms-edit-price" value="' + ln.price + '"></td>' +
+                        '</tr>'
+                    );
+                });
+                $modal.show();
+            });
+        }
+
+        function openChangesModal(orderId) {
+            activeOrderId = orderId;
+            $.getJSON('get-ms-order-lines.php', { order_id: orderId }, function (resp) {
+                if (!resp || !resp.success) { alert('Could not load this order.'); return; }
+                $('#msOrderModalTitle').text('Change History');
+                $('#msOrderEditSection').hide();
+                $('#msOrderChangesSection').show();
+                $('#msOrderSaveBtn').hide();
+                var $list = $('#msOrderChangesList').empty();
+                if (!resp.log.length) {
+                    $list.append('<div class="text-muted">No edits yet.</div>');
+                } else {
+                    resp.log.forEach(function (e) {
+                        var priceTxt = (e.old_price !== null || e.new_price !== null)
+                            ? (', price ' + (e.old_price !== null ? e.old_price.toFixed(2) : '-') + ' → ' + (e.new_price !== null ? e.new_price.toFixed(2) : '-'))
+                            : '';
+                        $list.append(
+                            '<div style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;">' +
+                            '<b>' + escHtml(e.product) + '</b>: ' + e.old_qty + ' → ' + e.new_qty + priceTxt + '<br>' +
+                            'by ' + escHtml(e.by_name || e.by_type) + ' (' + escHtml(e.by_type) + ') on ' + escHtml(e.at) + '<br>' +
+                            '<i>"' + escHtml(e.reason) + '"</i>' +
+                            '</div>'
+                        );
+                    });
+                }
+                $modal.show();
+            });
+        }
+
+        $(document).on('click', '.ms-order-edit-btn', function () { openEditModal($(this).data('order-id')); });
+        $(document).on('click', '.ms-order-changes-btn', function () { openChangesModal($(this).data('order-id')); });
+
+        $('#msOrderSaveBtn').on('click', function () {
+            var reason = $.trim($('#msOrderEditReason').val());
+            if (!reason) { alert('Please enter a reason.'); return; }
+            var qty = {}, price = {};
+            $('#msOrderEditTable tbody tr').each(function () {
+                var prId = $(this).data('pr-id');
+                qty[prId] = $(this).find('.ms-edit-qty').val();
+                price[prId] = $(this).find('.ms-edit-price').val();
+            });
+            $('#msOrderSaveBtn').prop('disabled', true);
+            $.post('ms-order-edit-action.php', { order_id: activeOrderId, qty: qty, price: price, reason: reason }, function (resp) {
+                if (resp && resp.success) {
+                    location.reload();
+                } else {
+                    alert((resp && resp.error) || 'Failed to save.');
+                    $('#msOrderSaveBtn').prop('disabled', false);
+                }
+            }, 'json').fail(function () {
+                alert('Failed to save. Please try again.');
+                $('#msOrderSaveBtn').prop('disabled', false);
+            });
+        });
+    })(jQuery);
     </script>
 </body>
 

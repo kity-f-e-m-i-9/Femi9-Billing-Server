@@ -170,3 +170,27 @@ function getMsAssignedTargetScopeNodes($db_conn, int $msId): array {
 
     return $result;
 }
+
+// Collapses a list of scope node ids (exactly as getMsAssignedTargetScopeNodes()
+// above returns them — always DISTRICT depth 3 or DIVISION depth 4) down to
+// their enclosing DISTRICT ids, for filtering shop.district_id. A DIVISION
+// node's parent_id IS its district; a DISTRICT node already is one. Used to
+// scope "TP Invoice Amount" to the shop's actual district instead of just
+// "this TP belongs to this DM somewhere" — a TP whose Firka assignments span
+// two different DMs' districts previously had their WHOLE invoice total
+// counted on both DMs' dashboards. 2026-11-20, user-reported.
+function districtIdsFromScopeNodeIds($db_conn, array $nodeIds): array {
+    $nodeIds = array_values(array_unique(array_map('intval', $nodeIds)));
+    if (empty($nodeIds)) { return []; }
+    $idList = implode(',', $nodeIds);
+    $res = $db_conn->query("SELECT id, parent_id, depth FROM partner_location_nodes WHERE id IN ($idList)");
+    $out = [];
+    while ($r = $res->fetch_assoc()) {
+        if ((int)$r['depth'] === 3) {
+            $out[(int)$r['id']] = true;
+        } elseif ((int)$r['depth'] === 4 && $r['parent_id'] !== null) {
+            $out[(int)$r['parent_id']] = true;
+        }
+    }
+    return array_keys($out);
+}

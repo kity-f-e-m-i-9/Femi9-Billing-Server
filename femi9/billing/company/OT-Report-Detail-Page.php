@@ -447,7 +447,7 @@ $page_title = htmlspecialchars($Report_LABEL . ' : ' . ($business_name ?? 'Busin
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            cursor: help;
+            cursor: pointer;
             color: var(--primary-blue);
             font-weight: 600;
             padding: 2px 6px;
@@ -876,14 +876,15 @@ if (empty($products)) {
 
     // Fetch sales data grouped by channel and product
     $stmt_sales = $db_conn->prepare("
-        SELECT 
+        SELECT
             cat,
             prid,
             SUM(qty) as total_qty,
-            SUM(CAST(total AS DECIMAL(10,2))) as total_amount
+            SUM(CAST(total AS DECIMAL(10,2))) as total_amount,
+            SUM(CAST(gst_amount AS DECIMAL(10,2))) as total_gst
         FROM ot_sales
         WHERE date BETWEEN ? AND ?
-            AND cat IS NOT NULL 
+            AND cat IS NOT NULL
             AND cat != ''
         GROUP BY cat, prid
     ");
@@ -919,6 +920,8 @@ if (empty($products)) {
                 'return_qty' => 0,
                 'sales_amount' => 0.0,
                 'return_amount' => 0.0,
+                'sales_gst' => 0.0,
+                'return_gst' => 0.0,
                 'products' => []
             ];
             foreach ($products as $pr_id => $pr_name) {
@@ -938,13 +941,14 @@ if (empty($products)) {
         
         $channels[$cat]['sales_qty'] += (int)$sale['total_qty'];
         $channels[$cat]['sales_amount'] += (float)$sale['total_amount'];
+        $channels[$cat]['sales_gst'] += (float)$sale['total_gst'];
         $channels[$cat]['products'][$prid]['sales_qty'] += (int)$sale['total_qty'];
     }
     $stmt_sales->close();
 
     // Fetch returns data grouped by channel and product
     $stmt_returns = $db_conn->prepare("
-        SELECT 
+        SELECT
             os.cat,
             osr.prid,
             SUM(osr.qty) as total_return_qty,
@@ -952,23 +956,23 @@ if (empty($products)) {
         FROM ot_sales_return osr
         INNER JOIN ot_sales os ON osr.tempid = os.tempid AND osr.prid = os.prid
         WHERE osr.return_date BETWEEN ? AND ?
-            AND os.cat IS NOT NULL 
+            AND os.cat IS NOT NULL
             AND os.cat != ''
         GROUP BY os.cat, osr.prid
     ");
-    
+
     if (!$stmt_returns) {
         die("Returns query preparation failed: " . htmlspecialchars($db_conn->error, ENT_QUOTES, 'UTF-8'));
     }
-    
+
     $stmt_returns->bind_param("ss", $from_date, $to_date);
     $stmt_returns->execute();
     $result_returns = $stmt_returns->get_result();
-    
+
     while ($ret = $result_returns->fetch_assoc()) {
         $cat = $ret['cat'];
         $prid = (int)$ret['prid'];
-        
+
         if (isset($channels[$cat]) && isset($channels[$cat]['products'][$prid])) {
             $channels[$cat]['return_qty'] += (int)$ret['total_return_qty'];
             $channels[$cat]['return_amount'] += (float)$ret['total_return_amount'];
@@ -976,6 +980,53 @@ if (empty($products)) {
         }
     }
     $stmt_returns->close();
+
+    // Return-side GST — ot_sales_return has no gst_amount column of its own
+    // (unlike ot_sales), so it's derived here from each line's own stored
+    // gst_type ('inclusive'/'exclusive') and the product's current gst%,
+    // same inclusive/exclusive distinction company/ot-sale-print.php's own
+    // per-line GST calc already uses. Subtracted from sales_gst below to
+    // give a NET Total Amount CGST/SGST figure, same "net = gross - return"
+    // convention the Qty/Amount columns already use. 2026-11-23,
+    // user-requested (CGST/SGST hover on this report's Total Amount column).
+    // Same Type-filter scoping the main sales loop applies after the fact
+    // (`if ($filter_type !== '' && !isset($products[$prid])) continue;`) —
+    // this query aggregates straight to one row per channel in SQL, so it
+    // needs the prid restriction built into the WHERE clause itself instead.
+    $__returnGstPridWhere = '';
+    if ($filter_type !== '' && !empty($products)) {
+        $__returnGstPridWhere = ' AND osr.prid IN (' . implode(',', array_map('intval', array_keys($products))) . ')';
+    }
+    $stmt_return_gst = $db_conn->prepare("
+        SELECT
+            os.cat,
+            SUM(CASE
+                WHEN osr.gst_type = 'inclusive' AND p.gst > 0 THEN osr.total * p.gst / (100 + p.gst)
+                WHEN p.gst > 0 THEN osr.total * p.gst / 100
+                ELSE 0
+            END) as total_return_gst
+        FROM ot_sales_return osr
+        INNER JOIN ot_sales os ON osr.tempid = os.tempid AND osr.prid = os.prid
+        LEFT JOIN products p ON p.id = osr.prid
+        WHERE osr.return_date BETWEEN ? AND ?
+            AND os.cat IS NOT NULL
+            AND os.cat != ''
+            $__returnGstPridWhere
+        GROUP BY os.cat
+    ");
+    if (!$stmt_return_gst) {
+        die("Return GST query preparation failed: " . htmlspecialchars($db_conn->error, ENT_QUOTES, 'UTF-8'));
+    }
+    $stmt_return_gst->bind_param("ss", $from_date, $to_date);
+    $stmt_return_gst->execute();
+    $result_return_gst = $stmt_return_gst->get_result();
+    while ($rg = $result_return_gst->fetch_assoc()) {
+        $cat = $rg['cat'];
+        if (isset($channels[$cat])) {
+            $channels[$cat]['return_gst'] += (float)$rg['total_return_gst'];
+        }
+    }
+    $stmt_return_gst->close();
 
     // Sort channels alphabetically
     ksort($channels);
@@ -985,6 +1036,8 @@ if (empty($products)) {
     $grand_return_qty = 0;
     $grand_sales_amount = 0.0;
     $grand_return_amount = 0.0;
+    $grand_sales_gst = 0.0;
+    $grand_return_gst = 0.0;
     $grand_product_sales = [];
     $grand_product_returns = [];
 
@@ -998,7 +1051,9 @@ if (empty($products)) {
         $grand_return_qty += $channel['return_qty'];
         $grand_sales_amount += $channel['sales_amount'];
         $grand_return_amount += $channel['return_amount'];
-        
+        $grand_sales_gst += $channel['sales_gst'];
+        $grand_return_gst += $channel['return_gst'];
+
         foreach ($channel['products'] as $pr_id => $pr_data) {
             $grand_product_sales[$pr_id] += $pr_data['sales_qty'];
             $grand_product_returns[$pr_id] += $pr_data['return_qty'];
@@ -1026,9 +1081,12 @@ if (empty($products)) {
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($channels as $channel): 
+            <?php foreach ($channels as $channel):
                 $net_qty = $channel['sales_qty'] - $channel['return_qty'];
                 $net_amount = $channel['sales_amount'] - $channel['return_amount'];
+                $net_gst = $channel['sales_gst'] - $channel['return_gst'];
+                $net_sgst = $net_gst / 2;
+                $net_cgst = $net_gst / 2;
             ?>
             <tr>
                 <td><strong><?= htmlspecialchars($channel['name'], ENT_QUOTES, 'UTF-8'); ?></strong></td>
@@ -1046,11 +1104,13 @@ if (empty($products)) {
                         ₹<?= inr_format($net_amount, 2); ?>
                         <i class="material-icons info-icon">info</i>
                         <span class="breakdown-tooltip">
-                            (₹<?= inr_format($channel['sales_amount'], 2); ?> - ₹<?= inr_format($channel['return_amount'], 2); ?>)
+                            (₹<?= inr_format($channel['sales_amount'], 2); ?> - ₹<?= inr_format($channel['return_amount'], 2); ?>)<br>
+                            SGST: ₹<?= inr_format($net_sgst, 2); ?><br>
+                            CGST: ₹<?= inr_format($net_cgst, 2); ?>
                         </span>
                     </span>
                 </td>
-                <?php foreach ($products as $pr_id => $pr_name): 
+                <?php foreach ($products as $pr_id => $pr_name):
                     $pr_sales = $channel['products'][$pr_id]['sales_qty'] ?? 0;
                     $pr_returns = $channel['products'][$pr_id]['return_qty'] ?? 0;
                     $pr_net = $pr_sales - $pr_returns;
@@ -1085,11 +1145,18 @@ if (empty($products)) {
                     </span>
                 </th>
                 <th style="text-align: right;">
+                    <?php
+                    $grand_net_gst = $grand_sales_gst - $grand_return_gst;
+                    $grand_net_sgst = $grand_net_gst / 2;
+                    $grand_net_cgst = $grand_net_gst / 2;
+                    ?>
                     <span class="breakdown-value">
                         ₹<?= inr_format($grand_sales_amount - $grand_return_amount, 2); ?>
                         <i class="material-icons info-icon">info</i>
                         <span class="breakdown-tooltip">
-                            (₹<?= inr_format($grand_sales_amount, 2); ?> - ₹<?= inr_format($grand_return_amount, 2); ?>)
+                            (₹<?= inr_format($grand_sales_amount, 2); ?> - ₹<?= inr_format($grand_return_amount, 2); ?>)<br>
+                            SGST: ₹<?= inr_format($grand_net_sgst, 2); ?><br>
+                            CGST: ₹<?= inr_format($grand_net_cgst, 2); ?>
                         </span>
                     </span>
                 </th>

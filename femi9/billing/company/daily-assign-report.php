@@ -107,12 +107,13 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
                                                     <th>District</th>
                                                     <th>Division</th>
                                                     <th>Firka</th>
+                                                    <th>DM Name</th>
                                                     <th>TP Name</th>
                                                     <th>Assigned By</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="repBody">
-                                                <tr><td colspan="6" class="dar-empty">Select filters and click Search.</td></tr>
+                                                <tr><td colspan="7" class="dar-empty">Select filters and click Search.</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -173,6 +174,7 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
             + '<td>' + escHtml(r.district_name) + '</td>'
             + '<td>' + escHtml(r.division_name) + '</td>'
             + '<td>' + escHtml(r.firka_name) + '</td>'
+            + '<td>' + escHtml(r.dm_name || 'Unassigned') + '</td>'
             + '<td>' + tpHtml + '</td>'
             + '<td>' + escHtml(r.assigned_by || '') + '</td>'
             + '</tr>';
@@ -186,7 +188,7 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
         var pageRows = allRows.slice(start, start + PAGE_SIZE);
         var $body = $('#repBody');
         if (!pageRows.length) {
-            $body.html('<tr><td colspan="6" class="dar-empty">No assignment records found for this filter.</td></tr>');
+            $body.html('<tr><td colspan="7" class="dar-empty">No assignment records found for this filter.</td></tr>');
         } else {
             $body.html(pageRows.map(renderRow).join(''));
         }
@@ -224,7 +226,7 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
 
     function runSearch() {
         var $body = $('#repBody');
-        $body.html('<tr><td colspan="6" class="dar-empty">Loading&hellip;</td></tr>');
+        $body.html('<tr><td colspan="7" class="dar-empty">Loading&hellip;</td></tr>');
         $('#repPagination').empty();
         $.getJSON('get-daily-assign-report.php', {
             ms_id: $('#repStaff').val(),

@@ -17,7 +17,7 @@ if ($inv_id === '') {
 }
 
 $stmt = $db_conn->prepare(
-    "SELECT inv_id, status FROM user_invoice WHERE inv_id=? AND from_user_type=? AND from_user_id=? LIMIT 1"
+    "SELECT inv_id, status, total FROM user_invoice WHERE inv_id=? AND from_user_type=? AND from_user_id=? LIMIT 1"
 );
 $stmt->bind_param('sss', $inv_id, $Login_user_TYPEvl, $tp_id_str);
 $stmt->execute();
@@ -82,7 +82,7 @@ try {
     $s->bind_param('sssss', $Login_user_TYPEvl, $tp_id_str, $inv_id, $Login_user_TYPEvl, $tp_id_str);
     $s->execute(); $s->close();
 
-    logShopInvoiceChange($db_conn, $inv_id, null, 'voided', null, null, $Login_user_TYPEvl, $tp_id_str, 'Invoice voided');
+    logShopInvoiceChange($db_conn, $inv_id, null, 'voided', null, null, $Login_user_TYPEvl, $tp_id_str, 'Invoice voided', (float)$inv['total'], 0.0);
 
     $db_conn->commit();
     $_SESSION['successMessage'] = "Invoice voided successfully.";

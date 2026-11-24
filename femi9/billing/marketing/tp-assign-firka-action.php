@@ -13,6 +13,7 @@ require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 require_once __DIR__ . '/include/AssignedLocations.php';
 require_once __DIR__ . '/include/TeamSubtree.php';
+require_once __DIR__ . '/../shared/TpWorkStart.php';
 header('Content-Type: application/json');
 error_reporting(0);
 
@@ -68,13 +69,11 @@ if ($firkaDistrictId === null || !isset($allowedDistrictIds[$firkaDistrictId])) 
 // One row per (date, firka) — same table the company page writes to, so
 // both pages' assignments show up together on daily-assign-report.php.
 // NULL territory_partner_id means "Vacant Area" for that date.
-$stmt = $db_conn->prepare("
-    INSERT INTO tp_daily_assignments (assign_date, location_id, territory_partner_id, assigned_by)
-    VALUES (?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE territory_partner_id = VALUES(territory_partner_id), assigned_by = VALUES(assigned_by)
-");
-$stmt->bind_param('siis', $assign_date, $firka_id, $tp_id, $assigned_by);
-$stmt->execute();
-$stmt->close();
+//
+// A save that actually CHANGES the TP (or is brand new) resets the whole
+// work-start chain back to 'none'; re-saving the SAME TP leaves it untouched
+// — see company/tp-assign-firka-action.php's matching comment and
+// tpDailyAssignSave()'s own doc comment.
+tpDailyAssignSave($db_conn, $assign_date, $firka_id, $tp_id, $assigned_by);
 
 echo json_encode(['success' => true, 'assigned_tp_id' => $tp_id]);

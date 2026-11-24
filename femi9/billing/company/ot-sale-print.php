@@ -140,6 +140,8 @@ $Total_amount_show   = round($gross_before_wallet - $wallet_amount_show, 2);
 #sealsign tr:nth-child(1){border-top:1px solid #000;}
 #sealsign tr td:nth-child(1){border-right:1px solid #000;}
 .wallet-deduction{color:#c0392b;}
+.gst-hover-cell{cursor:pointer;border-bottom:1px dotted #000;}
+#gstTipBox{position:fixed;z-index:9999;background:#111827;color:#fff;font-size:12.5px;line-height:1.7;padding:8px 12px;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none;white-space:nowrap;display:none;font-family:arial,"DejaVu Sans";}
 </style>
 
 <div class="maincontainar">
@@ -318,7 +320,22 @@ $Total_amount_show   = round($gross_before_wallet - $wallet_amount_show, 2);
                 <?= inr_format($row['discount'], 2) ?>
                 (<?= inr_format($discountPercentage, 2) ?>%)
             </td>
+            <?php if ($gstPct > 0):
+                // Hovering a line's Taxable Value shows that line's own
+                // SGST/CGST split (half the line's GST, same halving the
+                // invoice-level SGST/CGST rows below already do) — same
+                // pattern as shared/TpInvoiceHtml.php's own line-level GST
+                // hover for TP invoices. 2026-11-23, user-requested.
+                $item_half_amt = ($TotalAMount * $gstPct / 100) / 2;
+                $item_half_pct = rtrim(rtrim(number_format($gstPct / 2, 2, '.', ''), '0'), '.');
+                $item_gst_tip = 'SGST (' . $item_half_pct . '%): &#8377; ' . inr_format($item_half_amt, 2)
+                    . '<br>CGST (' . $item_half_pct . '%): &#8377; ' . inr_format($item_half_amt, 2)
+                    . '<br>Taxable Value: &#8377; ' . inr_format($TotalAMount, 2);
+            ?>
+            <td id="rightlaign" class="gst-hover-cell" data-gst-tip="<?= htmlspecialchars($item_gst_tip, ENT_QUOTES) ?>"><?= inr_format($TotalAMount, 2) ?></td>
+            <?php else: ?>
             <td id="rightlaign"><?= inr_format($TotalAMount, 2) ?></td>
+            <?php endif; ?>
         </tr>
         <?php endwhile; $stmt->close(); ?>
 
@@ -534,6 +551,27 @@ $Total_amount_show   = round($gross_before_wallet - $wallet_amount_show, 2);
 <div align="center">This is a Computer Generated Invoice</div>
 
             </div><!-- divToPrint -->
+
+<div id="gstTipBox"></div>
+<script>
+(function(){
+    var box = document.getElementById('gstTipBox');
+    if (!box) return;
+    document.querySelectorAll('.gst-hover-cell').forEach(function(el){
+        el.addEventListener('mouseenter', function(){
+            box.innerHTML = el.getAttribute('data-gst-tip');
+            box.style.display = 'block';
+        });
+        el.addEventListener('mousemove', function(e){
+            box.style.left = (e.clientX + 14) + 'px';
+            box.style.top = (e.clientY + 14) + 'px';
+        });
+        el.addEventListener('mouseleave', function(){
+            box.style.display = 'none';
+        });
+    });
+})();
+</script>
 
         </div><!-- app-content -->
     </div><!-- app-container -->

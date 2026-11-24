@@ -62,6 +62,33 @@ if (!empty($allFirkaIds)) {
 
 $dmHasActiveTp = !empty($firkaTpMap);
 
+// ── Active Channel Partners — for Vacant-Area orders (no TP covers the
+// shop's Firka), the DM picks a CP instead of a TP, same as add_order.php's
+// Get Order form. Without this block, editing an order that was originally
+// assigned to a CP showed a blank/empty field and, worse, Update wiped the
+// CP assignment out entirely (the re-insert below never carried
+// assigned_cp_id forward). 2026-11-17, user-reported bug.
+$cpList = [];
+$rCp = mysqli_query($db_conn, "SELECT id, name, COALESCE(NULLIF(delivery_district,''), branch_district) AS district FROM channel_partners WHERE is_active=1 ORDER BY name ASC");
+while ($c = mysqli_fetch_assoc($rCp)) { $cpList[] = $c; }
+
+$currentCpId = (int)($result_product_list['assigned_cp_id'] ?? 0);
+$currentCpName = '';
+$currentCpInList = false;
+if ($currentCpId > 0) {
+    foreach ($cpList as $c) {
+        if ((int)$c['id'] === $currentCpId) { $currentCpName = $c['name']; $currentCpInList = true; break; }
+    }
+    if (!$currentCpInList) {
+        $stmtCurCp = $db_conn->prepare("SELECT name FROM channel_partners WHERE id=? LIMIT 1");
+        $stmtCurCp->bind_param('i', $currentCpId);
+        $stmtCurCp->execute();
+        $rowCurCp = $stmtCurCp->get_result()->fetch_assoc();
+        $stmtCurCp->close();
+        $currentCpName = $rowCurCp['name'] ?? ('CP #' . $currentCpId);
+    }
+}
+
 // (Shop options themselves are rendered further below from the page's own
 // existing "select * from ms_shop where ms_id=..." loop, which already
 // carries district_node_id/taluk_node_id/district_name — those get emitted
@@ -141,6 +168,16 @@ if(isset($_REQUEST['update_no_order']))
 	}
 	$tp_id_sql = $tp_id > 0 ? "'".$tp_id."'" : "NULL";
 
+	// Assign To CP — same validation as order_action_get.php's Get Order
+	// creation. Must be re-collected and re-written on every edit, same as
+	// tp_id above, or an existing CP assignment is silently lost.
+	$assigned_cp_id = (int)($_POST["assigned_cp_id"] ?? 0);
+	if ($assigned_cp_id > 0) {
+		$cpCheck = mysqli_query($db_conn, "select id from channel_partners where id='".db_esc($assigned_cp_id)."' and is_active=1 limit 1");
+		if (!$cpCheck || mysqli_num_rows($cpCheck) === 0) { $assigned_cp_id = 0; }
+	}
+	$assigned_cp_id_sql = $assigned_cp_id > 0 ? "'".$assigned_cp_id."'" : "NULL";
+
 	$product_id = implode("#",$_REQUEST['pr_id']);
 $qty = implode("#",$_REQUEST['qty']);
 
@@ -165,7 +202,7 @@ if($result_count_dist['numShop']==0)
 	{
 	$lat_sql = $edit_latitude  !== null ? $edit_latitude  : "NULL";
 	$lng_sql = $edit_longitude !== null ? $edit_longitude : "NULL";
-        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,latitude,longitude) values (?,?,?,$tp_id_sql,?,'yes','nil',?,
+        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,assigned_cp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,latitude,longitude) values (?,?,?,$tp_id_sql,$assigned_cp_id_sql,?,'yes','nil',?,
 		?,?,$lat_sql,$lng_sql)";
 		db_q($db_conn,$sql,[$update_orderid,$shop_id,$ms_id,$order_date,$marketing_tool,$product_id_value,$qty_value]);
 		$insertedLines[] = ['pr_id' => (int)$product_id_value, 'qty' => (int)$qty_value];
@@ -343,7 +380,7 @@ if($result_count_dist['numShop']==0)
 	</select>
 	<br/>
 
-											<div id="tpSelectBlock" style="<?=($dmHasActiveTp || $currentTpId > 0) ? '' : 'display:none;'?>">
+											<div id="tpSelectBlock" style="<?=(($dmHasActiveTp || $currentTpId > 0) && $currentCpId <= 0) ? '' : 'display:none;'?>">
 											<label class="form-label">Assign To TP</label>
 											<select name="tp_id" id="tp_select" class="form-control">
 												<option value="" hidden>Select TP</option>
@@ -359,6 +396,27 @@ if($result_count_dist['numShop']==0)
 												<?php endif; ?>
 											</select>
 											<div id="noTpHint" style="display:none; margin-top:4px; font-size:12px; color:#9a6b00;">No TP covers this area yet — this order will go to the company for review instead.</div>
+											</div>
+
+											<!-- Vacant Area / CP-fulfilled order — Assign To CP instead of a TP, same
+												 pattern as add_order.php's Get Order form. Shown by default whenever the
+												 order is already attributed to a CP, or no TP covers this DM's area. -->
+											<div id="cpSelectBlock" style="<?=($currentCpId > 0 || !$dmHasActiveTp) ? '' : 'display:none;'?>">
+											<label class="form-label">No TP covers this area — Assign To CP</label>
+											<select name="assigned_cp_id" id="cp_select" class="form-control">
+												<option value="" <?php if ($currentCpId <= 0) echo 'selected'; ?>>Company</option>
+												<?php foreach($cpList as $c): ?>
+												<option value="<?=htmlspecialchars($c['id'])?>"
+														data-district="<?=htmlspecialchars($c['district'])?>"
+														<?php if ((int)$c['id'] === $currentCpId) echo 'selected'; ?>>
+													<?=htmlspecialchars($c['name'])?>
+												</option>
+												<?php endforeach; ?>
+												<?php if ($currentCpId > 0 && !$currentCpInList): ?>
+												<option value="<?=$currentCpId?>" selected><?=htmlspecialchars($currentCpName)?> (inactive)</option>
+												<?php endif; ?>
+											</select>
+											<div style="margin-top:4px; font-size:12px; color:#9a6b00;">No TP covers this area — pick the Channel Partner handling it, or "Company" if none.</div>
 											</div>
 											<br/>
 

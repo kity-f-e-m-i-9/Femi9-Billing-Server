@@ -576,16 +576,16 @@ if ($currentTeamLevelId) {
             $('#lpOwnLayerBtn').removeClass('active');
             clearSelection();
             if (priorDistrictIds.length) {
-                loadDivisionsForSelectedDistricts(priorDistrictIds);
+                loadDivisionsForSelectedDistricts(priorDistrictIds, $('#managerSelect').val() || 0);
             } else {
                 loadNodes();
             }
         });
 
-        function loadDivisionsForSelectedDistricts(districtIds) {
+        function loadDivisionsForSelectedDistricts(districtIds, managerId) {
             loaded = false;
             $('#lpBody').html('<div class="lp-loading">Loading&hellip;</div>');
-            $.getJSON('get-ms-divisions-for-districts.php?district_ids=' + districtIds.join(',') + '&exclude_ms_id=' + EXCLUDE_MS, function (resp) {
+            $.getJSON('get-ms-divisions-for-districts.php?district_ids=' + districtIds.join(',') + '&exclude_ms_id=' + EXCLUDE_MS + '&manager_id=' + (managerId || 0), function (resp) {
                 loaded = true;
                 if (resp.error || !resp.nodes || !resp.nodes.length) {
                     allNodes = [];

@@ -109,6 +109,10 @@ function render_tp_invoice_html(array $ctx, bool $show_carton_cols, bool $forPdf
 #sealsign td{padding:3px;}
 #sealsign tr:nth-child(1){border-top:1px solid #000;}
 #sealsign tr td:nth-child(1){border-right:1px solid #000;}
+<?php if (!$forPdf): ?>
+.gst-hover-cell{cursor:pointer;border-bottom:1px dotted #000;}
+#gstTipBox{position:fixed;z-index:9999;background:#111827;color:#fff;font-size:12.5px;line-height:1.7;padding:8px 12px;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none;white-space:nowrap;display:none;font-family:arial,"DejaVu Sans";}
+<?php endif; ?>
 <?php if ($forPdf): ?>
 /* dompdf renders a fixed A4 page with no viewport to shrink into, unlike a
    browser tab — the item table (with an extra carton column vs. the other
@@ -318,7 +322,13 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign">Amount</td>
 </tr>
 
-<?php $invno = 0; foreach ($invoice_items as $item):
+<?php
+// Diaper invoices only, per explicit request: hovering a line's Amount cell
+// shows that line's own SGST/CGST split (half the line's GST, same halving
+// the invoice-level SGST/CGST rows below already do) without having to
+// cross-reference the HSN-wise table further down the page.
+$_isDiaperInvoice = tpResolveProductType($result_Invoice_Details['product_type'] ?? null) === 'diaper';
+$invno = 0; foreach ($invoice_items as $item):
     $invno++;
     $qty           = (int)$item['quantity'];
     $gst_pct       = (int)$item['gst_percentage'];
@@ -349,7 +359,22 @@ Terms of Delivery<br/>&nbsp;
 <td id="rightlaign">Packs</td>
 <td id="rightlaign"><?= $gst_pct; ?>%</td>
 <td id="rightlaign"><?= inr_format($item_disc_amt, 2); ?><br/>(<?= fmt_gst_pct($item_disc_pct); ?>%)</td>
+<?php if ($_isDiaperInvoice && $gst_pct > 0):
+    $item_half_amt = ($taxable_value * $gst_pct / 100) / 2;
+    $item_half_pct = fmt_gst_pct($gst_pct / 2);
+    // A custom hover box (#gstTipBox below) instead of the native `title`
+    // tooltip — the OS-native tooltip renders with its own system font,
+    // which doesn't reliably carry the ₹ glyph (showed as "?"), and gives
+    // no control over showing the line Amount alongside SGST/CGST. This
+    // box is rendered by the page itself, same font as everything else.
+    $item_gst_tip = 'SGST (' . $item_half_pct . '%): ' . $Currency_symbol . ' ' . inr_format($item_half_amt, 2)
+        . '<br>CGST (' . $item_half_pct . '%): ' . $Currency_symbol . ' ' . inr_format($item_half_amt, 2)
+        . '<br>Amount: ' . $Currency_symbol . ' ' . inr_format($taxable_value, 2);
+?>
+<td id="rightlaign" class="gst-hover-cell" data-gst-tip="<?= htmlspecialchars($item_gst_tip, ENT_QUOTES); ?>"><?= inr_format($taxable_value, 2); ?></td>
+<?php else: ?>
 <td id="rightlaign"><?= inr_format($taxable_value, 2); ?></td>
+<?php endif; ?>
 </tr>
 <?php endforeach; ?>
 
@@ -512,6 +537,28 @@ Terms of Delivery<br/>&nbsp;
     &nbsp;|&nbsp; <?= htmlspecialchars($result_Invoice_Details['cp_district']); ?>
     <?php endif; ?>
 </div>
+<?php if (!$forPdf): ?>
+<div id="gstTipBox"></div>
+<script>
+(function(){
+    var box = document.getElementById('gstTipBox');
+    if (!box) return;
+    document.querySelectorAll('.gst-hover-cell').forEach(function(el){
+        el.addEventListener('mouseenter', function(){
+            box.innerHTML = el.getAttribute('data-gst-tip');
+            box.style.display = 'block';
+        });
+        el.addEventListener('mousemove', function(e){
+            box.style.left = (e.clientX + 14) + 'px';
+            box.style.top = (e.clientY + 14) + 'px';
+        });
+        el.addEventListener('mouseleave', function(){
+            box.style.display = 'none';
+        });
+    });
+})();
+</script>
+<?php endif; ?>
 <?php
     return ob_get_clean();
 }

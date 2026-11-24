@@ -200,6 +200,20 @@ $i= $start_from;
 										$fetch_product_list=db_q($db_conn,$select_product_list,[$Login_user_TYPEvl,$getinvuser,$from_date,$to_date]);
 										while($result_product_list=mysqli_fetch_array($fetch_product_list))
 										{
+											// A DM Get Order invoice sourced from a Channel Partner's own stock
+											// (fulfilled_by_cp_id set) deducted that stock immediately at
+											// creation and is immutable -- "Update"/"Edit" below used to show
+											// for these exactly like any ordinary editable invoice, with
+											// nothing indicating a CP was even involved. 2026-11-20, user-
+											// reported ("antha partner ahh follow panni varanum").
+											$cpFulfillerName = null;
+											if (!empty($result_product_list['fulfilled_by_cp_id'])) {
+												$stmtCpName = $db_conn->prepare("SELECT name FROM channel_partners WHERE id=?");
+												$stmtCpName->bind_param('i', $result_product_list['fulfilled_by_cp_id']);
+												$stmtCpName->execute();
+												$cpFulfillerName = $stmtCpName->get_result()->fetch_assoc()['name'] ?? ('#' . $result_product_list['fulfilled_by_cp_id']);
+												$stmtCpName->close();
+											}
 											//customer details
 											$CuSTID=$result_product_list['to_user_id'];
 										$select_Customers="select * from ".$tablename." where temp_id='$CuSTID'";
@@ -234,21 +248,33 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
                                                     <td><?php echo ++$i; ?></td>
                                                     <td><?php echo htmlspecialchars((string)($result_product_list["inv_number"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
 													<td><?php echo $Cust_Name;?><br/>M:&nbsp;<?php echo $Cust_Mbile;?>
-													
+													<?php if ($cpFulfillerName !== null): ?>
+													<br/><span class="badge badge-style-bordered badge-info" title="Deducted from this Channel Partner's own stock -- immutable, use Return (Credit Note) to correct">CP: <?=htmlspecialchars($cpFulfillerName, ENT_QUOTES);?></span>
+													<?php endif; ?>
+
 													<!------------UPDATE CUSTOMER------------->
-			<?php 
+			<?php
 			//COUNT return
 			$select_count_return="select * from user_return_stock_items where invnumber='".$result_product_list["inv_id"]."'";
 			$fetch_count_return=mysqli_query($db_conn,$select_count_return);
 			$result_count_return=mysqli_num_rows($fetch_count_return);
-			if($result_count_return==0){
+			if($cpFulfillerName !== null){
+				// update_customer_action2.php reassigns this invoice's
+				// to_user_id to a DIFFERENT shop -- CpShopWalletCommission.php's
+				// 3% credit/clawback for a CP-fulfilled invoice is keyed by
+				// that exact to_user_id, so reassigning it here would silently
+				// desync which shop the commission actually belongs to.
+				// Already shown above as the "CP: <name>" badge, so blocked
+				// rather than just hidden-by-omission. 2026-11-20, checked
+				// after a different-angle review of this fix.
+			} elseif($result_count_return==0){
 			?>
-													
+
 													<a href="update_customer2.php?invuser=<?=$getinvuser;?>&&InvoiceID=<?=htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false);?>" style="text-decoration:none;"><span class='badge badge-style-bordered badge-primary'>Update</span>
 													</a>
 			<?php } else{ echo "<span id='cnlable'>-&nbsp;CN&nbsp;-</span>";}?>
 			<!----------END CUSTOMER UPDATE***--------->
-			
+
 			</td>
 													<td><?php echo date("d/M/Y",strtotime($result_product_list["date"]));?></td>
 													
@@ -276,7 +302,11 @@ else if($Total_Receipt_amount>0 && $totalamount==$Total_Receipt_amount)
 
 																										<td>
 													    <div class="actions-group">
+													        <?php if ($cpFulfillerName !== null): ?>
+													        <span class="action-link" title="Fulfilled by this Channel Partner's own stock -- locked, use Return (Credit Note) to correct" style="cursor:not-allowed;opacity:0.5;"><i class="material-icons-outlined" style="font-size:17px;color:#9ca3af;">lock</i></span>
+													        <?php else: ?>
 													        <a href="shop-user-invoice-add?invuser=<?=$getinvuser;?>&&action=edit&&InvoiceID=<?=$INVID_encode;?>&&gid=<?=htmlspecialchars((string)($result_product_list['from_user_id']), ENT_QUOTES, 'ISO-8859-1', false);?>" class="action-link" title="Edit"><i class="material-icons-outlined" style="font-size:17px;color:#667eea;">edit</i></a>
+													        <?php endif; ?>
 													    </div>
 													</td>
 													

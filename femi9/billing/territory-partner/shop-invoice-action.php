@@ -2,6 +2,8 @@
 include("checksession.php");
 include("config.php");
 require_once("include/ShopInvoiceHistory.php");
+require_once("include/TpDistrictScope.php");
+require_once("include/ShopInvoiceCategoryLock.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -25,6 +27,31 @@ $customer_id = $_REQUEST['customer_id'] ?? '';
 $date        = date("Y-m-d", strtotime($_REQUEST['date'] ?? date("Y-m-d")));
 $inv_year    = date("Y", strtotime($date));
 $tp_id       = (int)$Login_user_IDvl;
+
+// The District the TP picked on the Invoice - Shop form itself, not the
+// shop's own stored district_id (which is often stale — confirmed
+// 2026-11-21 that 133 of 195 active TPs have shops whose district_id no
+// longer matches any of their currently-assigned districts, a TP
+// reassigned to a different Firka keeps her old shops' old district_id).
+// A TP picking "Namakkal" and invoicing a shop whose own district_id is
+// still stuck at "Erode" from years ago must count toward the Namakkal DM
+// she actually billed it from, not the DM the stale data happens to point
+// at. marketing/include/TpInvoiceAmount.php's attribution query prefers
+// this over shop.district_id when it's set. 2026-11-21, user-reported.
+// Re-derived server-side against this TP's REAL assigned districts (same
+// hardened pattern company/tp-assign-firka-action.php already uses for the
+// equivalent problem) — never trust the raw POSTed value as-is. Without
+// this, a stale cached dropdown, a replayed request, or a crafted POST
+// could attribute an invoice's revenue to a district this TP isn't even
+// assigned to, silently crediting an arbitrary DM's target/KPI numbers with
+// no validation error. 2026-11-21, code-review finding.
+$_rawDistrictId = (int)($_REQUEST['shop_district_id'] ?? 0);
+$_tpAllowedDistrictIds = array_column(getTpAssignedDistricts($db_conn, $tp_id), 'id');
+$invoiceDistrictId = in_array($_rawDistrictId, $_tpAllowedDistrictIds, true) ? $_rawDistrictId : 0;
+$chkDistCol = $db_conn->query("SHOW COLUMNS FROM user_invoice LIKE 'invoice_district_id'");
+if ($chkDistCol && $chkDistCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE user_invoice ADD COLUMN invoice_district_id INT NULL DEFAULT NULL AFTER source_ms_order_id");
+}
 
 // A shop with an un-invoiced field order ("Get Order" visit) must be
 // invoiced from that order (order-to-invoice.php via manage-orders.php),
@@ -74,7 +101,7 @@ $amount = (float)($_REQUEST['amount'] ?? 0);
 $qty    = (int)($_REQUEST['qty']    ?? 0);
 
 // Product details
-$stmtProd = $db_conn->prepare("SELECT gst,gst_type,hsn,rwpoints FROM products WHERE id=?");
+$stmtProd = $db_conn->prepare("SELECT gst,gst_type,hsn,rwpoints,category FROM products WHERE id=?");
 $stmtProd->bind_param('i', $pr_id);
 $stmtProd->execute();
 $prod = $stmtProd->get_result()->fetch_assoc();
@@ -83,6 +110,18 @@ $gst_percentage  = $prod['gst']      ?? 0;
 $gst_type_item   = $prod['gst_type'] ?: 'exclusive';
 $hsn             = $prod['hsn']      ?? '';
 $rwpoints        = ($prod['rwpoints'] ?? 0) * $qty;
+
+// An invoice is all-Napkin or all-Diaper, never mixed, once its first item
+// is added — re-validated here server-side (never trust the client's
+// Product dropdown alone, same pattern as the district re-validation above).
+// 'mixed' = a legacy invoice that already has both categories from before
+// this lock existed — left unrestricted so a TP can still finish it.
+// 2026-11-23, user-requested.
+$lockedCategory = getShopInvoiceLockedCategory($db_conn, $inv_id);
+if ($lockedCategory !== null && $lockedCategory !== 'mixed' && ($prod['category'] ?? '') !== $lockedCategory) {
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&CategoryMismatch&&invuser=".urlencode($invuser)."&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertMessage';</script>";
+    exit;
+}
 
 $totalamount = $amount * $qty;
 
@@ -214,16 +253,18 @@ $stmtChk->close();
 
 if ((int)$chk['n'] === 0) {
     $zero = '0'; $one = '1'; $nil = 'Nil';
+    $invoiceDistrictIdForInsert = $invoiceDistrictId > 0 ? $invoiceDistrictId : null;
     $stmtIns = $db_conn->prepare(
         "INSERT INTO user_invoice
          (inv_id,id_only,inv_number,date,inv_year,sub_total,discount,total,to_user_type,to_user_id,
-          from_user_type,from_user_id,gst_type,credit,roundoff,courier_charges,rwpoints_enable,buyer_gsttype,username,usertype)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+          from_user_type,from_user_id,gst_type,credit,roundoff,courier_charges,rwpoints_enable,buyer_gsttype,username,usertype,invoice_district_id)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
     );
-    $stmtIns->bind_param('ssssssssssssssssssss',
+    $stmtIns->bind_param('ssssssssssssssssssssi',
         $inv_id, $zero, $inv_number, $date, $inv_year, $zero, $zero, $zero,
         $invuser, $customer_id, $Login_user_TYPEvl, $tp_id,
-        $gst_type, $zero, $zero, $zero, $one, $buyer_gsttype, $nil, $nil
+        $gst_type, $zero, $zero, $zero, $one, $buyer_gsttype, $nil, $nil,
+        $invoiceDistrictIdForInsert
     );
     $stmtIns->execute(); $stmtIns->close();
 }

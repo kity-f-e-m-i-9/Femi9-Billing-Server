@@ -87,6 +87,46 @@ $conn->query("CREATE TABLE ot_sales (
     tempid VARCHAR(255) NOT NULL
 )");
 
+$conn->query("CREATE TABLE channel_partner_purchase_orders (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    channel_partner_id INT UNSIGNED NOT NULL,
+    order_date DATE NOT NULL,
+    status ENUM('waiting','completed','cancelled') NOT NULL DEFAULT 'waiting'
+)");
+
+$conn->query("CREATE TABLE channel_partner_purchase_order_items (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    po_id INT UNSIGNED NOT NULL,
+    product_id INT NOT NULL,
+    qty INT NOT NULL
+)");
+
+// Shop Invoice (company/ms-order-invoice-add.php's "no CP" path, 2026-11-13).
+$conn->query("CREATE TABLE user_invoice (
+    inv_id VARCHAR(255) NOT NULL PRIMARY KEY,
+    source_ms_order_id VARCHAR(255) NULL,
+    status ENUM('draft','submitted','cancelled') NOT NULL DEFAULT 'draft',
+    from_user_type VARCHAR(255) NOT NULL,
+    from_user_id VARCHAR(255) NOT NULL
+)");
+
+$conn->query("CREATE TABLE user_invoice_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    inv_id VARCHAR(255) NOT NULL,
+    pr_id INT NOT NULL,
+    qty INT NOT NULL
+)");
+
+// Submitted-invoice marker (company/shop-user-invoice-submit.php inserts a
+// row here the first time an invoice is finalized; user_invoice.status
+// itself never leaves 'draft' for this pipeline, so this table is the real
+// "already submitted, stock already deducted directly" signal the Shop
+// demand query excludes on, 2026-11-13).
+$conn->query("CREATE TABLE receipt (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    receiptid VARCHAR(255) NOT NULL
+)");
+
 // ========== FIXTURES ==========
 $conn->query("INSERT INTO company_godown (id, gname) VALUES
     (1, 'NEKSOMO HYGIENE INDUSTRIES'),
@@ -149,6 +189,55 @@ $conn->query("INSERT INTO ot_sales (godownid, prid, qty, date, tempid) VALUES (2
 $conn->query("INSERT INTO ot_sales_invoice (tempid, status) VALUES ('OTD3', 'draft')");
 $conn->query("INSERT INTO ot_sales (godownid, prid, qty, date, tempid) VALUES (3, 202, 7, '$today', 'OTD3')");
 
+// CP PO: product 101 qty 20, waiting
+$conn->query("INSERT INTO channel_partner_purchase_orders (id, channel_partner_id, order_date, status) VALUES (1, 55, '$today', 'waiting')");
+$conn->query("INSERT INTO channel_partner_purchase_order_items (po_id, product_id, qty) VALUES (1, 101, 20)");
+
+// CP PO: product 101 qty 999, completed (must be excluded)
+$conn->query("INSERT INTO channel_partner_purchase_orders (id, channel_partner_id, order_date, status) VALUES (2, 55, '$today', 'completed')");
+$conn->query("INSERT INTO channel_partner_purchase_order_items (po_id, product_id, qty) VALUES (2, 101, 999)");
+
+// Shop Invoice (draft, company-sourced from LLP godown id 3, has
+// source_ms_order_id): product 101 qty 10 — must COUNT.
+$conn->query("INSERT INTO user_invoice (inv_id, source_ms_order_id, status, from_user_type, from_user_id) VALUES ('SHOP1', 'ORDER1', 'draft', 'company', '3')");
+$conn->query("INSERT INTO user_invoice_items (inv_id, pr_id, qty) VALUES ('SHOP1', 101, 10)");
+
+// Shop Invoice: already submitted (not draft) — must be excluded.
+$conn->query("INSERT INTO user_invoice (inv_id, source_ms_order_id, status, from_user_type, from_user_id) VALUES ('SHOP2', 'ORDER2', 'submitted', 'company', '3')");
+$conn->query("INSERT INTO user_invoice_items (inv_id, pr_id, qty) VALUES ('SHOP2', 101, 999)");
+
+// Shop Invoice: draft, sourced from Healthcare (godown id 2), not LLP — must
+// still COUNT. company/ms-order-invoice-add.php's "no CP" path lets the
+// company pick ANY allowed godown via its own dropdown, not just LLP, and
+// the 2026-11-17 design note requires EVERY DM Get Order Shop Invoice to
+// show up as Auto Transfer demand regardless of godown. Previously excluded
+// here (a real bug fixed 2026-11-21 — found via code review, confirmed this
+// test itself was asserting the wrong behavior).
+$conn->query("INSERT INTO user_invoice (inv_id, source_ms_order_id, status, from_user_type, from_user_id) VALUES ('SHOP3', 'ORDER3', 'draft', 'company', '2')");
+$conn->query("INSERT INTO user_invoice_items (inv_id, pr_id, qty) VALUES ('SHOP3', 101, 999)");
+
+// Shop Invoice: draft, LLP, but NO source_ms_order_id (not a DM-order-
+// derived invoice) — must be excluded.
+$conn->query("INSERT INTO user_invoice (inv_id, source_ms_order_id, status, from_user_type, from_user_id) VALUES ('SHOP4', NULL, 'draft', 'company', '3')");
+$conn->query("INSERT INTO user_invoice_items (inv_id, pr_id, qty) VALUES ('SHOP4', 101, 999)");
+
+// Shop Invoice: draft, LLP, has source_ms_order_id, but from_user_type is
+// NOT 'company' (e.g. a TP's own shop invoice) — must be excluded, this
+// demand source is only ever company-direct invoices.
+$conn->query("INSERT INTO user_invoice (inv_id, source_ms_order_id, status, from_user_type, from_user_id) VALUES ('SHOP5', 'ORDER5', 'draft', 'territory_partner', '3')");
+$conn->query("INSERT INTO user_invoice_items (inv_id, pr_id, qty) VALUES ('SHOP5', 101, 999)");
+
+// Shop Invoice: status column never leaves 'draft' for this pipeline even
+// after the real Submit Invoice step finalizes it and deducts stock
+// directly (company/shop-user-invoice-submit.php) -- the only real
+// "already submitted" signal is a matching receipt row. Must be excluded,
+// else this real-flow gap would make Auto Transfer treat an already-
+// fulfilled order as outstanding demand forever (caught via live-DB
+// testing 2026-11-13, not by this suite originally).
+$conn->query("INSERT INTO user_invoice (inv_id, source_ms_order_id, status, from_user_type, from_user_id) VALUES ('SHOP6', 'ORDER6', 'draft', 'company', '3')");
+$conn->query("INSERT INTO user_invoice_items (inv_id, pr_id, qty) VALUES ('SHOP6', 101, 999)");
+$conn->query("INSERT INTO receipt (receiptid) VALUES ('SHOP6')");
+
 // ========== TESTS: resolve_godown_id_by_gname ==========
 assertEqual(resolve_godown_id_by_gname($conn, 'FEMI HEALTH CARE'), 2, 'resolves Healthcare godown id');
 assertEqual(resolve_godown_id_by_gname($conn, 'FEMI NAYAN LLP'), 3, 'resolves LLP godown id');
@@ -156,14 +245,31 @@ assertEqual(resolve_godown_id_by_gname($conn, 'DOES NOT EXIST'), null, 'returns 
 
 // ========== TESTS: get_auto_transfer_requirements ==========
 $requirements = get_auto_transfer_requirements($conn, 3);
-assertEqual($requirements[101] ?? null, 75, 'product 101: 40 (waiting TP today) + 15 (waiting TP yesterday) + 15 (LLP draft OT today) + 5 (LLP draft OT yesterday) = 75, excludes completed/confirmed/wrong-godown/ss-approved/cp-preferred/cancelled');
-assertEqual($requirements[202] ?? null, 7, 'product 202: only the LLP draft OT counts');
+assertEqual($requirements[101]['tp'] ?? null, 55, 'product 101 tp: 40 (waiting today) + 15 (waiting yesterday), excludes completed/ss-approved/cp-preferred/cancelled');
+assertEqual($requirements[101]['ot'] ?? null, 20, 'product 101 ot: 15 (LLP draft today) + 5 (LLP draft yesterday), excludes confirmed/wrong-godown');
+assertEqual($requirements[101]['cp'] ?? null, 20, 'product 101 cp: 20 waiting, excludes completed');
+assertEqual($requirements[101]['shop'] ?? null, 1009, 'product 101 shop: 10 (LLP) + 999 (Healthcare, counts too — not godown-restricted) draft+company+source_ms_order_id, excludes submitted/no-source-order/non-company/already-receipted');
+assertEqual($requirements[202]['ot'] ?? null, 7, 'product 202: only the LLP draft OT counts');
 assertEqual(count($requirements), 2, 'no extraneous product keys');
 
 // ========== TESTS: cap_auto_transfer_qty ==========
 assertEqual(cap_auto_transfer_qty(55, 30, 10), 40, 'caps to neksomo+healthcare available when short');
 assertEqual(cap_auto_transfer_qty(55, 100, 100), 55, 'uses required qty when stock is sufficient');
 assertEqual(cap_auto_transfer_qty(55, 0, 0), 0, 'floors at 0 when no stock anywhere');
+
+// ========== TESTS: cap_auto_transfer_qty_by_source (priority TP > CP > Shop > OT) ==========
+$split = cap_auto_transfer_qty_by_source(55, 20, 20, 90, 10); // tp=55, cp=20, ot=20, available=90, shop=10 -> all fit (55+20+10+20=105 > 90? no wait check below)
+// available=90: tp takes 55 (35 left), cp takes 20 (15 left), shop takes 10 (5 left), ot takes min(20,5)=5
+assertEqual($split, ['tp' => 55, 'cp' => 20, 'shop' => 10, 'ot' => 5], 'TP first, then CP, then Shop, then OT gets the remainder');
+
+$split2 = cap_auto_transfer_qty_by_source(55, 20, 20, 60, 10); // available=60: tp=55 (5 left), cp=min(20,5)=5 (0 left), shop=0, ot=0
+assertEqual($split2, ['tp' => 55, 'cp' => 5, 'shop' => 0, 'ot' => 0], 'CP, Shop and OT starved when TP alone nearly exhausts available stock');
+
+$split3 = cap_auto_transfer_qty_by_source(0, 0, 20, 10, 10); // available=10: tp=0, cp=0, shop=min(10,10)=10 (0 left), ot=0
+assertEqual($split3, ['tp' => 0, 'cp' => 0, 'shop' => 10, 'ot' => 0], 'Shop beats OT when both compete for the same limited stock');
+
+$split4 = cap_auto_transfer_qty_by_source(0, 0, 0, 100); // shop omitted -> defaults to 0, backward-compatible with pre-shop callers
+assertEqual($split4, ['tp' => 0, 'cp' => 0, 'shop' => 0, 'ot' => 0], 'shop param is optional and defaults to 0');
 
 // ========== SUMMARY ==========
 echo "\n$passCount passed, $failCount failed\n";

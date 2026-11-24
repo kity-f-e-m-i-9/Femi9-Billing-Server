@@ -49,7 +49,7 @@ if (!$isFromDmOrder) {
     exit;
 }
 
-$stmtRow = $db_conn->prepare("SELECT pr_id, qty, amount, hsn FROM user_invoice_items WHERE id=? AND inv_id=?");
+$stmtRow = $db_conn->prepare("SELECT pr_id, qty, amount, total, hsn FROM user_invoice_items WHERE id=? AND inv_id=?");
 $stmtRow->bind_param('is', $rowid, $inv_id);
 $stmtRow->execute();
 $oldRow = $stmtRow->get_result()->fetch_assoc();
@@ -59,8 +59,9 @@ if (!$oldRow) {
     exit;
 }
 
-$pr_id  = (int)$oldRow['pr_id'];
-$oldQty = (int)$oldRow['qty'];
+$pr_id     = (int)$oldRow['pr_id'];
+$oldQty    = (int)$oldRow['qty'];
+$oldTotal  = (float)$oldRow['total'];
 $qty    = (int)($_POST['qty'] ?? 0);
 // Price is a TP-entered override for this line (the shop may be billed at a
 // different rate than the product master's MRP) — posted value, falling
@@ -116,7 +117,8 @@ $stmtUpd->close();
 
 logShopInvoiceChange(
     $db_conn, $inv_id, $pr_id, 'qty_changed', $oldQty, $qty, $Login_user_TYPEvl, $tp_id_str,
-    $oldQty !== $qty ? 'Qty edited on invoice' : 'Price/discount edited on invoice'
+    $oldQty !== $qty ? 'Qty edited on invoice' : 'Price/discount edited on invoice',
+    $oldTotal, $total
 );
 
 header("Location: shop-invoice-add.php?InvoiceID={$invid_enc}&&UpdatedSuccess&&invuser={$invuser}&&action={$actionEdit}");

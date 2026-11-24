@@ -1,190 +1,37 @@
 <?php
-// Personal/team KPI page — Target Amount, Achieved (TP Napkin-only invoice
-// value, same definition TeamTargetRollup.php already uses everywhere else),
-// Balance, the date each person's target got completed, and this calendar
-// week's (Sunday-Saturday) prorated target. Works for whoever is logged in:
-// an SM sees their ASMs and under each ASM their DMs; a lone DM with no team
-// just sees their own row. Reuses the exact Target/Achieved numbers and
-// rollup rule (zero a manager's own target once they have a team, roll up
-// the children's sum instead) that my-team.php already established.
+// Personal/team KPI scorecard page — a free From/To date range (not tied to
+// a calendar month or week) drives a 5-KPI breakdown per person, each with
+// its own Plan/Achieved/Ach%/Score, rolled up into an overall KPI Score.
+// Works for whoever is logged in: an SM sees their ASMs and under each ASM
+// their DMs; a lone DM with no team just sees their own row. Reuses the
+// exact Target/Achieved numbers and rollup rule (zero a manager's own target
+// once they have a team, roll up the children's sum instead) that
+// my-team.php already established.
 include("checksession.php");
 include("config.php");
-require_once("include/TeamLevelColors.php");
-require_once("include/TeamSubtree.php");
-require_once __DIR__ . '/../company/include/TeamTargetRollup.php';
-error_reporting(0);
+require_once __DIR__ . '/include/KpiDataPrep.php';
+require_once __DIR__ . '/../shared/TpStaffFeedback.php';
 
-// Same ?embed=1 pattern as dashboard.php (company/view-ms-kpi.php's own
-// read-only "view as" bridge) — hides sidebar/header when embedded in an
-// iframe; $_companyBridgeView (set by checksession.php's bridge) drives the
-// read-only banner below when opened standalone instead.
-$embed = !empty($_GET['embed']);
-
-$rootId = (int)$markeingSTFID;
-$subtreeIds = getMsSubtreeIds($db_conn, $rootId);
-$idList = implode(',', $subtreeIds);
-
-$levelColorMap = getTeamLevelColorMap($db_conn);
-
-$staffRows = $db_conn->query("
-    SELECT ms.id, ms.ms_name, ms.manager_id, ms.team_level_id, tl.level_name, tl.level_rank
-    FROM marketing_staff ms
-    LEFT JOIN marketing_team_levels tl ON tl.id = ms.team_level_id
-    WHERE ms.id IN ($idList)
-    ORDER BY tl.level_rank ASC, ms.ms_name ASC
-")->fetch_all(MYSQLI_ASSOC);
-
-$byManager = [];
-$selfRow = null;
-foreach ($staffRows as $row) {
-    if ((int)$row['id'] === $rootId) { $selfRow = $row; }
-    $mgrKey = $row['manager_id'] ? (int)$row['manager_id'] : 0;
-    $byManager[$mgrKey][] = $row;
+// Layer 2 — "Your Total Score", the cumulative average of every month-end TP
+// feedback rating this person has received as a DM (see
+// shared/TpStaffFeedback.php), scoped to whichever months fall inside this
+// page's own $fromDate/$toDate range — same range every other KPI figure on
+// this page already respects, so picking a past month's range shows that
+// past month's own mark instead of always every month ever. 2026-11-24,
+// user-requested ("pona month filter pottalaum athu pona month potta mark
+// than kattanum"). Only a District-depth person is ever a 'dm' rating
+// target (getTpAssignedDmRows() only matches District-level staff), so this
+// stays hidden for an ASM/SM with no District level of their own.
+// Per-TP breakdown is included here but only ever RENDERED when viewed via
+// the Company "login as this DM" bridge — kept anonymous on the DM's own
+// direct login, by design (2026-11-24, user-requested: "dm login la direct
+// ahh partha antha tp yaaru yaaru evvalvau score pottu irukaganu katta
+// kudathu... company login la irunthu avnga login ku pona kattanum").
+$myLayer2Score = null;
+if (!empty($selfRow) && stripos($selfRow['level_name'] ?? '', 'District') !== false) {
+    $myLayer2Score = getCumulativeTpFeedbackScore($db_conn, 'dm', (int)$selfRow['id'], $fromDate, $toDate);
 }
-
-// ── Which week to show — any date the user picks (defaults to today); the
-// calendar MONTH used for Target/Achieved/proration always follows whichever
-// month that date falls in, so picking a date in an earlier/later month
-// shows that month's own target, not the current one.
-$weekDateParam = $_GET['week_date'] ?? '';
-$weekDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $weekDateParam) ? $weekDateParam : date('Y-m-d');
-
-$monthStart = date('Y-m-01', strtotime($weekDate));
-$monthEnd = date('Y-m-t', strtotime($weekDate));
-$daysInMonth = (int)date('t', strtotime($weekDate));
-
-$targetStats = getRawTargetAchievedStats($db_conn, $subtreeIds, $monthStart, $monthEnd);
-$dailyByMsId = getRawAchievedDailyByMsId($db_conn, $subtreeIds, $monthStart, $monthEnd);
-
-// ── The picked date's week (Sunday-Saturday), clipped to its calendar month
-// e.g. if the month started on a Wednesday, the week covering day 1-6 of the
-// month is only Wed-Sat — the Sun/Mon/Tue before the month started don't
-// belong to any target.
-$refDt = new DateTime($weekDate);
-$dow = (int)$refDt->format('w'); // 0=Sun..6=Sat
-$weekStartDt = (clone $refDt)->modify('-' . $dow . ' days');
-$weekEndDt = (clone $weekStartDt)->modify('+6 days');
-$monthStartDt = new DateTime($monthStart);
-$monthEndDt = new DateTime($monthEnd);
-$weekStartClipped = $weekStartDt < $monthStartDt ? $monthStartDt : $weekStartDt;
-$weekEndClipped = $weekEndDt > $monthEndDt ? $monthEndDt : $weekEndDt;
-$daysInWeekThisMonth = $weekEndClipped >= $weekStartClipped
-    ? ((int)floor(($weekEndClipped->getTimestamp() - $weekStartClipped->getTimestamp()) / 86400) + 1)
-    : 0;
-$weekLabel = $weekStartClipped->format('d M') . ' - ' . $weekEndClipped->format('d M');
-$weekStartStr = $weekStartClipped->format('Y-m-d');
-$weekEndStr = $weekEndClipped->format('Y-m-d');
-
-$rawStats = [];
-foreach ($subtreeIds as $id) {
-    $monthly = (float)($targetStats[$id]['target'] ?? 0.0);
-    $perDay = $daysInMonth > 0 ? $monthly / $daysInMonth : 0.0;
-    $rawStats[$id] = [
-        'target'        => $monthly,
-        'achieved'      => (float)($targetStats[$id]['achieved'] ?? 0.0),
-        'weekly_target' => $perDay * $daysInWeekThisMonth,
-    ];
-}
-
-// Roll a person's own stats + everyone below them up, same convention as
-// my-team.php's subtreeSumAndIds(): once someone has a team, their own raw
-// target/weekly_target is dropped in favour of the children's summed total
-// (Achieved is always a real performance number, so it's summed either way).
-function kpiSubtreeSumAndIds(int $id, array $byManager, array $rawStats): array {
-    $sum = $rawStats[$id] ?? ['target' => 0.0, 'achieved' => 0.0, 'weekly_target' => 0.0];
-    $children = $byManager[$id] ?? [];
-    if (!empty($children)) { $sum['target'] = 0.0; $sum['weekly_target'] = 0.0; }
-    $ids = [$id];
-    foreach ($children as $child) {
-        [$childSum, $childIds] = kpiSubtreeSumAndIds((int)$child['id'], $byManager, $rawStats);
-        $sum['target']        += $childSum['target'];
-        $sum['achieved']      += $childSum['achieved'];
-        $sum['weekly_target'] += $childSum['weekly_target'];
-        $ids = array_merge($ids, $childIds);
-    }
-    return [$sum, $ids];
-}
-
-function kpiCombinedDaily(array $ids, array $dailyByMsId): array {
-    $combined = [];
-    foreach ($ids as $id) {
-        foreach (($dailyByMsId[$id] ?? []) as $date => $amt) {
-            $combined[$date] = ($combined[$date] ?? 0.0) + $amt;
-        }
-    }
-    return $combined;
-}
-
-function kpiCompletedDate(array $daily, float $target): ?string {
-    if ($target <= 0) { return null; }
-    ksort($daily);
-    $running = 0.0;
-    foreach ($daily as $date => $amt) {
-        $running += $amt;
-        if ($running >= $target) { return $date; }
-    }
-    return null;
-}
-
-// Sum of a (date => amount) daily map restricted to [weekStart, weekEnd] —
-// the amount a person/team actually achieved during the selected week.
-function kpiWeeklyAchieved(array $daily, string $weekStart, string $weekEnd): float {
-    $sum = 0.0;
-    foreach ($daily as $date => $amt) {
-        if ($date >= $weekStart && $date <= $weekEnd) { $sum += $amt; }
-    }
-    return $sum;
-}
-
-function renderKpiRow(array $row, array $byManager, array $rawStats, array $dailyByMsId, array $levelColorMap, int $depth, string $weekStartStr, string $weekEndStr, int $parentId = 0): string {
-    $id = (int)$row['id'];
-    $color = $levelColorMap[(int)$row['team_level_id']] ?? '#999999';
-    [$sum, $ids] = kpiSubtreeSumAndIds($id, $byManager, $rawStats);
-    $target = $sum['target'];
-    $achieved = $sum['achieved'];
-    $balance = max(0, $target - $achieved);
-    $weeklyTarget = $sum['weekly_target'];
-
-    $combinedDaily = kpiCombinedDaily($ids, $dailyByMsId);
-    $completedDate = $target > 0 ? kpiCompletedDate($combinedDaily, $target) : null;
-    $weeklyAchieved = kpiWeeklyAchieved($combinedDaily, $weekStartStr, $weekEndStr);
-    $today = date('Y-m-d');
-
-    $indent = str_repeat('&nbsp;&nbsp;&nbsp;&nbsp;', $depth);
-    $isRoot = $depth === 0;
-
-    $html = '<tr data-id="' . $id . '" data-parent="' . $parentId . '"' . ($isRoot ? ' style="background:#f8fafc;"' : '') . '>';
-    $html .= '<td class="kpi-name">' . $indent . ($depth > 0 ? '&#8618;&nbsp;' : '') . ($isRoot ? '<b>' : '') . htmlspecialchars($row['ms_name']) . ($isRoot ? '</b>' : '') . '</td>';
-    $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
-    $html .= '<td>&#8377;' . inr_format($target, 0) . '</td>';
-    $html .= '<td>&#8377;' . inr_format($achieved, 0) . '</td>';
-    if ($target > 0 && $achieved >= $target) {
-        $html .= '<td><span style="color:#0ca30c;font-weight:600;">&#8377;0 &mdash; Target Achieved</span></td>';
-    } else {
-        $html .= '<td>&#8377;' . inr_format($balance, 0) . '</td>';
-    }
-    if ($target <= 0) {
-        $html .= '<td><span class="text-muted" style="font-size:11px;">&mdash;</span></td>';
-    } elseif ($completedDate === null) {
-        $html .= '<td><span style="color:#b45309;font-weight:600;">Not yet</span></td>';
-    } else {
-        $label = date('d M Y', strtotime($completedDate)) . ($completedDate === $today ? ' (Today)' : '');
-        $html .= '<td><span style="color:#166534;font-weight:600;">' . htmlspecialchars($label) . '</span></td>';
-    }
-    $html .= '<td>&#8377;' . inr_format($weeklyTarget, 0) . '</td>';
-    if ($weeklyTarget > 0 && $weeklyAchieved >= $weeklyTarget) {
-        $html .= '<td><span style="color:#0ca30c;font-weight:600;">&#8377;' . inr_format($weeklyAchieved, 0) . '</span></td>';
-    } else {
-        $html .= '<td>&#8377;' . inr_format($weeklyAchieved, 0) . '</td>';
-    }
-    $html .= '</tr>';
-
-    $children = $byManager[$id] ?? [];
-    foreach ($children as $child) {
-        $html .= renderKpiRow($child, $byManager, $rawStats, $dailyByMsId, $levelColorMap, $depth + 1, $weekStartStr, $weekEndStr, $id);
-    }
-    return $html;
-}
+$myLayer2CanSeeBreakdown = !empty($_SESSION['LOGGED_IN_VIA_COMPANY']) || !empty($_companyBridgeView);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -211,6 +58,27 @@ function renderKpiRow(array $row, array $byManager, array $rawStats, array $dail
             border-bottom:1px solid #e1e0d9; white-space:nowrap; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px;
         }
         .mt td { padding:9px 12px; border-bottom:1px solid #e1e0d9; vertical-align:middle; white-space:nowrap; }
+        .mt th.kpi-group { text-align:center; background:#eef2ff; border-left:1px solid #d7dafc; }
+        .kpi-hover-cell { cursor:pointer; border-bottom:1px dotted #6366f1; }
+        #kpiTipBox {
+            position:fixed; z-index:9999; background:#111827; color:#fff; padding:8px 10px;
+            border-radius:6px; font-size:12px; line-height:1.5; max-width:280px; display:none;
+            font-family:arial,"DejaVu Sans"; box-shadow:0 4px 12px rgba(0,0,0,.25);
+        }
+        /* Solo-view KPI cards — one card per KPI component instead of one
+           40+-column table row, for a DM with no subordinates. 2026-11-21. */
+        .kpi-card-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; }
+        .kpi-card { background:#fff; border:1px solid #e1e0d9; border-radius:10px; padding:16px 18px; }
+        .kpi-card-head { display:flex; align-items:center; gap:8px; font-weight:600; font-size:13.5px; color:#1f2937; margin-bottom:8px; }
+        .kpi-card-head i { color:#6366f1; font-size:19px; }
+        .kpi-card-desc { font-size:12px; color:#6b7280; margin-bottom:12px; min-height:32px; }
+        .kpi-card-stats { display:flex; gap:14px; border-top:1px solid #f1f5f9; padding-top:10px; margin-bottom:8px; }
+        .kpi-card-stats > div { display:flex; flex-direction:column; flex:1; }
+        .kpi-card-label { font-size:10.5px; color:#9ca3af; text-transform:uppercase; letter-spacing:.3px; margin-bottom:2px; }
+        .kpi-card-val { font-size:13.5px; font-weight:600; color:#1f2937; }
+        .kpi-card-score { font-size:15px; font-weight:700; text-align:right; }
+        .kpi-card-total { margin-top:16px; text-align:right; font-size:15px; color:#374151; }
+        @media (max-width:576px) { .kpi-card-grid { grid-template-columns:1fr; } }
     </style>
 </head>
 <body<?php echo $embed ? ' class="ms-embed"' : ''; ?>>
@@ -262,8 +130,10 @@ function renderKpiRow(array $row, array $byManager, array $rawStats, array $dail
                         <div class="row mb-2">
                             <div class="col">
                                 <p class="text-muted" style="font-size:12px;margin-bottom:6px;">
-                                    Target &amp; Achieved for <?php echo date('F Y', strtotime($monthStart)); ?> (<?php echo date('d M', strtotime($monthStart)); ?> - <?php echo date('d M', strtotime($monthEnd)); ?>) &mdash;
-                                    Weekly Target/Achieved for the week of <?php echo htmlspecialchars($weekLabel); ?>
+                                    KPI Scorecard for <?php echo date('d M Y', strtotime($fromDate)); ?> - <?php echo date('d M Y', strtotime($toDate)); ?>
+                                </p>
+                                <p class="text-muted" style="font-size:11px;margin-bottom:0;">
+                                    Layer 1 &mdash; Business Impact, scored here out of 60 marks. Per the official KPI Structure document this layer is actually 65 marks, but Monthly Promotional Activities (5%) has no DB signal anywhere in the system, so it's scored manually, outside this page, and left off this scorecard entirely. Layer 2 (Professional Excellence) and Innovation &amp; Value Creation are not included here &mdash; those are manual, multi-reviewer scores.
                                 </p>
                             </div>
                         </div>
@@ -271,20 +141,42 @@ function renderKpiRow(array $row, array $byManager, array $rawStats, array $dail
                             <div class="col">
                                 <form method="get" class="d-flex flex-wrap align-items-end gap-2">
                                     <div>
-                                        <label class="form-label mb-0" style="font-size:11px;font-weight:600;color:#6b7280;">Any date in the week</label>
-                                        <input type="date" name="week_date" class="form-control form-control-sm" value="<?php echo htmlspecialchars($weekDate); ?>">
+                                        <label class="form-label mb-0" style="font-size:11px;font-weight:600;color:#6b7280;">From Date</label>
+                                        <input type="date" name="from_date" class="form-control form-control-sm" value="<?php echo htmlspecialchars($fromDate); ?>">
                                     </div>
                                     <div>
-                                        <button type="submit" class="btn btn-primary btn-sm">Show Week</button>
-                                        <?php if ($weekDate !== date('Y-m-d')): ?>
-                                            <a href="kpi" class="btn btn-outline-secondary btn-sm">This Week</a>
+                                        <label class="form-label mb-0" style="font-size:11px;font-weight:600;color:#6b7280;">To Date</label>
+                                        <input type="date" name="to_date" class="form-control form-control-sm" value="<?php echo htmlspecialchars($toDate); ?>">
+                                    </div>
+                                    <div>
+                                        <button type="submit" class="btn btn-primary btn-sm">Show</button>
+                                        <?php if ($fromDate !== date('Y-m-01') || $toDate !== date('Y-m-d')): ?>
+                                            <a href="kpi" class="btn btn-outline-secondary btn-sm">This Month</a>
                                         <?php endif; ?>
+                                        <button type="button" id="kpiWeeklyToggleBtn" class="btn btn-outline-primary btn-sm">Weekly</button>
+                                        <a href="export-kpi-xlsx?from_date=<?php echo urlencode($fromDate); ?>&to_date=<?php echo urlencode($toDate); ?>" class="btn btn-outline-success btn-sm"><i class="material-icons-outlined" style="font-size:15px;vertical-align:middle;">download</i> Export Excel</a>
                                     </div>
                                 </form>
                             </div>
                         </div>
-                        <div class="row">
+                        <?php $isSoloView = empty($byManager[(int)$selfRow['id']] ?? []); ?>
+                        <?php // Personal scorecard — own numbers only (byManager=[] forces
+                        // computeKpiRowValues to treat this person as having no subtree, so
+                        // an ASM/SM sees their OWN 9 cards here, same as a solo DM always
+                        // has, instead of their team's rolled-up totals). 2026-11-30,
+                        // user-requested ("asm ku dm mathiri avnagalodathu 9 card ahh
+                        // kattanum") — previously an ASM/SM saw only the team table below,
+                        // never their own personal scorecard. ?>
+                        <div class="row" id="kpiMainViewRow">
                             <div class="col">
+                                <?php if (!$isSoloView): ?><h6 class="mb-2" style="font-weight:600;">Your Own Scorecard</h6><?php endif; ?>
+                                <?php echo renderKpiCards(computeKpiRowValues($selfRow, [], $rawStats, $dailyByMsId, $levelColorMap, 0, $fromDate, $daysInRange, $newShopCountByMsId, $marketWorkDatesByMsId, $workingDaysPlan, $kx)); ?>
+                            </div>
+                        </div>
+                        <?php if (!$isSoloView): ?>
+                        <div class="row mt-3" id="kpiTeamViewRow">
+                            <div class="col">
+                                <h6 class="mb-2" style="font-weight:600;">Team</h6>
                                 <div class="card">
                                     <div class="card-body">
                                         <div class="mb-3">
@@ -294,18 +186,106 @@ function renderKpiRow(array $row, array $byManager, array $rawStats, array $dail
                                         <table class="mt">
                                             <thead>
                                                 <tr>
-                                                    <th>Name</th>
-                                                    <th>Level</th>
-                                                    <th>Target Amount</th>
-                                                    <th>Achieved (TP Invoice)</th>
-                                                    <th>Balance</th>
-                                                    <th>Target Completed Date</th>
-                                                    <th>Weekly Target</th>
-                                                    <th>Weekly Achieved</th>
+                                                    <th rowspan="2">Name</th>
+                                                    <th rowspan="2">Level</th>
+                                                    <th colspan="4" class="kpi-group">1. Napkin Sales Target Ach. (15%)</th>
+                                                    <th colspan="4" class="kpi-group">2. District Sales Overachievement (10%)</th>
+                                                    <th colspan="4" class="kpi-group">3. Weekly Sales Target Ach. (5%)</th>
+                                                    <th colspan="4" class="kpi-group">4. Early Month Target Ach. (5%)</th>
+                                                    <th colspan="4" class="kpi-group">5. Daily Market Visit &amp; Order (10%)</th>
+                                                    <th colspan="4" class="kpi-group">6. New Shop Onboarding (5%)</th>
+                                                    <th colspan="4" class="kpi-group">7. New Category Outlets (5%)</th>
+                                                    <th colspan="4" class="kpi-group">8. Retail Shop Merchandising (5%)</th>
+                                                    <th colspan="3" class="kpi-group">9. Sales Return Control (deduct 10)</th>
+                                                    <th rowspan="2">KPI Score<br>(/ 60)</th>
+                                                </tr>
+                                                <tr>
+                                                    <th>Plan</th><th>Ach</th><th>Ach%</th><th>Score</th>
+                                                    <th>Eligibility</th><th>Ach%</th><th>vs Top</th><th>Score</th>
+                                                    <th>Plan</th><th>Ach</th><th>Ach%</th><th>Score</th>
+                                                    <th>Plan</th><th>Ach</th><th>Ach%</th><th>Score</th>
+                                                    <th>Plan</th><th>Ach</th><th>Ach%</th><th>Score</th>
+                                                    <th>Min</th><th>Ach</th><th>Ach%</th><th>Score</th>
+                                                    <th>Min</th><th>Ach</th><th>Ach%</th><th>Score</th>
+                                                    <th>Shops</th><th>Compliant</th><th>%</th><th>Score</th>
+                                                    <th>Return%</th><th>Status</th><th>Penalty</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="kpiMainTableBody">
+                                            <?php echo renderKpiRow($selfRow, $byManager, $rawStats, $dailyByMsId, $levelColorMap, 0, $fromDate, $daysInRange, $newShopCountByMsId, $marketWorkDatesByMsId, $workingDaysPlan, $newShopPlan, $kx); ?>
+                                            </tbody>
+                                        </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ($myLayer2Score !== null): ?>
+                        <div class="row mt-3">
+                            <div class="col">
+                                <p class="text-muted" style="font-size:11px;margin-bottom:6px;">
+                                    Layer 2 &mdash; Professional Excellence. Scored here from your own TPs' month-end feedback (5 questions, 1-5 stars each = out of 25 per TP per month) &mdash; the cumulative average of every rating received within the From/To range selected above.
+                                </p>
+                                <div class="kpi-card-grid">
+                                    <div class="kpi-card">
+                                        <div class="kpi-card-head"><i class="material-icons-outlined">star_rate</i> 1. Your Total Score</div>
+                                        <div class="kpi-card-desc">Average TP feedback score for the selected date range (out of 25 per rating).</div>
+                                        <div class="kpi-card-stats">
+                                            <div>
+                                                <span class="kpi-card-label">Average Score</span>
+                                                <span class="kpi-card-val"><?php echo $myLayer2Score['count'] > 0 ? number_format($myLayer2Score['avg_score_25'], 1) . ' / 25' : 'No ratings yet'; ?></span>
+                                            </div>
+                                            <div>
+                                                <span class="kpi-card-label">Ratings Received</span>
+                                                <span class="kpi-card-val"><?php echo (int)$myLayer2Score['count']; ?></span>
+                                            </div>
+                                        </div>
+                                        <?php if ($myLayer2CanSeeBreakdown && $myLayer2Score['count'] > 0): ?>
+                                        <div style="margin-top:10px;border-top:1px solid #f1f5f9;padding-top:10px;">
+                                            <p style="font-size:11px;color:#9ca3af;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px;">Per-TP breakdown (visible to Company only)</p>
+                                            <div style="max-height:180px;overflow-y:auto;">
+                                                <?php foreach ($myLayer2Score['rows'] as $_r2): ?>
+                                                <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;border-bottom:1px dotted #f1f5f9;">
+                                                    <span><?php echo htmlspecialchars($_r2['tp_name'] ?? '-'); ?> (<?php echo htmlspecialchars($_r2['tp_code'] ?? '-'); ?>) &mdash; <?php echo htmlspecialchars($_r2['period_month']); ?></span>
+                                                    <span style="font-weight:600;"><?php echo (int)$_r2['score_25']; ?> / 25</span>
+                                                </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <div class="row" id="kpiWeeklyViewRow" style="display:none;">
+                            <div class="col">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+                                            Week-wise Target / Achieved (TP Invoice) / Balance for <?php echo date('d M', strtotime($fromDate)) . ' - ' . date('d M Y', strtotime($toDate)); ?> &mdash; each week's Target is this person's selected-range target prorated to that week's days, so the weekly totals add up to the Plan/Achieved shown above.
+                                        </p>
+                                        <div style="overflow-x:auto;">
+                                        <table class="mt">
+                                            <thead>
+                                                <tr>
+                                                    <th rowspan="2">Name</th>
+                                                    <th rowspan="2">Level</th>
+                                                    <?php foreach ($kpiWeeks as $week): ?>
+                                                        <th colspan="3" class="kpi-group"><?php echo htmlspecialchars($week['label']); ?><br><span style="font-weight:400;"><?php echo date('d M', strtotime($week['start'])) . ' - ' . date('d M', strtotime($week['end'])); ?></span></th>
+                                                    <?php endforeach; ?>
+                                                </tr>
+                                                <tr>
+                                                    <?php foreach ($kpiWeeks as $week): ?>
+                                                        <th>Target</th><th>Achieved</th><th>Balance</th>
+                                                    <?php endforeach; ?>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                            <?php echo renderKpiRow($selfRow, $byManager, $rawStats, $dailyByMsId, $levelColorMap, 0, $weekStartStr, $weekEndStr); ?>
+                                            <?php echo renderWeeklyKpiRow($selfRow, $byManager, $monthlyRawStats, $monthlyDailyByMsId, $levelColorMap, 0, $kpiWeeks, $wkDaysInRange); ?>
                                             </tbody>
                                         </table>
                                         </div>
@@ -321,6 +301,7 @@ function renderKpiRow(array $row, array $byManager, array $rawStats, array $dail
     </div>
 </div>
 
+<div id="kpiTipBox"></div>
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -330,9 +311,27 @@ function renderKpiRow(array $row, array $byManager, array $rawStats, array $dail
 <script src="../../assets/js/custom.js"></script>
 <script>
 (function () {
+    var tipBox = document.getElementById('kpiTipBox');
+    if (!tipBox) return;
+    document.querySelectorAll('.kpi-hover-cell').forEach(function (cell) {
+        cell.addEventListener('mouseenter', function () {
+            tipBox.innerHTML = cell.getAttribute('data-kpi-tip') || '';
+            tipBox.style.display = 'block';
+        });
+        cell.addEventListener('mousemove', function (e) {
+            tipBox.style.left = (e.clientX + 14) + 'px';
+            tipBox.style.top = (e.clientY + 14) + 'px';
+        });
+        cell.addEventListener('mouseleave', function () {
+            tipBox.style.display = 'none';
+        });
+    });
+})();
+
+(function () {
     var searchBox = document.getElementById('kpiSearchBox');
     if (!searchBox) return;
-    var rows = Array.prototype.slice.call(document.querySelectorAll('.mt tbody tr'));
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#kpiMainTableBody tr'));
     var rowById = {};
     rows.forEach(function (tr) { rowById[tr.getAttribute('data-id')] = tr; });
 
@@ -359,6 +358,19 @@ function renderKpiRow(array $row, array $byManager, array $rawStats, array $dail
                 showWithAncestors(tr);
             }
         });
+    });
+})();
+
+(function () {
+    var btn = document.getElementById('kpiWeeklyToggleBtn');
+    var mainRow = document.getElementById('kpiMainViewRow');
+    var weeklyRow = document.getElementById('kpiWeeklyViewRow');
+    if (!btn || !mainRow || !weeklyRow) return;
+    btn.addEventListener('click', function () {
+        var showingWeekly = weeklyRow.style.display !== 'none';
+        weeklyRow.style.display = showingWeekly ? 'none' : '';
+        mainRow.style.display = showingWeekly ? '' : 'none';
+        btn.textContent = showingWeekly ? 'Weekly' : 'Scorecard';
     });
 })();
 </script>

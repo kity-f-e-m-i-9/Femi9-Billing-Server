@@ -319,7 +319,7 @@ foreach ($warehouseBuckets as $bucketKey => $bucket) {
 								<div class="card">
 									<div class="card-body">
 										<h1><span><?=htmlspecialchars((string)($result_Godown['gname']), ENT_QUOTES, 'ISO-8859-1', false);?> &mdash; <?=htmlspecialchars($bucket['label'], ENT_QUOTES, 'UTF-8');?></span> <span class="card-summary-line" id="cardSummary-<?=$user_id_Loginvl;?>-<?=htmlspecialchars($cardFilterClass, ENT_QUOTES, 'UTF-8');?>"></span></h1>
-										<div style="background:#fff;overflow:scroll;width:100%;">
+										<div style="background:#fff;overflow-x:auto;width:100%;">
 										<table class="table">
 											<thead>
 												<tr>

@@ -17,6 +17,10 @@
         </li>
 
         <li>
+            <a href="dm-orders.php"><i class="material-icons-two-tone">storefront</i>DM Orders</a>
+        </li>
+
+        <li>
             <a href="#"><i class="material-icons-two-tone">shopping_cart</i>Purchase Order<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
             <ul class="sub-menu">
                 <li><a href="add-purchase-order.php">New Purchase Order</a></li>

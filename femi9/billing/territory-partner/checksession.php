@@ -111,6 +111,23 @@ if (!in_array($__currentPage, ['agreement.php', 'agreement-action.php', 'change-
     }
 }
 
+// "Daily Work Start" — used to be a hard gate here (2026-11-12): once a DM
+// sent a work-start request for one of today's Firkas this TP covers
+// (marketing/daily-work-start.php), this TP could not use ANY other page of
+// the portal until they Accept/Deny it on work-start-confirm.php. Removed
+// 2026-11-24 per user request ("tp kitta approve kekkurathu... tp login ahh
+// lock pannurathu tp side logic ahh venam" — keep asking the TP to
+// Accept/Deny, just never force-lock their own login/portal over it). The
+// Accept/Deny flow itself is untouched and still fully reachable at any
+// time — work-start-confirm.php + work-start-confirm-action.php, and
+// tp_daily_assignments/tp_approval_status still work exactly as before for
+// the DM-side request/escalate flow and the ASM/Company resolve screens.
+// The TP is now surfaced this same pending request as a plain, dismissable
+// reminder banner/modal on their own dashboard.php instead (same "just
+// logged in" pattern as that page's existing tomorrow-Firka reminder) —
+// visible, but never blocking. Confirmed via code search that nothing else
+// in the codebase calls this removed block or depends on it being here.
+
 if (!isset($_SESSION['LOGIN_USER_ID'])) {
     $_SESSION['LOGIN_USER_ID'] = $result_LoGuserDtails['id'];
 }

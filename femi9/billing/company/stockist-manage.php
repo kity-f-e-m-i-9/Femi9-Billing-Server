@@ -253,6 +253,7 @@ $canDeleteSt = hasPermission('st_delete');
                                                         <th>Category</th>
                                                         <th>View</th>
                                                         <th>Edit</th>
+                                                        <th>Login</th>
                                                         <th>Delete</th>
                                                     </tr>
                                                 </thead>
@@ -364,6 +365,15 @@ $canDeleteSt = hasPermission('st_delete');
                                                            class="action-btn"
                                                            title="Edit Details">
                                                             <i class="material-icons-outlined">edit</i>
+                                                        </a>
+                                                        <?php endif; ?>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <?php if ($canEditSt && $result_product_list['account_status'] === 'active'): ?>
+                                                        <a href="login-as-stockist?stid=<?php echo $rowid;?>"
+                                                           class="action-btn" title="Login as this Stockist" target="_blank" rel="noopener">
+                                                            <i class="material-icons-outlined" style="color:#059669;">login</i>
                                                         </a>
                                                         <?php endif; ?>
                                                     </td>

@@ -4,6 +4,9 @@ date_default_timezone_set("Asia/Kolkata");
 error_reporting(0);
 include("config.php");
 require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
+require_once("include/TpDistrictScope.php");
+require_once("include/ShopInvoiceCategoryLock.php");
+$tpAssignedDistricts = getTpAssignedDistricts($db_conn, (int)$Login_user_IDvl);
 
 $getinvuser    = "shop";
 $get_action    = $_REQUEST['action'] ?? '';
@@ -13,6 +16,90 @@ $lablenamedisplay  = "Shop Name";
 $tablename         = "shop";
 $invidprefix       = "CMPSHP";
 
+// Brand-new invoice (no InvoiceID to resume/continue) always starts with a
+// Napkin/Lumi Diaper chooser screen, same pattern as add-purchase-order.php's
+// own type-chooser — picked once, upfront, before any form is shown at all,
+// instead of the inline card inside the form. Resuming an existing invoice
+// (InvoiceID set — e.g. "Continue Invoice" from a field order) is untouched:
+// that flow still uses its own inline card/locked-badge further down.
+// 2026-11-23, user-requested (mirror Purchase Order's exact UX).
+$newOrderType = null;
+if (!isset($_REQUEST['InvoiceID'])) {
+    $requestedNewType = $_GET['type'] ?? null;
+    if ($requestedNewType === 'napkin' || $requestedNewType === 'diaper') {
+        $newOrderType = $requestedNewType;
+    } else {
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?php echo $displaytitle; ?> : <?php echo $business_name; ?></title>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
+    <link href="../../assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../assets/css/main.min.css" rel="stylesheet">
+    <link href="../../assets/css/custom.css" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        .apo-type-choice { display: flex; gap: 20px; flex-wrap: wrap; max-width: 640px; margin: 30px auto; }
+        .apo-type-card {
+            flex: 1; min-width: 240px; background: #fff; border: 2px solid #e5e7eb; border-radius: 14px;
+            padding: 28px 22px; text-align: center; text-decoration: none; color: #1f2937; transition: all .2s;
+        }
+        .apo-type-card:hover { border-color: #667eea; box-shadow: 0 4px 16px rgba(102,126,234,.18); transform: translateY(-2px); color: #1f2937; }
+        .apo-type-card .material-icons-outlined { font-size: 40px; color: #667eea; margin-bottom: 10px; }
+        .apo-type-card .name { font-size: 18px; font-weight: 700; }
+        .apo-type-card .desc { font-size: 12.5px; color: #6b7280; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="app align-content-stretch d-flex flex-wrap">
+        <div class="app-sidebar">
+            <?php include("logo.php");?>
+            <?php include("femi_menu.php");?>
+        </div>
+        <div class="app-container">
+            <?php include("app-header.php");?>
+            <div class="app-content">
+                <div class="content-wrapper">
+                    <div class="container-fluid">
+                        <div class="page-description"><h1 style="margin:0;"><?php echo $displaytitle;?></h1></div>
+                        <p style="color:#6b7280;margin-top:6px;">What kind of invoice is this?</p>
+                        <div class="apo-type-choice">
+                            <a href="?invuser=shop&type=napkin" class="apo-type-card">
+                                <i class="material-icons-outlined">inventory_2</i>
+                                <div class="name">Napkin</div>
+                                <div class="desc">Femi9 Sanitary Napkin products</div>
+                            </a>
+                            <a href="?invuser=shop&type=diaper" class="apo-type-card">
+                                <i class="material-icons-outlined">inventory_2</i>
+                                <div class="name">Lumi Diaper</div>
+                                <div class="desc">Lumi Baby Diaper products</div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
+    <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
+    <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../../assets/plugins/perfectscroll/perfect-scrollbar.min.js"></script>
+    <script src="../../assets/plugins/pace/pace.min.js"></script>
+    <script src="../../assets/js/main.min.js"></script>
+    <script src="../../assets/js/custom.js"></script>
+</body>
+</html>
+<?php
+        exit;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -54,13 +141,19 @@ $invidprefix       = "CMPSHP";
 <?php if (isset($_REQUEST['AddedSuccess'])): ?><div class="alert alert-success">one product added success.</div><?php endif; ?>
 <?php if (isset($_REQUEST['ItemAlreadyExists'])): ?><div class="alert alert-danger">invalid product, already exists.</div><?php endif; ?>
 <?php if (isset($_REQUEST['InvalidStock'])): ?><div class="alert alert-danger">invalid qty, out of stock.</div><?php endif; ?>
+<?php if (isset($_REQUEST['CategoryMismatch'])): ?><div class="alert alert-danger">This invoice already has a different Product Type. An invoice can only have Napkin OR Diaper products, not both.</div><?php endif; ?>
 <?php if (isset($_REQUEST['DeleteSuccess'])): ?><div class="alert alert-danger">Deleted ! one product deleted success.</div><?php endif; ?>
 <?php if (isset($_REQUEST['invoicealready'])): ?><div class="alert alert-danger">Invoice Number already exists!</div><?php endif; ?>
 <?php if (isset($_REQUEST['InvoiceUpdatedSuccess'])): ?><div class="alert alert-success">Invoice Number Updated Success!.</div><?php endif; ?>
 <?php if (isset($_SESSION['errorMessage'])): ?><div class="alert alert-danger"><?php echo htmlspecialchars($_SESSION['errorMessage']); unset($_SESSION['errorMessage']); ?></div><?php endif; ?>
 
 <div class="page-title-modern">
-    <h1><i class="material-icons">receipt_long</i><?php if ($get_action == "edit") { echo "Update "; } ?><?php echo $displaytitle; ?></h1>
+    <div>
+        <h1><i class="material-icons">receipt_long</i><?php if ($get_action == "edit") { echo "Update "; } ?><?php echo $displaytitle; ?></h1>
+        <?php if ($newOrderType !== null): ?>
+        <a href="shop-invoice-add.php?invuser=shop" style="font-size:12.5px;color:#6b7280;">Change order type</a>
+        <?php endif; ?>
+    </div>
     <a href="shop-manage-invoice.php" class="menu-link" title="Manage Invoices"><i class="material-icons">list</i></a>
 </div>
 
@@ -88,7 +181,88 @@ function totalkm() {
     var textValue2 = document.getElementById('qty').value;
     document.getElementById('output').value = (textValue1 * textValue2);
 }
+// Product Type (Napkin/Diaper) narrows the Product dropdown to products of
+// that category only — window.__tpProducts is set by whichever
+// product-add-section block actually renders (edit-draft or new-invoice;
+// only one of the two is ever on the page at once). 2026-11-20, user-requested.
+function filterTpProductsByType(category) {
+    var sel = document.getElementById('prIdSelect');
+    if (!sel) { return; }
+    sel.innerHTML = '';
+    var ph = document.createElement('option');
+    ph.value = '';
+    ph.hidden = true;
+    if (!category) {
+        ph.textContent = 'Select Product Type first';
+        sel.appendChild(ph);
+        sel.disabled = true;
+        return;
+    }
+    ph.textContent = 'Select Product';
+    sel.appendChild(ph);
+    (window.__tpProducts || []).forEach(function(p) {
+        if (p.category === category) {
+            var opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            sel.appendChild(opt);
+        }
+    });
+    sel.disabled = false;
+}
+
+// Product Type card picker — a TP clicks Napkin or Diaper once (mirrors the
+// Purchase Order page's own type-chooser cards); it stays highlighted,
+// fills the hidden #prIdTypeSelect input the rest of this form already reads,
+// filters the Product dropdown, and hides the "pick a type" prompt. A
+// "change" link resets it, since nothing is actually saved until Add is
+// clicked. Once an invoice already has its first item, the server locks the
+// category for real (shop-invoice-action.php/shop-invoice-action2.php) and
+// this chooser isn't rendered at all — a fixed badge shows instead.
+// 2026-11-23, user-requested.
+function pickTpProductType(wrapperId, category) {
+    var wrapper = document.getElementById(wrapperId);
+    if (!wrapper) { return; }
+    wrapper.querySelectorAll('.tp-type-card').forEach(function(c) {
+        c.classList.toggle('selected', c.getAttribute('data-type') === category);
+    });
+    var hidden = wrapper.querySelector('input[type="hidden"]');
+    if (hidden) { hidden.value = category; }
+    var changeLink = wrapper.querySelector('.tp-type-change');
+    if (changeLink) { changeLink.style.display = ''; }
+    filterTpProductsByType(category);
+}
+function resetTpProductType(wrapperId) {
+    var wrapper = document.getElementById(wrapperId);
+    if (!wrapper) { return; }
+    wrapper.querySelectorAll('.tp-type-card').forEach(function(c) { c.classList.remove('selected'); });
+    var hidden = wrapper.querySelector('input[type="hidden"]');
+    if (hidden) { hidden.value = ''; }
+    var changeLink = wrapper.querySelector('.tp-type-change');
+    if (changeLink) { changeLink.style.display = 'none'; }
+    filterTpProductsByType('');
+}
 </script>
+
+<style type="text/css">
+.tp-type-cards { display: flex; gap: 10px; flex-wrap: wrap; }
+.tp-type-card {
+    flex: 1; min-width: 110px; background: #fff; border: 2px solid #e5e7eb; border-radius: 9px;
+    padding: 10px 12px; text-align: center; cursor: pointer; transition: all .15s ease; user-select: none;
+}
+.tp-type-card:hover { border-color: #93c5fd; }
+.tp-type-card.selected { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+.tp-type-card .material-icons-outlined { font-size: 22px; color: #2563eb; }
+.tp-type-card .tp-type-name { font-size: 13px; font-weight: 700; color: #1e293b; }
+.tp-type-change { font-size: 11.5px; margin-top: 4px; display: none; }
+.tp-type-locked-badge {
+    display: inline-flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center;
+    gap: 6px; background: #eff6ff; color: #1d4ed8; width: 100%; box-sizing: border-box;
+    border: 2px solid #bfdbfe !important; border-radius: 9px !important; padding: 10px 14px !important;
+    font-weight: 600; font-size: 14px !important; white-space: nowrap;
+}
+.tp-type-locked-badge .material-icons { font-size: 16px !important; line-height: 1; }
+</style>
 
 <style type="text/css">
 body { font-family: 'Poppins', sans-serif; }
@@ -150,10 +324,41 @@ body { font-family: 'Poppins', sans-serif; }
 }
 .product-add-grid .wide { grid-column: span 2; }
 @media (max-width: 992px) { .product-add-grid .wide { grid-column: 1 / -1; } }
+/* Mobile — phone widths. Bootstrap's col-md-* on the Invoice Details row
+   already stacks to full width below 768px with no extra CSS, but the
+   custom-grid "Add Product" section (not a Bootstrap grid) needed its own
+   rule, and select2's own JS-computed width can overflow a narrow screen
+   unless pinned to 100% explicitly. 2026-11-21, user-requested. */
+@media (max-width: 576px) {
+    .form-section, .product-add-section { padding: 14px; }
+    .product-add-grid { grid-template-columns: 1fr; }
+    .product-add-grid .wide { grid-column: 1 / -1; }
+    .select2-container { max-width: 100% !important; }
+}
 .input-group-modern { display: flex; flex-direction: column; }
 .input-group-modern label {
     font-size: 11.5px; color: #64748b; font-weight: 600; margin-bottom: 5px;
     text-transform: uppercase; letter-spacing: 0.4px;
+}
+/* #prIdTypeSelect (Product Type) is a plain <select class="form-control">,
+   not Bootstrap's .form-select or select2's .prinput — neither of which
+   paint a dropdown chevron, so it rendered as a bare text box with no
+   visual cue it's a dropdown. Painted one explicitly rather than switching
+   to .form-select, since this page's own padding override above
+   (padding:10px 14px !important) would otherwise clip Bootstrap's chevron
+   against the right edge.
+   Same fix applied to the District/Shop Name selects on the Invoice Details
+   row (#shopDistrictSelect[Edit], #customerSelect[Edit]) — their plain
+   .form-control's native browser arrow was floating right next to the short
+   placeholder text instead of pinned to the box's actual right edge on a
+   narrow column. 2026-11-21, user-reported. */
+#prIdTypeSelect, #shopDistrictSelect, #shopDistrictSelectEdit, #customerSelect, #customerSelectEdit {
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 13px;
+    padding-right: 34px !important;
 }
 /* Element-type selectors (not just .form-control) — loadPrice.php's AJAX
    response swaps #amount's markup for a bare, class-less <input>, so the
@@ -254,6 +459,12 @@ select:focus, input[type=number]:focus { background:#fff; }
 
     $CustomerID = $result_InvoieDetails['to_user_id'];
     $result_CUSTDetails = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='".db_esc($CustomerID)."'"));
+
+    // 'napkin'/'diaper' once this invoice already has an item of that type
+    // (locked, no further choice); null while it still has zero items (free
+    // choice via the card picker below); 'mixed' for a legacy invoice that
+    // already has both (unrestricted, same as before this lock existed).
+    $lockedCategory = getShopInvoiceLockedCategory($db_conn, $Invoice_ID);
 ?>
 
 <form action="shop-invoice-action2.php" method="post" enctype="multipart/form-data">
@@ -263,20 +474,62 @@ select:focus, input[type=number]:focus { background:#fff; }
 <div class="form-section">
 <div class="section-header"><i class="material-icons">edit_document</i>Invoice Details</div>
 <div class="row g-3">
-<div class="col-md-6">
-<label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
 <?php
 $totalcountitems = mysqli_fetch_array(mysqli_query($db_conn, "SELECT COUNT(*) AS n FROM user_invoice_items WHERE inv_id='".db_esc($Invoice_ID)."'"))['n'];
 ?>
-<select name="customer_id" class="form-control">
-<option value="<?php echo $CustomerID; ?>" hidden><?php echo htmlspecialchars((string)($result_CUSTDetails['name']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($result_CUSTDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
-<?php if ($totalcountitems == 0) {
-    $res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userID='".db_esc($Login_user_IDvl)."' AND onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' ORDER BY name ASC");
-    while ($r = mysqli_fetch_array($res_shops)) { ?>
-<option value="<?php echo htmlspecialchars((string)($r['temp_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucwords($r['name'])), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($r['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
-<?php } } ?>
+<?php if ($totalcountitems == 0): ?>
+<div class="col-md-3">
+<label class="form-label">District *</label>
+<select required name="shop_district_id" id="shopDistrictSelectEdit" class="form-control" onchange="loadShopsByDistrictEdit(this.value)">
+<option value="" hidden>Select</option>
+<?php foreach ($tpAssignedDistricts as $d) { ?>
+<option value="<?php echo (int)$d['id']; ?>" <?php echo ((int)$result_CUSTDetails['district_id'] === (int)$d['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($d['name'], ENT_QUOTES, 'UTF-8'); ?></option>
+<?php } ?>
 </select>
 </div>
+<div class="col-md-3">
+<label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
+<select name="customer_id" id="customerSelectEdit" class="form-control">
+<option value="<?php echo htmlspecialchars((string)$CustomerID, ENT_QUOTES, 'UTF-8'); ?>" selected><?php echo htmlspecialchars((string)($result_CUSTDetails['name']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($result_CUSTDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
+</select>
+<script>
+function loadShopsByDistrictEdit(districtId) {
+    var sel = document.getElementById('customerSelectEdit');
+    var current = sel.value;
+    if (!districtId) { return; }
+    sel.disabled = true;
+    fetch('get-shop-list-by-district.php?district_id=' + encodeURIComponent(districtId))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            sel.innerHTML = '';
+            function addGroup(label, shops) {
+                if (!shops.length) return;
+                var grp = document.createElement('optgroup');
+                grp.label = label;
+                shops.forEach(function(s) {
+                    var opt = document.createElement('option');
+                    opt.value = s.temp_id;
+                    opt.textContent = s.name + ', ' + s.mobile;
+                    if (s.temp_id === current) { opt.selected = true; }
+                    grp.appendChild(opt);
+                });
+                sel.appendChild(grp);
+            }
+            addGroup('Shops in this district', data.matched || []);
+            addGroup('All my other shops', data.other || []);
+            sel.disabled = false;
+        })
+        .catch(function() { sel.disabled = false; });
+}
+</script>
+</div>
+<?php else: ?>
+<div class="col-md-6">
+<label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
+<input type="hidden" name="customer_id" value="<?php echo htmlspecialchars((string)$CustomerID, ENT_QUOTES, 'UTF-8'); ?>">
+<input type="text" class="form-control" readonly value="<?php echo htmlspecialchars((string)($result_CUSTDetails['name']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($result_CUSTDetails['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
+</div>
+<?php endif; ?>
 <div class="col-md-6">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <label class="form-label">Invoice Date*</label>
@@ -320,19 +573,58 @@ flatpickr("#editInvoiceDate", {
 <div class="product-add-section">
 <div class="section-header" style="border:none;padding-bottom:10px;margin-bottom:12px;"><i class="material-icons">add_shopping_cart</i>Add Product</div>
 <div class="product-add-grid">
+<div class="input-group-modern" id="prIdTypeWrapperEdit">
+<label>Product Type *</label>
+<?php if ($lockedCategory === 'napkin' || $lockedCategory === 'diaper'): ?>
+<input type="hidden" name="prIdTypeSelect" id="prIdTypeSelect" value="<?php echo $lockedCategory; ?>">
+<span class="tp-type-locked-badge"><i class="material-icons" style="font-size:18px;">lock</i><?php echo ucfirst($lockedCategory); ?></span>
+<?php elseif ($lockedCategory === 'mixed'): ?>
+<select required id="prIdTypeSelect" class="form-control" autofocus onchange="filterTpProductsByType(this.value)">
+<option value="" hidden>Select</option>
+<option value="napkin">Napkin</option>
+<option value="diaper">Diaper</option>
+</select>
+<?php else: ?>
+<input type="hidden" name="prIdTypeSelect" id="prIdTypeSelect" value="">
+<div class="tp-type-cards">
+<div class="tp-type-card" data-type="napkin" onclick="pickTpProductType('prIdTypeWrapperEdit','napkin')">
+<i class="material-icons-outlined">inventory_2</i>
+<div class="tp-type-name">Napkin</div>
+</div>
+<div class="tp-type-card" data-type="diaper" onclick="pickTpProductType('prIdTypeWrapperEdit','diaper')">
+<i class="material-icons-outlined">inventory_2</i>
+<div class="tp-type-name">Diaper</div>
+</div>
+</div>
+<a href="#" class="tp-type-change" onclick="resetTpProductType('prIdTypeWrapperEdit');return false;">Change</a>
+<?php endif; ?>
+</div>
 <div class="input-group-modern wide">
 <label>Product</label>
-<select required name="pr_id" class="prinput" style="width:100%;" autofocus onchange="showPrice(this.value)">
-<option value="" hidden>Select Product</option>
+<select required name="pr_id" id="prIdSelect" class="prinput" style="width:100%;" onchange="showPrice(this.value)" disabled>
+<option value="" hidden>Select Product Type first</option>
+</select>
 <?php
 // Not filtered by p.deleted_at (company's "inactive" flag) — that only
 // blocks ordering FRESH stock of an inactive product; a TP with existing
 // closing_qty > 0 must still be able to invoice it out. Confirmed 2026-09-05.
-$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
-while ($rp = mysqli_fetch_array($res_prods)) { ?>
-<option value="<?php echo htmlspecialchars((string)($rp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rp['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
-<?php } ?>
-</select>
+// Pre-filtered to the locked category when one applies — the card/badge
+// above never offers the other type anyway, so there's nothing to filter
+// client-side for the locked case; filterTpProductsByType() still runs for
+// 'mixed' (free dropdown) and for the still-unlocked card-picker.
+$__catFilterSql = ($lockedCategory === 'napkin' || $lockedCategory === 'diaper') ? " AND p.category = '" . db_esc($lockedCategory) . "'" : '';
+$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName, p.category FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL)$__catFilterSql ORDER BY p.id ASC");
+$__tpProductsList = [];
+while ($rp = mysqli_fetch_array($res_prods)) {
+    $__tpProductsList[] = ['id' => $rp['id'], 'name' => $rp['productName'], 'category' => $rp['category']];
+}
+?>
+<script>
+window.__tpProducts = <?php echo json_encode($__tpProductsList); ?>;
+<?php if ($lockedCategory === 'napkin' || $lockedCategory === 'diaper'): ?>
+filterTpProductsByType(<?php echo json_encode($lockedCategory); ?>);
+<?php endif; ?>
+</script>
 </div>
 <div class="input-group-modern">
 <label>Qty</label>
@@ -755,31 +1047,60 @@ function showInvoiceDuplicate(str) {
 <script>showInvoiceDuplicate(<?php echo json_encode($suggested_inv_number); ?>);</script>
 <?php endif; ?>
 </div>
-<div class="col-md-4">
-<label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
-<?php
-// Shops with an un-invoiced field order ("Get Order" visit) must be
-// invoiced from that order via Manage Orders, not started fresh here — see
-// the matching server-side block in shop-invoice-action.php. Excluded from
-// this dropdown (rather than just disabled) so a TP can't submit one anyway
-// via a stale/edited option.
-$pendingOrderShops = [];
-$res_pending_shops = mysqli_query($db_conn, "SELECT DISTINCT shop_id FROM tp_orders WHERE tp_id='".db_esc($Login_user_IDvl)."' AND new_order='yes' AND voided_at IS NULL AND (invoiced_inv_id IS NULL OR invoiced_inv_id='')");
-while ($rp2 = mysqli_fetch_array($res_pending_shops)) { $pendingOrderShops[$rp2['shop_id']] = true; }
-?>
-<select required name="customer_id" class="form-control" autofocus>
+<div class="col-md-2">
+<label class="form-label">District *</label>
+<select required name="shop_district_id" id="shopDistrictSelect" class="form-control" onchange="loadShopsByDistrict(this.value)">
 <option value="" hidden>Select</option>
-<?php
-$res_shops = mysqli_query($db_conn, "SELECT * FROM $tablename WHERE onboard_userTYPE='".db_esc($Login_user_TYPEvl)."' AND onboard_userID='".db_esc($Login_user_IDvl)."' ORDER BY name ASC");
-while ($r = mysqli_fetch_array($res_shops)) {
-    if (isset($pendingOrderShops[$r['id']])) { continue; }
-?>
-<option value="<?php echo htmlspecialchars((string)($r['temp_id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)(ucwords($r['name'])), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)($r['mobile_number']), ENT_QUOTES, 'ISO-8859-1', false); ?>, <?php echo htmlspecialchars((string)(ucwords($r['address'])), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
+<?php foreach ($tpAssignedDistricts as $d) { ?>
+<option value="<?php echo (int)$d['id']; ?>"><?php echo htmlspecialchars($d['name'], ENT_QUOTES, 'UTF-8'); ?></option>
 <?php } ?>
 </select>
-<?php if (!empty($pendingOrderShops)) { ?>
-<small class="text-muted">Shops with a pending field order aren't listed — invoice them from <a href="manage-orders.php">Manage Orders</a> instead.</small>
-<?php } ?>
+</div>
+<div class="col-md-2">
+<label class="form-label"><?php echo $lablenamedisplay; ?>*</label>
+<select required name="customer_id" id="customerSelect" class="form-control" disabled>
+<option value="" hidden>Select District first</option>
+</select>
+<small id="pendingOrderHint" class="text-muted" style="display:none;">Shops with a pending field order aren't listed — invoice them from <a href="manage-orders.php">Manage Orders</a> instead.</small>
+<script>
+// District picks which of this TP's shops sort to the top (a 2026-11-20
+// cascade, added for a TP whose Firka assignments span more than one
+// district) — NOT which ones are shown at all. get-shop-list-by-district.php
+// always returns every one of this TP's own shops, split into 'matched'
+// (district_id = the clicked district) and 'other' (everything else),
+// because shop.district_id is confirmed stale for a large share of the TP
+// base (a TP reassigned to a different Firka keeps her old shops' old
+// district_id) — filtering those out entirely was hiding real,
+// invoiceable shops. 2026-11-21.
+function loadShopsByDistrict(districtId) {
+    var sel = document.getElementById('customerSelect');
+    var hint = document.getElementById('pendingOrderHint');
+    sel.innerHTML = '<option value="" hidden>Select</option>';
+    if (!districtId) { sel.disabled = true; hint.style.display = 'none'; return; }
+    sel.disabled = true;
+    fetch('get-shop-list-by-district.php?district_id=' + encodeURIComponent(districtId))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            function addGroup(label, shops) {
+                if (!shops.length) return;
+                var grp = document.createElement('optgroup');
+                grp.label = label;
+                shops.forEach(function(s) {
+                    var opt = document.createElement('option');
+                    opt.value = s.temp_id;
+                    opt.textContent = s.name + ', ' + s.mobile + ', ' + s.address;
+                    grp.appendChild(opt);
+                });
+                sel.appendChild(grp);
+            }
+            addGroup('Shops in this district', data.matched || []);
+            addGroup('All my other shops', data.other || []);
+            sel.disabled = false;
+            hint.style.display = '';
+        })
+        .catch(function() { sel.disabled = false; });
+}
+</script>
 </div>
 <div class="col-md-4">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -808,19 +1129,33 @@ flatpickr("#bookingDate", invoiceDateOpts);
 <div class="product-add-section">
 <div class="section-header" style="border:none;padding-bottom:10px;margin-bottom:12px;"><i class="material-icons">add_shopping_cart</i>Add Product</div>
 <div class="product-add-grid">
+<div class="input-group-modern" id="prIdTypeWrapperNew">
+<label>Product Type *</label>
+<input type="hidden" name="prIdTypeSelect" id="prIdTypeSelect" value="<?php echo htmlspecialchars($newOrderType); ?>">
+<span class="tp-type-locked-badge"><i class="material-icons" style="font-size:18px;">lock</i><?php echo ucfirst($newOrderType); ?></span>
+</div>
 <div class="input-group-modern wide">
 <label>Product</label>
-<select required name="pr_id" style="width:100%;" onchange="showPrice(this.value);" class="prinput">
+<select required name="pr_id" id="prIdSelect" style="width:100%;" onchange="showPrice(this.value);" class="prinput">
 <option value="" hidden>Select Product</option>
+</select>
 <?php
 // Not filtered by p.deleted_at (company's "inactive" flag) — that only
 // blocks ordering FRESH stock of an inactive product; a TP with existing
 // closing_qty > 0 must still be able to invoice it out. Confirmed 2026-09-05.
-$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) ORDER BY p.id ASC");
-while ($rp = mysqli_fetch_array($res_prods)) { ?>
-<option value="<?php echo htmlspecialchars((string)($rp['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>"><?php echo htmlspecialchars((string)($rp['productName']), ENT_QUOTES, 'ISO-8859-1', false); ?></option>
-<?php } ?>
-</select>
+// Already pre-filtered to $newOrderType — chosen upfront on the standalone
+// chooser screen above (shop-invoice-add.php's own gate), not a free choice
+// here any more. 2026-11-23.
+$res_prods = mysqli_query($db_conn, "SELECT p.id, p.productName, p.category FROM products p INNER JOIN territory_partner_stock tps ON tps.product_id = p.id AND tps.territory_partner_id = '$Login_user_IDvl' AND tps.closing_qty > 0 WHERE (p.temp_id NOT LIKE 'NKS-%' OR p.temp_id IS NULL) AND p.category = '" . db_esc($newOrderType) . "' ORDER BY p.id ASC");
+$__tpProductsList = [];
+while ($rp = mysqli_fetch_array($res_prods)) {
+    $__tpProductsList[] = ['id' => $rp['id'], 'name' => $rp['productName'], 'category' => $rp['category']];
+}
+?>
+<script>
+window.__tpProducts = <?php echo json_encode($__tpProductsList); ?>;
+filterTpProductsByType(<?php echo json_encode($newOrderType); ?>);
+</script>
 </div>
 <div class="input-group-modern">
 <label>Qty</label>
@@ -915,6 +1250,29 @@ function discamount() {
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script src="../../assets/js/pages/select2.js"></script>
+<script>
+// select2.js's blanket $('select').select2() (loaded just above) wasn't
+// rendering a visible select2 widget for #prIdTypeSelect — found no
+// override anywhere else in this page, so most likely its 2-option list +
+// the .input-group-modern flex-column wrapper left it with no resolvable
+// width at the moment the blanket call ran. Forced an explicit
+// re-init here, after that script has already run, with width:'100%' and
+// the search box turned off (a 2-option list doesn't need search, same
+// idea as a plain native select) — this guarantees the same dropdown
+// chevron the other select2 fields on this page already show, instead of
+// depending on the blanket call picking it up correctly. 2026-11-21,
+// user-reported the icon was missing.
+// #prIdTypeSelect is a hidden <input> (not a <select>) whenever the Product
+// Type is already locked or driven by the card picker instead of a plain
+// dropdown (see the Product Type card/badge above, 2026-11-23) — select2
+// only applies to the remaining 'mixed'-invoice case, which still uses a
+// real <select>.
+$('#prIdTypeSelect').filter('select').each(function () {
+    var $s = $(this);
+    if ($s.hasClass('select2-hidden-accessible')) { $s.select2('destroy'); }
+    $s.select2({ width: '100%', minimumResultsForSearch: Infinity });
+});
+</script>
 <script>
 $(document).on('click', '.request-shop-action-btn', function () {
     var $btn = $(this);

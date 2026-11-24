@@ -269,6 +269,7 @@ $canDeleteSs = hasPermission('ss_delete');
                                                         <th>Status</th>
                                                         <th>View</th>
                                                         <th>Edit</th>
+                                                        <th>Login</th>
                                                         <th>Delete</th>
                                                     </tr>
                                                 </thead>
@@ -410,6 +411,15 @@ $canDeleteSs = hasPermission('ss_delete');
                                                            class="action-btn"
                                                            title="Edit Details">
                                                             <i class="material-icons-outlined">edit</i>
+                                                        </a>
+                                                        <?php endif; ?>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <?php if ($canEditSs && $result_product_list['account_status'] === 'active'): ?>
+                                                        <a href="login-as-superstockist?ssid=<?php echo $rowid;?>"
+                                                           class="action-btn" title="Login as this Super Stockist" target="_blank" rel="noopener">
+                                                            <i class="material-icons-outlined" style="color:#059669;">login</i>
                                                         </a>
                                                         <?php endif; ?>
                                                     </td>

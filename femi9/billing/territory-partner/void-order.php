@@ -61,6 +61,6 @@ $stmtVoid->bind_param('ssssi', $Login_user_TYPEvl, $tp_id_str, $void_reason, $or
 $stmtVoid->execute();
 $stmtVoid->close();
 
-$_SESSION['successMessage'] = "Order cancelled.";
+$_SESSION['successMessage'] = "Order marked as Not Converted.";
 header('Location: manage-orders.php');
 exit;

@@ -40,7 +40,7 @@ if (($voidChkRow['status'] ?? '') === 'cancelled') {
 }
 
 // Look up the line before deleting, so the removal can be logged.
-$stmtRow = $db_conn->prepare("SELECT pr_id, qty FROM user_invoice_items WHERE id=?");
+$stmtRow = $db_conn->prepare("SELECT pr_id, qty, total FROM user_invoice_items WHERE id=?");
 $stmtRow->bind_param('i', $rowid);
 $stmtRow->execute();
 $delRow = $stmtRow->get_result()->fetch_assoc();
@@ -53,7 +53,7 @@ $stmt->execute();
 $stmt->close();
 
 if ($delRow) {
-    logShopInvoiceChange($db_conn, $inv_id_decoded, (int)$delRow['pr_id'], 'removed', (int)$delRow['qty'], null, $Login_user_TYPEvl, (string)$Login_user_IDvl);
+    logShopInvoiceChange($db_conn, $inv_id_decoded, (int)$delRow['pr_id'], 'removed', (int)$delRow['qty'], null, $Login_user_TYPEvl, (string)$Login_user_IDvl, null, (float)$delRow['total'], 0.0);
 }
 
 echo "<script>window.location='shop-invoice-add.php?InvoiceID=".urlencode($invoice_id_encode)."&&DeleteSuccess&&invuser=".urlencode($invuser)."&&ActionRemove&&action={$actionEdit}';</script>";

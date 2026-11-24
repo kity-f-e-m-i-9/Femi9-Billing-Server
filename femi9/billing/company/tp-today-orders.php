@@ -356,7 +356,7 @@ $companyProfiles = $db_conn->query(
         .stat-card.blue   .stat-icon { color: #3b82f6; }
         .stat-card.green  .stat-icon { color: #10b981; }
 
-        .stat-card.hoverable { cursor: help; }
+        .stat-card.hoverable { cursor: pointer; }
         .stat-tooltip {
             display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
             background: #fff; border-radius: 10px; padding: 12px 16px;

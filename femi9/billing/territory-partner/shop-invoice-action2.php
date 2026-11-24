@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once("include/ShopInvoiceCategoryLock.php");
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -35,7 +36,7 @@ $s->close();
 $gst_type      = $invRow['gst_type']      ?? 'inner';
 $buyer_gsttype = $invRow['buyer_gsttype'] ?? 'unregister';
 
-$s = $db_conn->prepare("SELECT gst,gst_type,hsn,rwpoints FROM products WHERE id=?");
+$s = $db_conn->prepare("SELECT gst,gst_type,hsn,rwpoints,category FROM products WHERE id=?");
 $s->bind_param('i', $pr_id);
 $s->execute();
 $prod = $s->get_result()->fetch_assoc();
@@ -46,6 +47,15 @@ $hsn                = $prod['hsn']      ?? '';
 $rwpoints           = ($prod['rwpoints'] ?? 0) * $qty;
 $gstamount_singlepr = '0';
 $totalamount        = $amount * $qty;
+
+// Same all-Napkin-or-all-Diaper lock as shop-invoice-action.php — this is
+// the resume-draft "no items yet" entry point's own Add Product handler.
+// 2026-11-23, user-requested.
+$lockedCategory = getShopInvoiceLockedCategory($db_conn, $inv_id);
+if ($lockedCategory !== null && $lockedCategory !== 'mixed' && ($prod['category'] ?? '') !== $lockedCategory) {
+    echo "<script>window.location='shop-invoice-add.php?InvoiceID=" . base64_encode($inv_id) . "&&CategoryMismatch&&invuser=".urlencode($invuser)."&&action=" . ($_SESSION['ACTIONEDIT'] ?? '') . "&&AlertMessage';</script>";
+    exit;
+}
 
 if (($_POST['discount_percentage'] ?? 0) > 0) {
     $discount_percentage = (float)$_POST['discount_percentage'];
