@@ -233,17 +233,28 @@ function getMsDailyVisitRows(mysqli $db_conn, string $from, string $to, array $o
 function getMsDailyVisitDaySummary(mysqli $db_conn, string $from, string $to, int $msId): array {
     $rows = getMsDailyVisitRows($db_conn, $from, $to, ['ms_id' => $msId]);
     $byDate = [];
+    // Total/New/Existing/Get-Order Visits must all count DISTINCT SHOPS per
+    // day, not rows — $rows is one row per ORDER (order_id), so a shop
+    // placing several separate Get Orders in one day (e.g. 10 invoices)
+    // previously inflated "Total Visits" to 10 for what the 35-shop/day
+    // target actually means as ONE shop visited. 2026-11-30, user-reported
+    // ("oru shop la 10 invoice potttu irunthalum total visits la 1 nu than
+    // varanum"). napkin_shops/diaper_shops below were already correct
+    // (distinct-shop maps) — this just applies the same pattern to the
+    // other three visit counts.
+    $visitShopsByDate = []; $newShopsByDate = []; $existingShopsByDate = []; $getOrderShopsByDate = [];
     $napkinShopsByDate = []; $diaperShopsByDate = [];
     foreach ($rows as $r) {
         $d = $r['date'];
         if (!isset($byDate[$d])) {
             $byDate[$d] = ['date' => $d, 'total_visits' => 0, 'new_visits' => 0, 'existing_visits' => 0, 'get_order_visits' => 0, 'napkin_shops' => 0, 'diaper_shops' => 0, 'napkin_value' => 0.0, 'diaper_value' => 0.0];
         }
-        $byDate[$d]['total_visits']++;
-        if ($r['is_new']) { $byDate[$d]['new_visits']++; } else { $byDate[$d]['existing_visits']++; }
-        if ($r['visit_type'] === 'order') { $byDate[$d]['get_order_visits']++; }
         $byDate[$d]['napkin_value'] += $r['napkin_value'];
         $byDate[$d]['diaper_value'] += $r['diaper_value'];
+
+        $visitShopsByDate[$d][$r['shop_id']] = true;
+        if ($r['is_new']) { $newShopsByDate[$d][$r['shop_id']] = true; } else { $existingShopsByDate[$d][$r['shop_id']] = true; }
+        if ($r['visit_type'] === 'order') { $getOrderShopsByDate[$d][$r['shop_id']] = true; }
 
         // Napkin/Diaper shop counts — a shop visited more than once the
         // same day for the same category still counts once (distinct shop
@@ -252,6 +263,10 @@ function getMsDailyVisitDaySummary(mysqli $db_conn, string $from, string $to, in
         if ($r['category'] === 'diaper' || $r['category'] === 'mixed') { $diaperShopsByDate[$d][$r['shop_id']] = true; }
     }
     foreach ($byDate as $d => &$row) {
+        $row['total_visits']     = count($visitShopsByDate[$d] ?? []);
+        $row['new_visits']       = count($newShopsByDate[$d] ?? []);
+        $row['existing_visits']  = count($existingShopsByDate[$d] ?? []);
+        $row['get_order_visits'] = count($getOrderShopsByDate[$d] ?? []);
         $row['napkin_shops'] = count($napkinShopsByDate[$d] ?? []);
         $row['diaper_shops'] = count($diaperShopsByDate[$d] ?? []);
     }

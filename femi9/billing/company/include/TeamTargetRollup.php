@@ -270,11 +270,24 @@ function getGetOrderInvoiceIdsByMsId($db_conn, array $ids, string $fromDate, str
     return $out;
 }
 
-// First date (within [$fromDate, $toDate]) on which $msId's cumulative
-// Napkin-only achieved sales reached $target — null if never reached in
-// range. $dailyByMsId is getRawAchievedDailyByMsId()'s own output (passed
-// in rather than re-queried, so a caller checking several people reuses one
-// batched query).
+// Date $msId's cumulative Napkin-only achieved sales first reached $target
+// — null if never reached in range. $dailyByMsId is
+// getRawAchievedDailyByMsId()'s own output (passed in rather than
+// re-queried, so a caller checking several people reuses one batched
+// query).
+//
+// Returns the day AFTER the raw crossing day, not the crossing day itself —
+// 2026-12-01, user-requested ("innaikku morning na 12 clock eluntha na
+// enakku ennoda login la balance 0 nu varanum antha day than achieved
+// date" — e.g. the target was actually crossed mid-day on the 27th, but the
+// 27th itself never opened with Balance already at 0, only the 28th does,
+// so the 28th is the real "completed" date). Same concept
+// marketing/include/KpiDataPrep.php's Early Month Target Achievement KPI
+// applies to its own copy of this same crossing-date logic
+// (kpiCompletedDate() + its own +1-day shift) — kept as two separate
+// functions since they read from differently-shaped daily maps, but both
+// must apply the identical +1-day rule so "Target Completed Date" shown
+// here and the KPI's own scoring date never disagree.
 function getTargetCompletedDate(array $dailyByMsId, int $msId, float $target): ?string {
     if ($target <= 0) { return null; }
     $days = $dailyByMsId[$msId] ?? [];
@@ -282,7 +295,7 @@ function getTargetCompletedDate(array $dailyByMsId, int $msId, float $target): ?
     $running = 0.0;
     foreach ($days as $date => $amt) {
         $running += $amt;
-        if ($running >= $target) { return $date; }
+        if ($running >= $target) { return date('Y-m-d', strtotime($date . ' +1 day')); }
     }
     return null;
 }

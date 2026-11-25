@@ -1,6 +1,7 @@
 <?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/include/ShopStateIdResolver.php';
 error_reporting(0);
 date_default_timezone_set("Asia/Kolkata");
 
@@ -11,7 +12,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 $shop_cat    = $_POST["shop_cat"]       ?? '';
 $temp_id     = $_POST["temp_id"]        ?? '';
 $name        = str_replace("'", "&#39;", $_POST["name"]        ?? '');
-$state_id    = (int)($_POST["state_id"]    ?? 0);
+$state_id    = resolveRealStateId($db_conn, (int)($_POST["state_id"] ?? 0));
 $district_id = (int)($_POST["district_id"] ?? 0);
 $taluk_id    = (int)($_POST["taluk_id"]    ?? 0);
 $firka_id    = (int)($_POST["firka_id"]    ?? 0);

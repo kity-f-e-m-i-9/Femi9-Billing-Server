@@ -1,12 +1,18 @@
 <?php
 // Month-end TP feedback — on the last calendar day of every month, each TP
 // is asked (via a popup on their own dashboard) to rate their DM and their
-// SalesBDM separately, 5 star-questions each (1-5 points per question, so a
-// submission scores out of 25). One submission per TP per target per month
-// (re-submitting the same month overwrites, via ON DUPLICATE KEY). The DM's
-// own `marketing/kpi.php` "Your Total Score" card shows the ALL-TIME
-// cumulative average across every month ever submitted — not just this
-// month — and a per-TP breakdown is shown only when the page is being
+// SalesBDM separately, 5 star-questions each. Stars are still stored 1-5
+// (q1..q5, the raw rating the TP picked), but each question is worth at most
+// 1 mark, not 5 — a star maps to 0.2/0.4/0.6/0.8/1.0, so 5 questions sum to
+// a submission score out of 5 (see getCumulativeTpFeedbackScore()'s
+// `(q1+..+q5) * 0.2`). 2026-11-30, user-corrected (was out of 25 — 1 point
+// per star — until "apdi venam... oru question ku oru mark than": each
+// question should max out at 1 mark via the 0.2-per-star scale, not 5).
+// One submission per TP per target per month (re-submitting the same month
+// overwrites, via ON DUPLICATE KEY). The DM's own `marketing/kpi.php` "Your
+// Total Score" card shows the cumulative average across whichever months
+// fall in the page's own date range (see getCumulativeTpFeedbackScore()'s
+// own comment), and a per-TP breakdown is shown only when the page is being
 // viewed via the Company "login as this DM" bridge, never on the DM's own
 // direct login (kept anonymous there, by design). 2026-11-24, user-requested
 // ("month last la tp login panna udaney... share your feedback... 1st star
@@ -140,7 +146,7 @@ function saveTpStaffFeedback($db_conn, int $tpId, string $targetType, int $targe
 function getCumulativeTpFeedbackScore($db_conn, string $targetType, int $targetId, ?string $fromDate = null, ?string $toDate = null): array {
     ensureTpStaffFeedbackTable($db_conn);
     $sql = "SELECT f.tp_id, tp.name AS tp_name, tp.tp_id AS tp_code, f.period_month,
-                   (f.q1+f.q2+f.q3+f.q4+f.q5) AS score_25, f.submitted_at
+                   (f.q1+f.q2+f.q3+f.q4+f.q5) * 0.2 AS score_5, f.submitted_at
             FROM tp_staff_feedback f
             LEFT JOIN territory_partners tp ON tp.id = f.tp_id
             WHERE f.target_type=? AND f.target_id=?";
@@ -160,6 +166,6 @@ function getCumulativeTpFeedbackScore($db_conn, string $targetType, int $targetI
     $stmt->close();
 
     $count = count($rows);
-    $avg25 = $count > 0 ? array_sum(array_column($rows, 'score_25')) / $count : 0.0;
-    return ['count' => $count, 'avg_score_25' => $avg25, 'rows' => $rows];
+    $avg5 = $count > 0 ? array_sum(array_column($rows, 'score_5')) / $count : 0.0;
+    return ['count' => $count, 'avg_score_5' => $avg5, 'rows' => $rows];
 }

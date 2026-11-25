@@ -20,6 +20,7 @@ if(isset($_GET['clear_filters']) || isset($_POST['clear_all'])) {
     unset($_SESSION['tp_retail_report_district_ids']);
     unset($_SESSION['tp_retail_report_firka_ids']);
     unset($_SESSION['tp_retail_report_tp_ids']);
+    unset($_SESSION['tp_retail_report_product_type']);
     unset($_SESSION['tp_retail_report_amount_range']);
     unset($_SESSION['tp_retail_report_records_per_page']);
     unset($_SESSION['tp_retail_report_search']);
@@ -102,6 +103,19 @@ if(isset($_POST['tp_id'])) {
     }
 } elseif(isset($_SESSION['tp_retail_report_tp_ids'])) {
     $selected_tp_ids = (array)$_SESSION['tp_retail_report_tp_ids'];
+}
+
+// Product Type filter (Napkin / Diaper) -- 2026-12-01, user-requested.
+$selected_product_type = '';
+if(isset($_POST['product_type'])) {
+    $selected_product_type = in_array($_POST['product_type'], ['napkin', 'diaper'], true) ? $_POST['product_type'] : '';
+    if($selected_product_type) {
+        $_SESSION['tp_retail_report_product_type'] = $selected_product_type;
+    } else {
+        unset($_SESSION['tp_retail_report_product_type']);
+    }
+} elseif(isset($_SESSION['tp_retail_report_product_type'])) {
+    $selected_product_type = $_SESSION['tp_retail_report_product_type'];
 }
 
 // Amount range filter
@@ -243,6 +257,7 @@ $qparam = urlencode($search ?? '');
                                                     <?php foreach($selected_tp_ids as $tid): ?>
                                                     <input type="hidden" name="tp_id[]" value="<?=(int)$tid;?>">
                                                     <?php endforeach; ?>
+                                                    <input type="hidden" name="product_type" value="<?=htmlspecialchars((string)($selected_product_type), ENT_QUOTES, 'UTF-8', false);?>">
                                                     <input type="hidden" name="amount_range" value="<?=htmlspecialchars((string)($selected_amount_range), ENT_QUOTES, 'UTF-8', false);?>">
                                                     <input type="hidden" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>">
                                                     <button type="submit" class="btn btn-success btn-sm">
@@ -359,6 +374,14 @@ $qparam = urlencode($search ?? '');
                                                     </select>
                                                 </div>
                                                 <div class="col-md-3 col-sm-6 mb-2">
+                                                    <label class="form-label">Product Type</label>
+                                                    <select name="product_type" id="product_type_filter" class="form-control">
+                                                        <option value="">All Products</option>
+                                                        <option value="napkin" <?= $selected_product_type == 'napkin' ? 'selected' : ''; ?>>Napkin</option>
+                                                        <option value="diaper" <?= $selected_product_type == 'diaper' ? 'selected' : ''; ?>>Diaper</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3 col-sm-6 mb-2">
                                                     <label class="form-label">Amount Range</label>
                                                     <select name="amount_range" id="amount_range_filter" class="form-control">
                                                         <option value="">All Amounts</option>
@@ -425,6 +448,9 @@ $qparam = urlencode($search ?? '');
                                                 }
                                                 $tn_stmt->close();
                                             }
+                                            if(!empty($selected_product_type)) {
+                                                $active_filters[] = "Product Type: " . ucfirst($selected_product_type);
+                                            }
                                             if(!empty($selected_amount_range)) {
                                                 $amount_labels = [
                                                     '10000-49999' => '₹10,000 - ₹49,999',
@@ -466,6 +492,7 @@ $qparam = urlencode($search ?? '');
                                                 <?php foreach($selected_tp_ids as $tid): ?>
                                                 <input type="hidden" name="tp_id[]" value="<?=(int)$tid;?>">
                                                 <?php endforeach; ?>
+                                                <input type="hidden" name="product_type" value="<?=htmlspecialchars((string)($selected_product_type), ENT_QUOTES, 'UTF-8', false);?>">
                                                 <input type="hidden" name="amount_range" value="<?=htmlspecialchars((string)($selected_amount_range), ENT_QUOTES, 'UTF-8', false);?>">
                                                 <input type="hidden" name="page" value="1">
                                                 <input type="hidden" name="q" value="<?=htmlspecialchars($search, ENT_QUOTES);?>">
@@ -499,7 +526,11 @@ $qparam = urlencode($search ?? '');
                                     <div class="card-body">
 <?php
 $products = [];
-$product_query = "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC";
+$product_query = "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL)";
+if($selected_product_type !== '') {
+    $product_query .= " AND category = '" . $db_conn->real_escape_string($selected_product_type) . "'";
+}
+$product_query .= " ORDER BY id ASC";
 $product_result = mysqli_query($db_conn, $product_query);
 if($product_result) {
     while($pr = mysqli_fetch_assoc($product_result)) {
@@ -551,18 +582,42 @@ if($result) {
 
 // Sales via user_invoice (shop channel) -- same table/convention
 // Retail-Report-Details.php uses for every other seller type.
+//
+// When a Product Type filter is active, Sub Total/Total Amount are
+// recomputed from the matching category's own line items instead of the
+// invoice's own (whole-invoice) sub_total/total -- an invoice can be Mixed
+// (Napkin + Diaper lines together), so the invoice-level figure would
+// overcount a single-category view. Courier is a per-invoice shipping
+// charge, not tied to any one product's category, so it's left out of a
+// category-filtered view rather than guessed/split.
 $sellers_with_data = [];
 foreach($sellers as $seller) {
-    $total_query = "SELECT COALESCE(SUM(sub_total), 0) as sub_total,
-                    COALESCE(SUM(courier_charges), 0) as courier_charges,
-                    COALESCE(SUM(total), 0) as total_amount
-                    FROM user_invoice
-                    WHERE from_user_id = '" . $db_conn->real_escape_string($seller['seller_id']) . "'
-                    AND from_user_type = 'territory_partner'
-                    AND to_user_type = 'shop'
-                    AND date BETWEEN '" . $db_conn->real_escape_string($from_date) . "'
-                    AND '" . $db_conn->real_escape_string($to_date) . "'
-                    AND sub_total > 0";
+    if($selected_product_type !== '') {
+        $total_query = "SELECT COALESCE(SUM(uii.total), 0) as sub_total,
+                        0 as courier_charges,
+                        COALESCE(SUM(uii.total), 0) as total_amount
+                        FROM user_invoice ui
+                        INNER JOIN user_invoice_items uii ON uii.inv_id = ui.inv_id
+                        INNER JOIN products p ON p.id = uii.pr_id
+                        WHERE ui.from_user_id = '" . $db_conn->real_escape_string($seller['seller_id']) . "'
+                        AND ui.from_user_type = 'territory_partner'
+                        AND ui.to_user_type = 'shop'
+                        AND ui.date BETWEEN '" . $db_conn->real_escape_string($from_date) . "'
+                        AND '" . $db_conn->real_escape_string($to_date) . "'
+                        AND ui.sub_total > 0
+                        AND p.category = '" . $db_conn->real_escape_string($selected_product_type) . "'";
+    } else {
+        $total_query = "SELECT COALESCE(SUM(sub_total), 0) as sub_total,
+                        COALESCE(SUM(courier_charges), 0) as courier_charges,
+                        COALESCE(SUM(total), 0) as total_amount
+                        FROM user_invoice
+                        WHERE from_user_id = '" . $db_conn->real_escape_string($seller['seller_id']) . "'
+                        AND from_user_type = 'territory_partner'
+                        AND to_user_type = 'shop'
+                        AND date BETWEEN '" . $db_conn->real_escape_string($from_date) . "'
+                        AND '" . $db_conn->real_escape_string($to_date) . "'
+                        AND sub_total > 0";
+    }
     $total_result = mysqli_query($db_conn, $total_query);
     if($total_result) {
         $total_row = mysqli_fetch_assoc($total_result);
@@ -796,6 +851,11 @@ if(!empty($sellers_paginated)) {
             });
             $('#amount_range_filter').select2({
                 placeholder: 'All Amounts',
+                allowClear: true,
+                width: '100%'
+            });
+            $('#product_type_filter').select2({
+                placeholder: 'All Products',
                 allowClear: true,
                 width: '100%'
             });

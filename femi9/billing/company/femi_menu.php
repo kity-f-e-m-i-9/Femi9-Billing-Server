@@ -428,6 +428,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="district-tp-stock-report">District-wise TP Stock</a></li>
 						<li><a href="district-tp-reward-points-report">District-wise TP Reward Points</a></li>
 						<li><a href="district-dm-tp-conversion-report">District-wise DM/TP Order Conversion</a></li>
+						<li><a href="tp-multi-district-invoice-report">Multi-District TP Invoice Mismatch</a></li>
 						<li><a href="dm-target-achievement-export.php">DM Target vs Achievement (Excel)</a></li>
                         </ul>
                     </li>
@@ -974,6 +975,7 @@ $LoginusertypeGET=$resultusertypeGET['usertype'];
 						<li><a href="district-tp-stock-report">District-wise TP Stock</a></li>
 						<li><a href="district-tp-reward-points-report">District-wise TP Reward Points</a></li>
 						<li><a href="district-dm-tp-conversion-report">District-wise DM/TP Order Conversion</a></li>
+						<li><a href="tp-multi-district-invoice-report">Multi-District TP Invoice Mismatch</a></li>
                         </ul>
                     </li>
 					<?php }?>

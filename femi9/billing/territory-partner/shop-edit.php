@@ -7,6 +7,14 @@ $get_id = mysqli_real_escape_string($db_conn, base64_decode($_REQUEST['prid'] ??
 $shop   = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM shop WHERE id='$get_id' LIMIT 1"));
 if (!$shop) { header("Location: shop-manage.php"); exit; }
 
+// order-confirm-shop.php's "new shop" path (no match found in this TP's own
+// shop list) lands here instead of invoicing straight away — the DM-typed
+// shop details need a human review/correction pass first, same as any other
+// shop onboarding, before they're billed against permanently.
+// shop-edit-action.php continues on to order-to-invoice-action.php after
+// saving when this is present. 2026-12-01, user-requested.
+$order_id_for_invoice = $_GET['order_id'] ?? '';
+
 $shop_cat_id = $shop['shop_cat'];
 $cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_category WHERE id='".db_esc($shop_cat_id)."' LIMIT 1"));
 ?>
@@ -41,7 +49,7 @@ $cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_cate
                         <div class="col">
                             <div class="page-description">
                                 <h1><table class="headertble"><tr>
-                                    <td>Edit Shop</td>
+                                    <td><?php echo $order_id_for_invoice !== '' ? 'Review Shop Details — Invoice This Order' : 'Edit Shop'; ?></td>
                                     <td><a href="shop-manage.php" title="Manage Shop">&#9776;</a></td>
                                 </tr></table></h1>
                             </div>
@@ -56,6 +64,9 @@ $cat = mysqli_fetch_array(mysqli_query($db_conn, "SELECT catlable FROM shop_cate
 <form action="shop-edit-action.php" method="post" enctype="multipart/form-data">
 <input type="hidden" name="update_id" value="<?php echo htmlspecialchars((string)($shop['id']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
 <input type="hidden" name="old_icon"  value="<?php echo htmlspecialchars((string)($shop['user_icon']), ENT_QUOTES, 'ISO-8859-1', false); ?>">
+<?php if ($order_id_for_invoice !== ''): ?>
+<input type="hidden" name="order_id" value="<?php echo htmlspecialchars($order_id_for_invoice, ENT_QUOTES); ?>">
+<?php endif; ?>
 <div class="example-container"><div class="example-content">
 
 <label class="form-label">Category*</label>
@@ -139,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <input type="text" name="gstin" class="form-control" value="<?php echo htmlspecialchars($shop['gstin']); ?>"><br/>
 
 <button type="submit" name="update-shop" class="btn btn-primary">
-    <i class="material-icons">update</i>Update
+    <i class="material-icons">update</i><?php echo $order_id_for_invoice !== '' ? 'Save & Continue to Invoice' : 'Update'; ?>
 </button>
 </div></div>
 </form>
@@ -205,12 +216,22 @@ function geoPopulate(parentDepth, parentId, savedVal) {
 document.addEventListener('DOMContentLoaded', function() {
     var s2 = document.getElementById('loc_2');
     if (!s2) return;
+    var opts = Array.from(s2.options).filter(function(o){ return o.value !== ''; });
+    // geoSaved[2] (shop.state_id) is confirmed bad data on some real shops
+    // (seen holding a DISTRICT-depth node's id, not a real State one) —
+    // 2026-12-01, user-reported. Using it blindly set the State dropdown to
+    // a value with no matching option (silently failing) and then cascaded
+    // geoPopulate() from that same bad id, which also matched nothing, so
+    // District (and everything below it) rendered as an empty placeholder
+    // even though the shop's OWN district_id/taluk_id/firka_id were fine.
+    // Only trust the saved State if it's actually one of the State options
+    // this TP can even see (geoNodes is already restricted to their own
+    // assigned territory) — otherwise fall back to the existing
+    // single-State auto-select, same as a shop with no saved State at all.
     var sv2 = geoSaved[2];
-    if (sv2) { s2.value = sv2; geoPopulate(2, sv2, null); }
-    else {
-        var opts = Array.from(s2.options).filter(function(o){ return o.value !== ''; });
-        if (opts.length === 1) { s2.value = opts[0].value; geoPopulate(2, opts[0].value, null); }
-    }
+    var matchesRealOption = sv2 && opts.some(function(o){ return parseInt(o.value, 10) === sv2; });
+    if (matchesRealOption) { s2.value = sv2; geoPopulate(2, sv2, null); }
+    else if (opts.length === 1) { s2.value = opts[0].value; geoPopulate(2, opts[0].value, null); }
 });
 </script>
 </body>

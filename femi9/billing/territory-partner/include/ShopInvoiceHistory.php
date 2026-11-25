@@ -139,6 +139,103 @@ function getShopInvoiceReturnAmountByUser(mysqli $db_conn, array $tpIds, ?string
     return $out;
 }
 
+// Napkin/Diaper split of getShopInvoiceReturnAmountByUser()'s same total —
+// for the "TP Return Amount" dashboard card's hover modal. 2026-11-30,
+// user-requested. Every return line has its own prid, so this is a plain
+// category GROUP BY, no proportional-split complexity needed (unlike the
+// Removed-amount twin below, which has to handle a whole-invoice Void).
+function getShopInvoiceReturnAmountByUserAndCategory(mysqli $db_conn, array $tpIds, ?string $fromDate = null, ?string $toDate = null): array {
+    $out = ['napkin' => 0.0, 'diaper' => 0.0];
+    if (empty($tpIds)) return $out;
+    $idList = "'" . implode("','", array_map('intval', $tpIds)) . "'";
+    $dateClause = '';
+    if ($fromDate !== null && $toDate !== null) {
+        $dateClause = " AND DATE(r.date) BETWEEN '" . $db_conn->real_escape_string($fromDate) . "' AND '" . $db_conn->real_escape_string($toDate) . "'";
+    }
+    $res = $db_conn->query("
+        SELECT p.category, SUM(r.subtotal) AS amt
+        FROM user_return_stock_items r
+        JOIN products p ON p.id = r.prid
+        WHERE r.to_usertype = 'territory_partner' AND r.to_userid IN ($idList) AND r.from_usertype = 'shop'
+          AND r.deleted_at IS NULL $dateClause
+        GROUP BY p.category
+    ");
+    if ($res) {
+        while ($row = $res->fetch_assoc()) {
+            if (isset($out[$row['category']])) { $out[$row['category']] = (float)$row['amt']; }
+        }
+    }
+    return $out;
+}
+
+// Napkin/Diaper split of getShopInvoiceRemovedAmountByUser()'s same total —
+// for the "TP Removed Amount" dashboard card's hover modal. 2026-11-30,
+// user-requested. A 'removed'/'qty_changed' row carries its own pr_id (one
+// line), but a 'voided' row logs the WHOLE invoice in a single row with
+// pr_id NULL — so its removed amount is split proportionally across that
+// invoice's own Napkin/Diaper line totals instead. user_invoice_items rows
+// survive a Void (only user_invoice.status flips to 'cancelled' — nothing
+// is deleted), so this proportional split is always computable.
+function getShopInvoiceRemovedAmountByUserAndCategory(mysqli $db_conn, string $changedByUserType, array $changedByUserIds, ?string $fromDate = null, ?string $toDate = null): array {
+    $out = ['napkin' => 0.0, 'diaper' => 0.0];
+    if (empty($changedByUserIds)) return $out;
+    ensureShopInvoiceChangeLogAmountColumns($db_conn);
+    $idList = "'" . implode("','", array_map(fn($v) => $db_conn->real_escape_string((string)$v), $changedByUserIds)) . "'";
+    $typeEsc = $db_conn->real_escape_string($changedByUserType);
+    $dateClause = '';
+    if ($fromDate !== null && $toDate !== null) {
+        $dateClause = " AND DATE(l.created_at) BETWEEN '" . $db_conn->real_escape_string($fromDate) . "' AND '" . $db_conn->real_escape_string($toDate) . "'";
+    }
+
+    $res = $db_conn->query("
+        SELECT p.category, SUM(GREATEST(COALESCE(l.amount_before,0) - COALESCE(l.amount_after,0), 0)) AS amt
+        FROM shop_invoice_change_log l
+        JOIN products p ON p.id = l.pr_id
+        WHERE l.changed_by_user_type = '$typeEsc' AND l.changed_by_user_id IN ($idList)
+          AND l.change_type IN ('removed','qty_changed') AND l.pr_id IS NOT NULL
+          $dateClause
+        GROUP BY p.category
+    ");
+    if ($res) {
+        while ($row = $res->fetch_assoc()) {
+            if (isset($out[$row['category']])) { $out[$row['category']] += (float)$row['amt']; }
+        }
+    }
+
+    $res2 = $db_conn->query("
+        SELECT l.inv_id, GREATEST(COALESCE(l.amount_before,0) - COALESCE(l.amount_after,0), 0) AS removed
+        FROM shop_invoice_change_log l
+        WHERE l.changed_by_user_type = '$typeEsc' AND l.changed_by_user_id IN ($idList)
+          AND l.change_type = 'voided'
+          $dateClause
+    ");
+    $voidedRows = [];
+    if ($res2) { while ($r = $res2->fetch_assoc()) { $voidedRows[] = $r; } }
+    if (!empty($voidedRows)) {
+        $invIdList = "'" . implode("','", array_map(fn($v) => $db_conn->real_escape_string($v['inv_id']), $voidedRows)) . "'";
+        $resCat = $db_conn->query("
+            SELECT uii.inv_id, p.category, SUM(uii.total) AS amt
+            FROM user_invoice_items uii
+            JOIN products p ON p.id = uii.pr_id
+            WHERE uii.inv_id IN ($invIdList)
+            GROUP BY uii.inv_id, p.category
+        ");
+        $catByInv = [];
+        if ($resCat) {
+            while ($r = $resCat->fetch_assoc()) { $catByInv[$r['inv_id']][$r['category']] = (float)$r['amt']; }
+        }
+        foreach ($voidedRows as $vr) {
+            $cats = $catByInv[$vr['inv_id']] ?? [];
+            $lineTotal = array_sum($cats);
+            if ($lineTotal <= 0) { continue; }
+            foreach ($cats as $cat => $amt) {
+                if (isset($out[$cat])) { $out[$cat] += (float)$vr['removed'] * ($amt / $lineTotal); }
+            }
+        }
+    }
+    return $out;
+}
+
 // Per-invoice breakdown behind getShopInvoiceReturnAmountByUser() — which
 // TP, which invoice number, how much — for the "TP Return Amount" card's
 // hover tooltip on marketing/dashboard.php. Returns one row per (tp_id,

@@ -1,7 +1,6 @@
 <?php
 include("checksession.php");
 include("config.php");
-require_once(__DIR__ . '/../shared/TpOrderInvoiceLookup.php');
 error_reporting(0);
 
 date_default_timezone_set("Asia/Kolkata");
@@ -33,13 +32,19 @@ function parseMarketingTool(?string $raw): array {
     return ['status' => null, 'tools' => [], 'raw' => $raw];
 }
 
-// invoiced_at — when the Convert button actually linked this order to an
-// invoice (separate from the invoice's own created_at, which is when that
-// invoice itself was first raised — could be a much earlier date for an
-// invoice that already existed). Self-migrating, same pattern as every
-// other ad-hoc column added this session. 2026-11-24, user-requested
-// ("invoice potta time anga varanum... convert ah click panna time also
-// varanum").
+// "Convert" (pick an already-raised invoice to link to) was replaced
+// 2026-12-01 by a direct "Invoice" button (order-confirm-shop.php ->
+// order-to-invoice-action.php) that creates the real invoice right away,
+// same concept as the original order-to-invoice.php "Invoice" button this
+// Convert step itself had replaced on 2026-11-24 — user asked to go back to
+// that, with an added shop-confirm step. invoiced_inv_id/invoiced_at are
+// still the same two columns that drive Pending/Converted status here, just
+// now written by the new action file instead of convert-order-invoice.php.
+//
+// invoiced_at — when the order actually got linked to an invoice (separate
+// from the invoice's own created_at, which is when that invoice itself was
+// first raised). Self-migrating, same pattern as every other ad-hoc column
+// added this session.
 $_chkInvoicedAt = $db_conn->query("SHOW COLUMNS FROM tp_orders LIKE 'invoiced_at'");
 if ($_chkInvoicedAt && $_chkInvoicedAt->num_rows === 0) {
     $db_conn->query("ALTER TABLE tp_orders ADD COLUMN invoiced_at DATETIME NULL DEFAULT NULL AFTER invoiced_inv_id");
@@ -147,20 +152,6 @@ if ($mt_filter === 'available') {
     $visits = array_filter($visits, fn($v) => $v['marketing_tool_parsed']['status'] === 'Not Available');
 }
 
-// Shop invoices this TP can link a "pending" Get Order to, via the Convert
-// button — every invoice this TP has already raised to that shop (not just
-// ones auto-created from a field order), batched by shop temp_id so the
-// Convert modal needs no extra round trip. Only built for shops that
-// actually have a pending (not yet invoiced/voided) visit, since that's the
-// only state the Convert button shows for. Duplicate-shop-aware (see
-// shared/TpOrderInvoiceLookup.php). 2026-11-24, user-requested.
-$_pendingShopsForLookup = [];
-foreach ($visits as $v) {
-    if ($v['invoice_status'] === 'pending' && !empty($v['shop_temp_id'])) {
-        $_pendingShopsForLookup[$v['shop_temp_id']] = ['name' => $v['shop_name'] ?? '', 'mobile' => $v['shop_mobile'] ?? ''];
-    }
-}
-$invoicesByShopTempId = getInvoicesByShopTempIdForTp($db_conn, (int)$Login_user_IDvl, $_pendingShopsForLookup);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -195,8 +186,9 @@ $invoicesByShopTempId = getInvoicesByShopTempIdForTp($db_conn, (int)$Login_user_
 
         .tp-action-link {
             font-size:12px; font-weight:600; text-decoration:none; padding:6px 13px;
-            border-radius:6px; display:inline-block;
+            border-radius:6px; display:inline-block; text-align:center;
         }
+        .tp-invoice-actions { display:flex; flex-direction:column; align-items:stretch; gap:6px; max-width:150px; }
         .tp-action-primary {
             color:#fff; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
         }
@@ -417,8 +409,10 @@ $invoicesByShopTempId = getInvoicesByShopTempIdForTp($db_conn, (int)$Login_user_
                                                             <div class="text-muted" style="font-size:11px;">Converted: <?=htmlspecialchars(date('d-m-Y h:i A', strtotime($v['invoiced_at'])))?></div>
                                                             <?php endif; ?>
                                                             <?php else: ?>
-                                                            <a href="javascript:void(0);" onclick="openConvertModal('<?=htmlspecialchars($oid, ENT_QUOTES)?>','<?=htmlspecialchars($v['shop_temp_id'] ?? '', ENT_QUOTES)?>','<?=htmlspecialchars($v['shop_name'] ?? '', ENT_QUOTES)?>');" class="tp-action-link tp-action-primary">Convert</a>
-                                                            <a href="javascript:void(0);" onclick="openCancelOrderModal('<?=htmlspecialchars($oid, ENT_QUOTES)?>');" class="tp-action-link tp-action-danger" style="margin-left:6px;">Not Convert</a>
+                                                            <div class="tp-invoice-actions">
+                                                                <a href="order-confirm-shop.php?order_id=<?=urlencode($oid)?>" class="tp-action-link tp-action-primary">Invoice</a>
+                                                                <a href="javascript:void(0);" onclick="openCancelOrderModal('<?=htmlspecialchars($oid, ENT_QUOTES)?>');" class="tp-action-link tp-action-danger">Not Convert</a>
+                                                            </div>
                                                             <?php endif; ?>
                                                         <?php else: ?>
                                                             <span class="text-muted">&mdash;</span>
@@ -463,30 +457,6 @@ $invoicesByShopTempId = getInvoicesByShopTempIdForTp($db_conn, (int)$Login_user_
         </div>
     </div>
 
-    <!-- Convert modal — pick one of this shop's already-raised invoices to
-         link this Get Order to. 2026-11-24, user-requested. -->
-    <div class="modal fade" id="convertOrderModal" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <form method="post" action="convert-order-invoice.php" id="convertOrderForm">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Convert — <span id="convertShopName"></span></h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" name="order_id" id="convertOrderIdField" value="">
-                        <label class="form-label">Pick the invoice already raised to this shop</label>
-                        <div id="convertInvoiceList" style="max-height:300px;overflow-y:auto;"></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" id="convertConfirmBtn" class="tp-action-link tp-action-primary" style="border:none;font-size:14px;padding:8px 16px;" disabled>Confirm Convert</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -499,41 +469,6 @@ $invoicesByShopTempId = getInvoicesByShopTempIdForTp($db_conn, (int)$Login_user_
         document.getElementById('cancelOrderIdField').value = orderId;
         document.getElementById('cancelOrderReasonField').value = '';
         var modalEl = document.getElementById('cancelOrderModal');
-        var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-        modal.show();
-    }
-
-    var invoicesByShopTempId = <?php echo json_encode($invoicesByShopTempId); ?>;
-
-    function openConvertModal(orderId, shopTempId, shopName) {
-        document.getElementById('convertOrderIdField').value = orderId;
-        document.getElementById('convertShopName').textContent = shopName;
-        var listEl = document.getElementById('convertInvoiceList');
-        var invoices = invoicesByShopTempId[shopTempId] || [];
-        if (!invoices.length) {
-            listEl.innerHTML = '<p class="text-muted">No invoices found for this shop yet.</p>';
-        } else {
-            listEl.innerHTML = invoices.map(function (inv) {
-                var badge = inv.completed
-                    ? '<span class="tp-tag tp-tag-good" style="margin-left:6px;">Completed</span>'
-                    : '<span class="tp-tag tp-tag-neutral" style="margin-left:6px;">Draft</span>';
-                var placedLine = inv.placed_at ? '<div class="text-muted" style="font-size:11px;">Invoice placed: ' + inv.placed_at + '</div>' : '';
-                return '<label style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #e1e0d9;cursor:pointer;">' +
-                    '<input type="radio" name="inv_id" value="' + inv.inv_id + '" required>' +
-                    '<div><span>' + inv.inv_number + ' &mdash; ' + inv.date + '</span>' + badge + placedLine + '</div>' +
-                    '</label>';
-            }).join('');
-        }
-        // Single Confirm Convert button lives in the modal-footer (not
-        // duplicated inside the list) — disabled until a radio is picked, or
-        // whenever there's nothing to convert to. 2026-11-24, user-reported
-        // ("rendu close button... confirm convert button venum size ku").
-        var confirmBtn = document.getElementById('convertConfirmBtn');
-        if (confirmBtn) {
-            confirmBtn.disabled = true;
-            listEl.onchange = function () { confirmBtn.disabled = false; };
-        }
-        var modalEl = document.getElementById('convertOrderModal');
         var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
         modal.show();
     }

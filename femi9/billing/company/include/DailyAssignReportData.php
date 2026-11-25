@@ -52,7 +52,7 @@ function attachDmNamesToDailyAssignRows($db_conn, array &$rows): void {
 
 function fetchDailyAssignRows($db_conn, int $ms_id, string $from, string $to): array {
     $sql = "
-        SELECT da.assign_date, d.id AS district_id, d.name AS district_name,
+        SELECT da.id, da.assign_date, d.id AS district_id, d.name AS district_name,
                dv.id AS division_id, dv.name AS division_name,
                t.id AS taluk_id, f.id AS firka_id, f.name AS firka_name,
                COALESCE(tp.name, 'Vacant Area') AS tp_name,

@@ -648,7 +648,7 @@ if (!empty($teamMsIdsForShops)) {
     $_toEsc = $db_conn->real_escape_string($to);
 
     $resNewShopDm = $db_conn->query("
-        SELECT s.id, s.name, s.mobile_number AS mobile, COALESCE(dn.name, s.district_name, 'Unassigned') AS district
+        SELECT s.id, s.name, s.mobile_number AS mobile, s.shop_cat, COALESCE(dn.name, s.district_name, 'Unassigned') AS district
         FROM ms_shop s
         LEFT JOIN partner_location_nodes dn ON dn.id = s.district_node_id
         WHERE s.ms_id IN ($_msIdList) AND DATE(s.created_at) BETWEEN '$_fromEsc' AND '$_toEsc'
@@ -666,7 +666,7 @@ if (!empty($teamMsIdsForShops)) {
         }
         $_scopeIdList = implode(',', array_map('intval', $statsScopeIds));
         $resNewShopTp = $db_conn->query("
-            SELECT s.id, s.name, s.mobile_number AS mobile, COALESCE(dn.name, 'Unassigned') AS district
+            SELECT s.id, s.name, s.mobile_number AS mobile, s.shop_cat, COALESCE(dn.name, 'Unassigned') AS district
             FROM shop s
             LEFT JOIN partner_location_nodes dn ON dn.id = s.district_id
             WHERE s.district_id IN ($_scopeIdList) AND s.source_ms_shop_id IS NULL
@@ -737,25 +737,35 @@ function shopHoverTip(array $rows, array $tpShopKeysForMatch = []): string {
 }
 
 // ── Shop Category Split (supermarket, beauty parlour, etc.) ────────────────
-// Shops this team added (ms_shop.created_at) within the selected period,
-// grouped by shop_category — shop_cat already stores the category id from
-// add_ss.php's own "Category" dropdown, no new field needed. Same period
-// scoping as New Shop Onboarding above, so both cards agree on "this
-// period"'s shops.
+// Shops this team onboarded this period, grouped by shop_category — reuses
+// the SAME two already-deduped sources New Shop Onboarding above computed
+// ($tpNewShopRows + $dmUniqueShopRows, never $dmOverlapShopRows) instead of
+// querying ms_shop alone. 2026-12-01, user-reported: this modal showed only
+// 4 categories while KPI #7 "New Category Outlets" (which already counted
+// both sources, same as the "Total New Shops Onboarded" figure) showed 5 —
+// the 5th category existed only among TP-onboarded shops, which this modal
+// was silently missing entirely (same bug class already fixed for New Shop
+// Onboarding's own total and KPI #6/#7, just never applied here).
 $shopCategorySplit = [];
-if (!empty($teamMsIdsForShops)) {
-    $_msIdList2 = implode(',', array_map('intval', $teamMsIdsForShops));
-    $resShopCat = $db_conn->query("
-        SELECT COALESCE(sc.catlable, 'Uncategorized') AS category, COUNT(*) AS c
-        FROM ms_shop s
-        LEFT JOIN shop_category sc ON sc.id = s.shop_cat
-        WHERE s.ms_id IN ($_msIdList2) AND DATE(s.created_at) BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
-        GROUP BY category
-        ORDER BY c DESC
-    ");
-    while ($_scr = $resShopCat->fetch_assoc()) {
-        $shopCategorySplit[] = ['category' => $_scr['category'], 'count' => (int)$_scr['c']];
-    }
+$_shopCatCounts = [];
+$_shopCatIdsSeen = array_values(array_unique(array_filter(array_merge(
+    array_column($tpNewShopRows, 'shop_cat'),
+    array_column($dmUniqueShopRows, 'shop_cat')
+), fn($v) => $v !== null && $v !== '')));
+$_shopCatLabelById = [];
+if (!empty($_shopCatIdsSeen)) {
+    $_catIdList = implode(',', array_map('intval', $_shopCatIdsSeen));
+    $_resCatLabels = $db_conn->query("SELECT id, catlable FROM shop_category WHERE id IN ($_catIdList)");
+    while ($_cr = $_resCatLabels->fetch_assoc()) { $_shopCatLabelById[(int)$_cr['id']] = $_cr['catlable']; }
+}
+foreach (array_merge($tpNewShopRows, $dmUniqueShopRows) as $_scRow) {
+    $_catId = $_scRow['shop_cat'] ?? null;
+    $_label = ($_catId !== null && $_catId !== '' && isset($_shopCatLabelById[(int)$_catId])) ? $_shopCatLabelById[(int)$_catId] : 'Uncategorized';
+    $_shopCatCounts[$_label] = ($_shopCatCounts[$_label] ?? 0) + 1;
+}
+arsort($_shopCatCounts);
+foreach ($_shopCatCounts as $_label => $_count) {
+    $shopCategorySplit[] = ['category' => $_label, 'count' => $_count];
 }
 
 // ── Napkin vs Diaper — Orders & Shops ───────────────────────────────────────
@@ -872,11 +882,20 @@ if (!empty($allTpIds)) {
     // pure-Napkin invoice as "Mixed"). 2026-11-23, user-reported: invoice
     // S/26-27/68, 3 Napkin lines + a ₹100 courier charge, showed a "Mixed"
     // badge.
+    // idn/fd resolve the SAME way getTpInvoiceAmountForDistricts() now does
+    // (2026-12-01 fix) — fd (the TP's own single district, when they have
+    // exactly one) is checked FIRST, idn (the validated per-invoice
+    // resolution) only decides for a multi-district TP. Without this,
+    // updateStatCards() (JS, re-runs on every page load — see comment above)
+    // would keep matching invoices by the OLD unfixed inv_district and
+    // silently undo the server-side fix the moment the page renders in a
+    // real browser, same class of bug as the earlier napkin_total/JS gotcha.
+    $fallbackCaseRows = buildSingleDistrictFallbackCaseSql($db_conn, $allTpIds);
     $stmtRows = $db_conn->prepare(
         "SELECT ui.inv_id, ui.inv_number, ui.date, ui.total, ui.to_user_id,
                 tp.id AS tp_pk, tp.name AS tp_name, tp.tp_id AS tp_code, tp.mobile AS tp_mobile,
                 COALESCE(NULLIF(tp.assigned_district,''), tp.branch_district) AS tp_district,
-                idn.name AS inv_district,
+                COALESCE(fd.name, idn.name) AS inv_district,
                 s.name AS shop_name,
                 COALESCE((
                     SELECT SUM(uii.total) FROM user_invoice_items uii
@@ -891,7 +910,8 @@ if (!empty($allTpIds)) {
          FROM user_invoice ui
          JOIN territory_partners tp ON tp.id = ui.from_user_id
          LEFT JOIN shop s ON s.temp_id = ui.to_user_id
-         LEFT JOIN partner_location_nodes idn ON idn.id = COALESCE(ui.invoice_district_id, s.district_id)
+         LEFT JOIN partner_location_nodes idn ON idn.id = COALESCE(ui.invoice_district_id, s.district_id) AND idn.depth = 3
+         LEFT JOIN partner_location_nodes fd ON fd.id = $fallbackCaseRows
          WHERE ui.from_user_type='territory_partner' AND ui.to_user_type='shop' AND ui.from_user_id IN ($idList)
            AND ui.`date` BETWEEN ? AND ?
          ORDER BY ui.date DESC, ui.inv_number DESC"
@@ -948,18 +968,6 @@ if (!empty($allTpIds)) {
     $diaperInvoiceAmount = array_sum(array_column($_myOwnInvoiceRows, 'diaper_total'));
 }
 
-// Get Order Amount (Napkin-only, Get-Order-converted sales) for this page's
-// own scope — same "Achieved" definition as $myDms rows / TeamTargetRollup.
-// For an ASM/SM, summed straight from the team's own DM achieved figures
-// already computed above; for an actual DM (no one below them) computed
-// fresh for their own ms_id.
-if (!empty($myDms)) {
-    $ownGetOrderAchieved = array_sum(array_column($myDms, 'achieved'));
-} else {
-    $_ownAchievedStats = getRawTargetAchievedStats($db_conn, [$msId], $from, $to);
-    $ownGetOrderAchieved = (float)($_ownAchievedStats[$msId]['achieved'] ?? 0);
-}
-
 // ── My Own Weekly Breakdown — same shape as the per-DM weekly modal above
 // (Target/Achieved/TP Invoice/Total per calendar week), computed here
 // instead for a solo DM with no team (empty($myDms)), who otherwise had no
@@ -985,29 +993,20 @@ if (empty($myDms) && !empty($allTpIds)) {
     }
 }
 
-// Per-district Get Order Amount — same breakdown as $districtTargetTotals
-// below, so the top cards' district filter can add TP Invoice Amount + Get
-// Order Amount consistently whichever district is picked.
-$districtAchievedTotals = [];
-if (!empty($myDms)) {
-    foreach ($myDms as $_dm) {
-        foreach (explode(', ', $_dm['district']) as $_dn) {
-            $_dn = trim($_dn);
-            if ($_dn === '' || $_dn === 'No District Assigned') { continue; }
-            $districtAchievedTotals[$_dn] = ($districtAchievedTotals[$_dn] ?? 0) + $_dm['achieved'];
-        }
-    }
-} else {
-    foreach ($districtNames as $_dn) {
-        $districtAchievedTotals[$_dn] = $ownGetOrderAchieved;
-    }
-}
-
-// "Your TPs' Invoice Amount" card now shows TP Invoice Amount + Get Order
-// Amount combined (the Total the DM/ASM/SM actually achieved), with
-// Balance computed against that combined total instead of invoice-only.
-$totalAchieveAmount = $invoicedAmount + $ownGetOrderAchieved;
-$balanceTarget = max($districtStats['district_total_target'] - $totalAchieveAmount, 0);
+// Napkin/Diaper Target split — 2026-12-01, user-corrected. Napkin Target is
+// the FULL District Total Target as-is (every Firka's own target assigned
+// in this district, unchanged) — NOT halved. Diaper Target is 50% of that
+// SAME full figure, a secondary/smaller expectation on top, not a 50/50
+// carve-out of one shared total (an earlier 2026-11-30 version wrongly
+// halved Napkin's own target too, making Napkin and Diaper show the exact
+// same number — user-reported, "napkin oda target antha district la iruka
+// total frikas oda value, diaper odathu athul 50%"). $invoicedAmount /
+// $diaperInvoiceAmount are unchanged — only this target split and its two
+// Balance figures are affected.
+$napkinTargetAmount = $districtStats['district_total_target'];
+$diaperTargetAmount = $districtStats['district_total_target'] * 0.5;
+$napkinBalanceAmount = max($napkinTargetAmount - $invoicedAmount, 0);
+$diaperBalanceAmount = max($diaperTargetAmount - $diaperInvoiceAmount, 0);
 
 // TP roster for the tabs — All / Active / Inactive. Scoped to this person's
 // OWN assigned district(s) for a DM, but for an ASM/SM (who may have no
@@ -1163,6 +1162,16 @@ if (!empty($allTpIds)) {
     $_resTpNames = $db_conn->query("SELECT id, name, tp_id FROM territory_partners WHERE id IN (" . implode(',', array_map('intval', $allTpIds)) . ")");
     while ($_tnr = $_resTpNames->fetch_assoc()) { $_tpNameById[(int)$_tnr['id']] = $_tnr['name'] . ' (' . $_tnr['tp_id'] . ')'; }
 }
+// Napkin/Diaper category split, shown as a 2-line summary at the top of
+// each tooltip, above the existing per-invoice list. 2026-11-30, user-
+// requested ("napkin la evvalavu return diaper la evvalavu athey mathiri
+// remove also napkin la evvalavu diaper la evvalavu nu venum").
+function dashCategorySplitHtml(array $catAmounts): string {
+    return '<div class="stat-card-tooltip-row" style="border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:6px;margin-bottom:6px;">'
+         . '<span>Napkin</span><span style="font-weight:600;white-space:nowrap;">' . inr_format($catAmounts['napkin'], 0) . '</span></div>'
+         . '<div class="stat-card-tooltip-row" style="border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:6px;margin-bottom:6px;">'
+         . '<span>Diaper</span><span style="font-weight:600;white-space:nowrap;">' . inr_format($catAmounts['diaper'], 0) . '</span></div>';
+}
 function dashReturnRemoveTooltipHtml(array $rows, array $tpNameById): string {
     if (empty($rows)) { return '<div class="stat-card-tooltip-row"><span>No entries in this period.</span></div>'; }
     $html = '';
@@ -1174,8 +1183,10 @@ function dashReturnRemoveTooltipHtml(array $rows, array $tpNameById): string {
 }
 $_returnDetailRows = getShopInvoiceReturnDetailByUser($db_conn, $allTpIds, $from, $to);
 $_removedDetailRows = getShopInvoiceRemovedDetailByUser($db_conn, 'territory_partner', $allTpIds, $from, $to);
-$dmTpReturnTooltip = dashReturnRemoveTooltipHtml($_returnDetailRows, $_tpNameById);
-$dmTpRemovedTooltip = dashReturnRemoveTooltipHtml($_removedDetailRows, $_tpNameById);
+$_returnByCategory = getShopInvoiceReturnAmountByUserAndCategory($db_conn, $allTpIds, $from, $to);
+$_removedByCategory = getShopInvoiceRemovedAmountByUserAndCategory($db_conn, 'territory_partner', $allTpIds, $from, $to);
+$dmTpReturnTooltip = dashCategorySplitHtml($_returnByCategory) . dashReturnRemoveTooltipHtml($_returnDetailRows, $_tpNameById);
+$dmTpRemovedTooltip = dashCategorySplitHtml($_removedByCategory) . dashReturnRemoveTooltipHtml($_removedDetailRows, $_tpNameById);
 
 if (!empty($myDms)) {
     $_tpIdToDmId = [];
@@ -1559,13 +1570,15 @@ ksort($districtTpCounts);
                             </div>
                         </div>
 
-                        <!-- Top Stat Cards -->
+                        <!-- Napkin row — Target/Invoice/Balance split 2026-11-30 (was one
+                             ambiguous Target + Napkin-only Invoice + Balance; now explicitly
+                             labeled Napkin, with a matching Diaper row below). -->
                         <div class="row">
                             <div class="col-12 col-md-6 col-xl-4">
                                 <div class="stat-card purple">
                                     <div>
-                                        <h3 id="statDistrictTarget">&#8377;<?php echo inr_format($districtStats['district_total_target'], 0); ?></h3>
-                                        <p><?php echo htmlspecialchars($scopeWord); ?> Total Target</p>
+                                        <h3 id="statDistrictTarget">&#8377;<?php echo inr_format($napkinTargetAmount, 0); ?></h3>
+                                        <p title="50% of the <?php echo htmlspecialchars($scopeWord); ?> Total Target">Napkin Target Amount</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">flag</i></div>
                                 </div>
@@ -1574,7 +1587,7 @@ ksort($districtTpCounts);
                                 <div class="stat-card green stat-card-hoverable" tabindex="0">
                                     <div>
                                         <h3 id="statInvoiceAmount">&#8377;<?php echo inr_format($invoicedAmount, 0); ?></h3>
-                                        <p title="TP shop invoice amount only — Get Order amount is no longer added in here">Your TPs' Invoice Amount</p>
+                                        <p title="TP shop invoice amount, Napkin lines only — Get Order amount is not added in here">Napkin Invoice Amount</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">receipt_long</i></div>
                                     <div class="stat-card-tooltip" id="statInvoiceAmountTooltip"></div>
@@ -1583,23 +1596,56 @@ ksort($districtTpCounts);
                             <div class="col-12 col-md-6 col-xl-4">
                                 <div class="stat-card red">
                                     <div>
-                                        <h3 id="statBalanceTarget">&#8377;<?php echo inr_format($balanceTarget, 0); ?></h3>
-                                        <p>Balance Target Amount</p>
+                                        <h3 id="statBalanceTarget">&#8377;<?php echo inr_format($napkinBalanceAmount, 0); ?></h3>
+                                        <p>Napkin Balance Amount</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">trending_up</i></div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Second row: TP Return/Removed/Diaper Amount + Target Completed Date
-                             — smaller "compact" cards, 4 across on one line. 2026-11-23,
-                             user-requested. -->
+                        <!-- Diaper row — same Target/Invoice/Balance trio as the Napkin row
+                             above, Diaper's own 50% split. 2026-11-30, user-requested. -->
+                        <div class="row">
+                            <div class="col-12 col-md-6 col-xl-4">
+                                <div class="stat-card purple">
+                                    <div>
+                                        <h3 id="statDiaperTarget">&#8377;<?php echo inr_format($diaperTargetAmount, 0); ?></h3>
+                                        <p title="50% of the <?php echo htmlspecialchars($scopeWord); ?> Total Target">Diaper Target Amount</p>
+                                    </div>
+                                    <div class="stat-icon-wrap"><i class="material-icons-outlined">flag</i></div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-xl-4">
+                                <div class="stat-card green stat-card-hoverable" tabindex="0">
+                                    <div>
+                                        <h3 id="statDiaperAmount">&#8377;<?php echo inr_format($diaperInvoiceAmount, 0); ?></h3>
+                                        <p title="TP shop invoice amount, Diaper lines only — hover for the per-TP split">Diaper Invoice Amount</p>
+                                    </div>
+                                    <div class="stat-icon-wrap"><i class="material-icons-outlined">baby_changing_station</i></div>
+                                    <div class="stat-card-tooltip" id="statDiaperAmountTooltip"></div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-xl-4">
+                                <div class="stat-card red">
+                                    <div>
+                                        <h3 id="statDiaperBalance">&#8377;<?php echo inr_format($diaperBalanceAmount, 0); ?></h3>
+                                        <p>Diaper Balance Amount</p>
+                                    </div>
+                                    <div class="stat-icon-wrap"><i class="material-icons-outlined">trending_up</i></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Compact row: TP Return/Removed Amount + Target Completed Date.
+                             2026-11-23, user-requested; Diaper Amount moved out to its own
+                             full-size row above, 2026-11-30. -->
                         <div class="row">
                             <div class="col-6 col-xl-3">
                                 <div class="stat-card orange compact stat-card-hoverable" tabindex="0">
                                     <div>
                                         <h3>&#8377;<?php echo inr_format($dmTpReturnAmount, 0); ?></h3>
-                                        <p title="Return amount against every shop invoice your TPs raised in this period — hover for the per-TP/invoice split">TP Return Amount</p>
+                                        <p title="Return amount against every shop invoice your TPs raised in this period — hover for the Napkin/Diaper split + per-TP/invoice detail">TP Return Amount</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">assignment_return</i></div>
                                     <div class="stat-card-tooltip"><?php echo $dmTpReturnTooltip; ?></div>
@@ -1609,20 +1655,10 @@ ksort($districtTpCounts);
                                 <div class="stat-card red compact stat-card-hoverable" tabindex="0">
                                     <div>
                                         <h3>&#8377;<?php echo inr_format($dmTpRemovedAmount, 0); ?></h3>
-                                        <p title="₹ taken off your TPs' shop invoices via Remove / qty-edit / Void, this period (from 21 Nov 2026 onward) — hover for the per-TP/invoice split">TP Removed Amount</p>
+                                        <p title="₹ taken off your TPs' shop invoices via Remove / qty-edit / Void, this period (from 21 Nov 2026 onward) — hover for the Napkin/Diaper split + per-TP/invoice detail">TP Removed Amount</p>
                                     </div>
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">delete_sweep</i></div>
                                     <div class="stat-card-tooltip"><?php echo $dmTpRemovedTooltip; ?></div>
-                                </div>
-                            </div>
-                            <div class="col-6 col-xl-3">
-                                <div class="stat-card orange compact stat-card-hoverable" tabindex="0">
-                                    <div>
-                                        <h3 id="statDiaperAmount">&#8377;<?php echo inr_format($diaperInvoiceAmount, 0); ?></h3>
-                                        <p title="Diaper-only portion of your TPs' shop invoices, this period — hover for the per-TP split">Your TPs' Diaper Amount</p>
-                                    </div>
-                                    <div class="stat-icon-wrap"><i class="material-icons-outlined">baby_changing_station</i></div>
-                                    <div class="stat-card-tooltip" id="statDiaperAmountTooltip"></div>
                                 </div>
                             </div>
                             <?php if (empty($myDms)): ?>
@@ -2842,8 +2878,6 @@ ksort($districtTpCounts);
                             // 2026-11-21, user-reported.
                             var myDistrictNamesLower = <?php echo json_encode(array_map('mb_strtolower', $districtNames)); ?>;
                             var overallTarget = <?php echo (float)$districtStats['district_total_target']; ?>;
-                            var districtAchievedTotals = <?php echo json_encode($districtAchievedTotals); ?>;
-                            var overallAchieved = <?php echo (float)$ownGetOrderAchieved; ?>;
 
                             var escDiv = document.createElement('div');
                             function esc(s) { escDiv.textContent = (s == null ? '' : s); return escDiv.innerHTML; }
@@ -2876,18 +2910,21 @@ ksort($districtTpCounts);
                                 var invoiceEl = document.getElementById('statInvoiceAmount');
                                 var balanceEl = document.getElementById('statBalanceTarget');
                                 if (!targetEl || !invoiceEl || !balanceEl) return;
-                                var target = currentDistrict === 'all' ? overallTarget : (districtTargetTotals[currentDistrict] || 0);
+                                var fullTarget = currentDistrict === 'all' ? overallTarget : (districtTargetTotals[currentDistrict] || 0);
+                                // Napkin Target is the FULL district target, unchanged; Diaper
+                                // Target is 50% of that same full figure — 2026-12-01, user-
+                                // corrected (an earlier version wrongly halved Napkin's own target
+                                // too). Matches the server-rendered $napkinTargetAmount /
+                                // $diaperTargetAmount this row starts with.
+                                var target = fullTarget;
+                                var diaperTarget = fullTarget * 0.5;
                                 // Napkin-only — matches the server-rendered $invoicedAmount this
                                 // card starts with (getTpInvoiceAmountForDistricts()); r.total
                                 // here is the invoice's REAL (both-category) total, which must
                                 // NOT feed this specific sum. 2026-11-21.
                                 var invoiced = districtOnlyRows(currentDistrict).reduce(function (sum, r) { return sum + (r.napkin_total || 0); }, 0);
-                                var getOrderAmt = currentDistrict === 'all' ? overallAchieved : (districtAchievedTotals[currentDistrict] || 0);
-                                // Balance still measures against TP Invoice + Get Order combined
-                                // (the real total achievement against target) — only the middle
-                                // card's own displayed number changed to invoice-only, per request.
-                                var totalAmt = invoiced + getOrderAmt;
-                                var balance = Math.max(0, target - totalAmt);
+                                // Balance = Target - TP Invoice Amount only — 2026-11-30, user-corrected.
+                                var balance = Math.max(0, target - invoiced);
                                 targetEl.innerHTML = money(target);
                                 invoiceEl.innerHTML = money(invoiced);
                                 balanceEl.innerHTML = money(balance);
@@ -2925,6 +2962,13 @@ ksort($districtTpCounts);
                                 if (diaperEl) {
                                     var diaperTotal = districtOnlyRows(currentDistrict).reduce(function (sum, r) { return sum + (r.diaper_total || 0); }, 0);
                                     diaperEl.innerHTML = money(diaperTotal);
+                                    // Diaper Target/Balance — 50% of the full target (not Napkin's
+                                    // own target), same Target-minus-Invoice formula as the Napkin
+                                    // row above. 2026-12-01, user-corrected.
+                                    var diaperTargetEl = document.getElementById('statDiaperTarget');
+                                    var diaperBalanceEl = document.getElementById('statDiaperBalance');
+                                    if (diaperTargetEl) { diaperTargetEl.innerHTML = money(diaperTarget); }
+                                    if (diaperBalanceEl) { diaperBalanceEl.innerHTML = money(Math.max(0, diaperTarget - diaperTotal)); }
                                     var diaperTooltipEl = document.getElementById('statDiaperAmountTooltip');
                                     if (diaperTooltipEl) {
                                         var byTpD = {};

@@ -200,26 +200,72 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     <style>
         table td { padding: 5px !important; }
         select:disabled { opacity: 0.45; }
-        #dataTableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        #dataTable { min-width: 640px; }
-        #dataTable .order-qty { min-width: 70px; }
-        #dataTable .order-disc { min-width: 80px; }
-        #dataTable .order-pr-select { min-width: 200px; }
-        #dataTable .order-line-amounts { min-width: 130px; white-space: nowrap; }
         .mobile-field-label { display: none; }
 
-        /* Mobile: stack each product row's fields one per line (Product, then
-           Qty, then Discount, then Amount) instead of squeezing them side by
-           side into unreadable table columns. */
+        /* ── SKU picker — click a card to add it to the order ── */
+        .sku-search-box { margin-bottom: 10px; max-width: 360px; }
+        .sku-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px; max-height: 320px; overflow-y: auto; padding: 2px;
+        }
+        .sku-card {
+            background: #fff; border: 1.5px solid #e5e7eb; border-radius: 10px;
+            padding: 12px 12px; cursor: pointer; text-align: left;
+            transition: border-color .15s ease, box-shadow .15s ease, transform .1s ease;
+        }
+        .sku-card:hover { border-color: #4f6ef7; box-shadow: 0 2px 8px rgba(79,110,247,0.14); }
+        .sku-card:active { transform: scale(0.98); }
+        .sku-card.in-cart { border-color: #16a34a; background: #f0fdf4; }
+        .sku-card-name { font-weight: 600; font-size: 13px; color: #1f2937; line-height: 1.3; margin-bottom: 6px; min-height: 34px; }
+        .sku-card-price { font-size: 12.5px; color: #4f6ef7; font-weight: 700; }
+        .sku-card-badge {
+            display: inline-flex; align-items: center; gap: 2px; font-size: 10.5px; font-weight: 700;
+            color: #16a34a; margin-top: 6px;
+        }
+        .sku-card-badge .material-icons { font-size: 13px; }
+        .sku-grid-empty { padding: 20px; text-align: center; color: #9ca3af; font-size: 13px; }
+
+        /* ── Cart (selected products) ── */
+        .cart-empty-hint { font-size: 12.5px; color: #9ca3af; padding: 8px 2px; }
+        #orderItemsList { display: flex; flex-direction: column; gap: 8px; }
+        .cart-row {
+            display: flex; align-items: flex-end; gap: 12px;
+            background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px;
+            padding: 10px 14px; position: relative;
+        }
+        .cart-row:focus-within { border-color: #c7d2fe; box-shadow: 0 0 0 3px rgba(79,110,247,0.08); }
+        .cart-row .cart-field { display: flex; flex-direction: column; }
+        .cart-row .cart-field-name { flex: 1 1 200px; min-width: 150px; font-weight: 600; font-size: 13.5px; color: #1f2937; justify-content: center; }
+        .cart-row .cart-field-qty { flex: 0 0 90px; }
+        .cart-row .cart-field-disc { flex: 0 0 100px; }
+        .cart-row .cart-field-amount { flex: 0 0 150px; white-space: nowrap; }
+        .cart-row .cart-field-amount .cart-line-actual { font-size: 12px; color: #6b7280; }
+        .cart-row .cart-field-amount .cart-line-final { font-size: 13.5px; font-weight: 700; color: #1f2937; }
+        .cart-row .cart-row-remove {
+            flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%;
+            border: 1px solid #fecaca; background: #fff5f5; color: #dc2626;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; margin-bottom: 2px;
+        }
+        .cart-row .cart-row-remove:hover { background: #fee2e2; }
+        .cart-row .cart-row-remove .material-icons { font-size: 18px; }
+        #orderGrandTotal {
+            background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;
+            padding: 10px 14px; color: #166534; font-size: 14px;
+        }
+        #orderGrandTotal:empty { display: none; padding: 0; border: none; background: none; }
+        #productCategoryFilter .category-card.cat-locked { opacity: 0.5; cursor: not-allowed; }
+
+        /* Mobile: stack each cart row's fields one per line. */
         @media (max-width: 600px) {
-            #dataTableWrap { overflow-x: visible; }
-            #dataTable { min-width: 0; width: 100%; }
-            #dataTable, #dataTable tbody, #dataTable tr { display: block; width: 100%; }
-            #dataTable .dataTable-header-row { display: none; }
-            #dataTable td { display: block; width: 100% !important; box-sizing: border-box; padding: 4px 0 !important; }
+            .sku-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); max-height: 260px; }
+            .cart-row { flex-direction: column; align-items: stretch; gap: 8px; padding-top: 14px; }
+            .cart-row .cart-field-name,
+            .cart-row .cart-field-qty,
+            .cart-row .cart-field-disc,
+            .cart-row .cart-field-amount { flex: 1 1 auto; width: 100%; }
+            .cart-row .cart-row-remove { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; margin-bottom: 0; }
             .mobile-field-label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 2px; }
-            .mobile-chk-label { display: inline; font-weight: 500; color: #333; margin-bottom: 0; vertical-align: middle; }
-            #dataTable .order-qty, #dataTable .order-disc, #dataTable .order-pr-select { width: 100% !important; min-width: 0; }
         }
     </style>
 </head>
@@ -336,9 +382,10 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
 
                                                     <label class="form-label">Marketing Tool*</label>
                                                     <input type="hidden" name="marketing_tool" id="marketing_tool_value" value="">
-                                                    <div id="mtStatusToggle" style="display:flex;gap:10px;margin-bottom:10px;">
-                                                        <div class="mt-status-card" data-status="Available" onclick="setMtStatus('Available')" style="flex:1;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Available</div>
-                                                        <div class="mt-status-card" data-status="Not Available" onclick="setMtStatus('Not Available')" style="flex:1;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Not Available</div>
+                                                    <div id="mtStatusToggle" style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                                                        <div class="mt-status-card" data-status="Already Available" onclick="setMtStatus('Already Available')" style="flex:1;min-width:140px;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Already Available</div>
+                                                        <div class="mt-status-card" data-status="Needed - Not Available" onclick="setMtStatus('Needed - Not Available')" style="flex:1;min-width:140px;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Needed - Not Available</div>
+                                                        <div class="mt-status-card" data-status="Not Required" onclick="setMtStatus('Not Required')" style="flex:1;min-width:140px;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Not Required</div>
                                                     </div>
                                                     <style>
                                                         .mt-status-card.selected { border-color:#4f6ef7 !important; background:#eef2ff; color:#4f46e5 !important; }
@@ -362,14 +409,24 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                             document.querySelectorAll('#mtStatusToggle .mt-status-card').forEach(function (c) {
                                                                 c.classList.toggle('selected', c.getAttribute('data-status') === status);
                                                             });
-                                                            document.getElementById('mtToolsBlock').style.display = 'block';
-                                                            document.getElementById('mtToolsLabel').textContent = (status === 'Available')
-                                                                ? 'Which tools are at this shop?'
-                                                                : 'Which tools does this shop need?';
-                                                            // Switching Available <-> Not Available clears every tool
-                                                            // checkbox — the same tool list means two different things
-                                                            // depending on status, so a selection made under the old
-                                                            // status shouldn't silently carry over. 2026-11-30, user-requested.
+                                                            // "Not Required" skips the tool checklist entirely — nothing
+                                                            // to pick when the shop doesn't need a marketing tool at
+                                                            // all. 2026-11-30, user-requested (3rd option added
+                                                            // alongside the existing Already Available / Needed - Not
+                                                            // Available pair).
+                                                            var toolsBlock = document.getElementById('mtToolsBlock');
+                                                            if (status === 'Not Required') {
+                                                                toolsBlock.style.display = 'none';
+                                                            } else {
+                                                                toolsBlock.style.display = 'block';
+                                                                document.getElementById('mtToolsLabel').textContent = (status === 'Already Available')
+                                                                    ? 'Which tools are at this shop?'
+                                                                    : 'Which tools does this shop need?';
+                                                            }
+                                                            // Switching status clears every tool checkbox — the same
+                                                            // tool list means a different thing depending on status, so
+                                                            // a selection made under the old status shouldn't silently
+                                                            // carry over. 2026-11-30, user-requested.
                                                             document.querySelectorAll('.mt-tool-check').forEach(function (c) { c.checked = false; });
                                                             var selectAll = document.getElementById('mtSelectAll');
                                                             if (selectAll) { selectAll.checked = false; }
@@ -384,12 +441,12 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                             var checked = Array.prototype.slice.call(all).filter(function (c) { return c.checked; });
                                                             var selectAll = document.getElementById('mtSelectAll');
                                                             if (selectAll) { selectAll.checked = all.length > 0 && checked.length === all.length; }
-                                                            var val = mtCurrentStatus ? (mtCurrentStatus + ': ' + checked.map(function (c) { return c.value; }).join(', ')) : '';
+                                                            var val = !mtCurrentStatus ? '' : (mtCurrentStatus === 'Not Required' ? 'Not Required' : (mtCurrentStatus + ': ' + checked.map(function (c) { return c.value; }).join(', ')));
                                                             document.getElementById('marketing_tool_value').value = val;
                                                         }
                                                         function validateMarketingTool() {
-                                                            if (!mtCurrentStatus) { alert('Pick Available or Not Available for Marketing Tool.'); return false; }
-                                                            if (!document.querySelector('.mt-tool-check:checked')) { alert('Select at least one marketing tool.'); return false; }
+                                                            if (!mtCurrentStatus) { alert('Pick a Marketing Tool status.'); return false; }
+                                                            if (mtCurrentStatus !== 'Not Required' && !document.querySelector('.mt-tool-check:checked')) { alert('Select at least one marketing tool.'); return false; }
                                                             return true;
                                                         }
                                                     </script>
@@ -543,9 +600,10 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
 
                                                     <label class="form-label">Marketing Tool*</label>
                                                     <input type="hidden" name="marketing_tool" id="marketing_tool_value" value="">
-                                                    <div id="mtStatusToggle" style="display:flex;gap:10px;margin-bottom:10px;">
-                                                        <div class="mt-status-card" data-status="Available" onclick="setMtStatus('Available')" style="flex:1;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Available</div>
-                                                        <div class="mt-status-card" data-status="Not Available" onclick="setMtStatus('Not Available')" style="flex:1;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Not Available</div>
+                                                    <div id="mtStatusToggle" style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                                                        <div class="mt-status-card" data-status="Already Available" onclick="setMtStatus('Already Available')" style="flex:1;min-width:140px;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Already Available</div>
+                                                        <div class="mt-status-card" data-status="Needed - Not Available" onclick="setMtStatus('Needed - Not Available')" style="flex:1;min-width:140px;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Needed - Not Available</div>
+                                                        <div class="mt-status-card" data-status="Not Required" onclick="setMtStatus('Not Required')" style="flex:1;min-width:140px;cursor:pointer;border:2px solid #e5e7eb;border-radius:9px;padding:10px 12px;text-align:center;font-weight:600;color:#1f2937;">Not Required</div>
                                                     </div>
                                                     <style>
                                                         .mt-status-card.selected { border-color:#4f6ef7 !important; background:#eef2ff; color:#4f46e5 !important; }
@@ -569,14 +627,24 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                             document.querySelectorAll('#mtStatusToggle .mt-status-card').forEach(function (c) {
                                                                 c.classList.toggle('selected', c.getAttribute('data-status') === status);
                                                             });
-                                                            document.getElementById('mtToolsBlock').style.display = 'block';
-                                                            document.getElementById('mtToolsLabel').textContent = (status === 'Available')
-                                                                ? 'Which tools are at this shop?'
-                                                                : 'Which tools does this shop need?';
-                                                            // Switching Available <-> Not Available clears every tool
-                                                            // checkbox — the same tool list means two different things
-                                                            // depending on status, so a selection made under the old
-                                                            // status shouldn't silently carry over. 2026-11-30, user-requested.
+                                                            // "Not Required" skips the tool checklist entirely — nothing
+                                                            // to pick when the shop doesn't need a marketing tool at
+                                                            // all. 2026-11-30, user-requested (3rd option added
+                                                            // alongside the existing Already Available / Needed - Not
+                                                            // Available pair).
+                                                            var toolsBlock = document.getElementById('mtToolsBlock');
+                                                            if (status === 'Not Required') {
+                                                                toolsBlock.style.display = 'none';
+                                                            } else {
+                                                                toolsBlock.style.display = 'block';
+                                                                document.getElementById('mtToolsLabel').textContent = (status === 'Already Available')
+                                                                    ? 'Which tools are at this shop?'
+                                                                    : 'Which tools does this shop need?';
+                                                            }
+                                                            // Switching status clears every tool checkbox — the same
+                                                            // tool list means a different thing depending on status, so
+                                                            // a selection made under the old status shouldn't silently
+                                                            // carry over. 2026-11-30, user-requested.
                                                             document.querySelectorAll('.mt-tool-check').forEach(function (c) { c.checked = false; });
                                                             var selectAll = document.getElementById('mtSelectAll');
                                                             if (selectAll) { selectAll.checked = false; }
@@ -591,62 +659,29 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                             var checked = Array.prototype.slice.call(all).filter(function (c) { return c.checked; });
                                                             var selectAll = document.getElementById('mtSelectAll');
                                                             if (selectAll) { selectAll.checked = all.length > 0 && checked.length === all.length; }
-                                                            var val = mtCurrentStatus ? (mtCurrentStatus + ': ' + checked.map(function (c) { return c.value; }).join(', ')) : '';
+                                                            var val = !mtCurrentStatus ? '' : (mtCurrentStatus === 'Not Required' ? 'Not Required' : (mtCurrentStatus + ': ' + checked.map(function (c) { return c.value; }).join(', ')));
                                                             document.getElementById('marketing_tool_value').value = val;
                                                         }
                                                         function validateMarketingTool() {
-                                                            if (!mtCurrentStatus) { alert('Pick Available or Not Available for Marketing Tool.'); return false; }
-                                                            if (!document.querySelector('.mt-tool-check:checked')) { alert('Select at least one marketing tool.'); return false; }
+                                                            if (!mtCurrentStatus) { alert('Pick a Marketing Tool status.'); return false; }
+                                                            if (mtCurrentStatus !== 'Not Required' && !document.querySelector('.mt-tool-check:checked')) { alert('Select at least one marketing tool.'); return false; }
                                                             return true;
                                                         }
                                                     </script>
                                                     <br/>
 
-                                                    <p>
-                                                        <button type="button" class="btn btn-primary btn-burger" onclick="addRow('dataTable')">
-                                                            <i class="material-icons">add</i>
-                                                        </button>
-                                                        <button type="button" class="btn btn-danger btn-burger" onclick="deleteRow('dataTable')">
-                                                            <i class="material-icons">delete_outline</i>
-                                                        </button>
-                                                    </p>
-
-                                                    <div id="dataTableWrap">
-                                                    <table id="dataTable" border="0">
-                                                        <tr class="dataTable-header-row">
-                                                            <td></td>
-                                                            <td><label class="form-label" style="margin-bottom:2px;">Product</label></td>
-                                                            <td><label class="form-label" style="margin-bottom:2px;">Qty</label></td>
-                                                            <td><label class="form-label" style="margin-bottom:2px;">Discount</label></td>
-                                                            <td><label class="form-label" style="margin-bottom:2px;">Amount</label></td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td class="order-row-chk"><input type="checkbox" name="chk[]"/> <span class="mobile-field-label mobile-chk-label">Select to remove this product</span></td>
-                                                            <td>
-                                                                <label class="mobile-field-label">Product</label>
-                                                                <select required name="pr_id[]" class="form-control product-select order-pr-select" onchange="recalcOrderLine(this)">
-                                                                    <option value="" hidden>Select Product</option>
-                                                                    <?php foreach($productList as $p): ?>
-                                                                    <option value="<?=$p['id']?>" data-price="<?=htmlspecialchars($p['outlet_price'])?>" data-category="<?=($p['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin'?>"><?=htmlspecialchars($p['productName'])?></option>
-                                                                    <?php endforeach; ?>
-                                                                </select>
-                                                            </td>
-                                                            <td>
-                                                                <label class="mobile-field-label">Qty</label>
-                                                                <input type="number" placeholder="Qty" min="0" name="qty[]" class="form-control order-qty" oninput="recalcOrderLine(this)" autocomplete="off" required/>
-                                                            </td>
-                                                            <td>
-                                                                <label class="mobile-field-label">Discount %</label>
-                                                                <input type="number" placeholder="Disc %" min="0" max="100" step="0.01" value="0" name="discount_percentage[]" class="form-control order-disc" oninput="recalcOrderLine(this)" autocomplete="off"/>
-                                                            </td>
-                                                            <td class="order-line-amounts">
-                                                                <label class="mobile-field-label">Amount</label>
-                                                                <div class="order-line-actual">Actual: &#8377;0.00</div>
-                                                                <div class="order-line-final">After Disc: &#8377;0.00</div>
-                                                            </td>
-                                                        </tr>
-                                                    </table>
+                                                    <label class="form-label" style="margin-bottom:6px;">Products*</label>
+                                                    <div class="sku-picker">
+                                                        <input type="text" id="skuSearchBox" class="form-control sku-search-box" placeholder="Search SKU to add…" autocomplete="off">
+                                                        <div id="skuGrid" class="sku-grid"></div>
+                                                        <div id="skuGridEmpty" class="sku-grid-empty" style="display:none;">No products match.</div>
                                                     </div>
+
+                                                    <div id="cartSection" style="display:none;">
+                                                        <label class="form-label" style="margin:14px 0 6px;">Selected Products</label>
+                                                        <div id="orderItemsList"></div>
+                                                    </div>
+                                                    <div id="cartEmptyHint" class="cart-empty-hint">Click a product above to add it to this order.</div>
                                                     <br/>
                                                     <div id="orderGrandTotal" style="font-weight:600;margin-bottom:10px;"></div>
 
@@ -691,82 +726,192 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
     var talukFirkaData  = <?php echo json_encode($talukFirkaMap); ?>;
     var firkaTpData     = <?php echo json_encode($firkaTpMap); ?>;
 
-    // ── Add / Remove product rows ────────────────────────────────────────────
-    // The product cell's pristine markup is captured once, before select2 gets
-    // anywhere near it — select2 hides the original <select> and appends its
-    // own generated widget as a sibling, so cloning a select2-ized cell's live
-    // innerHTML (as this used to) would duplicate that generated widget into
-    // the new row instead of a plain, initializable <select>.
-    var productCellIndex    = 1; // checkbox, product select, qty
-    var productCellTemplate = null;
+    // ── SKU click-to-add picker + cart ───────────────────────────────────────
+    // Replaces the old per-row product <select> entirely: every SKU is shown
+    // as a clickable card (filtered by the Napkin/Diaper category toggle and
+    // the search box); clicking one adds it to the "Selected Products" cart
+    // below (or bumps its qty by 1 if it's already in there). The cart is
+    // what actually gets submitted — pr_id[]/qty[]/discount_percentage[]
+    // hidden/visible inputs are generated per cart line.
+    var productCatalog = <?php echo json_encode(array_map(function($p) {
+        return [
+            'id'       => (int)$p['id'],
+            'name'     => $p['productName'],
+            'price'    => (float)$p['outlet_price'],
+            'category' => ($p['category'] ?? '') === 'diaper' ? 'diaper' : 'napkin',
+        ];
+    }, $productList)); ?>;
 
-    // Napkin/Diaper category filter. Disabling a non-matching <option> does
-    // NOT hide it from Select2's own results list — Select2 still lists a
-    // disabled option (just greyed out/unselectable), so the dropdown kept
-    // showing every product regardless of which category was active. A
-    // custom `matcher` is Select2's actual mechanism for excluding options
-    // from the results entirely, so that's what filters here now.
     var activeProductCategory = 'napkin';
-    function productCategoryMatcher(params, data) {
-        if (data.element) {
-            var cat = data.element.getAttribute('data-category');
-            if (cat && cat !== activeProductCategory) { return null; }
-        }
-        if ($.trim(params.term) === '') { return data; }
-        if (typeof data.text === 'undefined') { return null; }
-        if (data.text.toUpperCase().indexOf(params.term.toUpperCase()) > -1) { return data; }
-        return null;
-    }
-    function initProductSearch($scope) {
-        $scope.find('select.product-select').select2({ placeholder: 'Search product…', width: '100%', matcher: productCategoryMatcher });
+    var cart = {}; // productId (string) => { id, name, price, qty, discount }
+    var cartOrder = []; // insertion order of productIds, for stable row ordering
+
+    function renderSkuGrid() {
+        var grid = document.getElementById('skuGrid');
+        var empty = document.getElementById('skuGridEmpty');
+        if (!grid) { return; }
+        var term = ($('#skuSearchBox').val() || '').trim().toUpperCase();
+        grid.innerHTML = '';
+        var shown = 0;
+        productCatalog.forEach(function (p) {
+            if (p.category !== activeProductCategory) { return; }
+            if (term && p.name.toUpperCase().indexOf(term) === -1) { return; }
+            shown++;
+            var card = document.createElement('div');
+            card.className = 'sku-card' + (cart[p.id] ? ' in-cart' : '');
+            card.setAttribute('data-id', p.id);
+            card.innerHTML =
+                '<div class="sku-card-name"></div>' +
+                '<div class="sku-card-price"></div>' +
+                (cart[p.id] ? '<div class="sku-card-badge"><i class="material-icons">check_circle</i>In order (' + cart[p.id].qty + ')</div>' : '');
+            card.querySelector('.sku-card-name').textContent = p.name;
+            card.querySelector('.sku-card-price').textContent = '₹' + p.price.toFixed(2);
+            card.addEventListener('click', function () { addToCart(p.id); });
+            grid.appendChild(card);
+        });
+        if (empty) { empty.style.display = shown === 0 ? 'block' : 'none'; }
     }
 
-    // Clears a row's selection if its currently-picked product falls outside
-    // the newly chosen category — the matcher above only controls what's
-    // offered going forward, not an already-made selection.
-    function applyProductCategoryFilter($scope) {
-        $scope.find('select.product-select').each(function () {
-            var $sel = $(this);
-            var opt = this.options[this.selectedIndex];
-            var cat = opt ? opt.getAttribute('data-category') : null;
-            if (cat && cat !== activeProductCategory) {
-                $sel.val('').trigger('change');
-                var row = $sel.closest('tr')[0];
-                if (row) { recalcOrderLine(row.querySelector('.order-qty')); }
-            }
+    function addToCart(productId) {
+        var p = productCatalog.find(function (x) { return x.id === productId; });
+        if (!p) { return; }
+        var key = String(productId);
+        if (cart[key]) {
+            cart[key].qty += 1;
+        } else {
+            cart[key] = { id: p.id, name: p.name, price: p.price, qty: 1, discount: 0 };
+            cartOrder.push(key);
+        }
+        renderCart();
+        renderSkuGrid();
+    }
+
+    function removeFromCart(productId) {
+        var key = String(productId);
+        delete cart[key];
+        cartOrder = cartOrder.filter(function (k) { return k !== key; });
+        renderCart();
+        renderSkuGrid();
+    }
+
+    function updateCartField(productId, field, value) {
+        var key = String(productId);
+        if (!cart[key]) { return; }
+        if (field === 'qty') { cart[key].qty = Math.max(0, parseFloat(value) || 0); }
+        if (field === 'discount') { cart[key].discount = Math.min(100, Math.max(0, parseFloat(value) || 0)); }
+        recalcCartLine(key);
+        recalcOrderGrandTotal();
+    }
+
+    function recalcCartLine(key) {
+        var item = cart[key];
+        var row = document.querySelector('.cart-row[data-id="' + key + '"]');
+        if (!item || !row) { return; }
+        var actual = item.price * item.qty;
+        var final  = actual * (1 - item.discount / 100);
+        row.querySelector('.cart-line-actual').textContent = 'Actual: ₹' + actual.toFixed(2);
+        row.querySelector('.cart-line-final').textContent  = 'After Disc: ₹' + final.toFixed(2);
+    }
+
+    function renderCart() {
+        var list = document.getElementById('orderItemsList');
+        var section = document.getElementById('cartSection');
+        var hint = document.getElementById('cartEmptyHint');
+        if (!list) { return; }
+        list.innerHTML = '';
+        cartOrder.forEach(function (key) {
+            var item = cart[key];
+            if (!item) { return; }
+            var row = document.createElement('div');
+            row.className = 'cart-row';
+            row.setAttribute('data-id', key);
+            row.innerHTML =
+                '<input type="hidden" name="pr_id[]" value="' + item.id + '">' +
+                '<div class="cart-field cart-field-name"></div>' +
+                '<div class="cart-field cart-field-qty">' +
+                    '<label class="mobile-field-label">Qty</label>' +
+                    '<input type="number" min="0" name="qty[]" class="form-control cart-qty" autocomplete="off" required>' +
+                '</div>' +
+                '<div class="cart-field cart-field-disc">' +
+                    '<label class="mobile-field-label">Discount %</label>' +
+                    '<input type="number" min="0" max="100" step="0.01" name="discount_percentage[]" class="form-control cart-disc" autocomplete="off">' +
+                '</div>' +
+                '<div class="cart-field cart-field-amount">' +
+                    '<label class="mobile-field-label">Amount</label>' +
+                    '<div class="cart-line-actual">Actual: ₹0.00</div>' +
+                    '<div class="cart-line-final">After Disc: ₹0.00</div>' +
+                '</div>' +
+                '<button type="button" class="cart-row-remove" title="Remove this product"><i class="material-icons">close</i></button>';
+            row.querySelector('.cart-field-name').textContent = item.name;
+            var qtyInput  = row.querySelector('.cart-qty');
+            var discInput = row.querySelector('.cart-disc');
+            qtyInput.value  = item.qty;
+            discInput.value = item.discount;
+            qtyInput.addEventListener('input', function () { updateCartField(item.id, 'qty', this.value); });
+            discInput.addEventListener('input', function () { updateCartField(item.id, 'discount', this.value); });
+            row.querySelector('.cart-row-remove').addEventListener('click', function () { removeFromCart(item.id); });
+            list.appendChild(row);
+            recalcCartLine(key);
         });
+
+        var hasItems = cartOrder.length > 0;
+        if (section) { section.style.display = hasItems ? '' : 'none'; }
+        if (hint) { hint.style.display = hasItems ? 'none' : ''; }
+        updateCategoryLockState();
+    }
+
+    function recalcOrderGrandTotal() {
+        var actualTotal = 0, finalTotal = 0;
+        cartOrder.forEach(function (key) {
+            var item = cart[key];
+            if (!item) { return; }
+            var actual = item.price * item.qty;
+            actualTotal += actual;
+            finalTotal  += actual * (1 - item.discount / 100);
+        });
+        var totalEl = document.getElementById('orderGrandTotal');
+        if (totalEl) {
+            totalEl.textContent = (actualTotal > 0 || finalTotal > 0)
+                ? 'Order Total — Actual: ₹' + actualTotal.toFixed(2) + '  |  After Discount: ₹' + finalTotal.toFixed(2)
+                : '';
+        }
+    }
+
+    // An order can only contain ONE product category at a time (Napkin OR
+    // Diaper, never mixed) — user-requested, 2026-11-25. Once the cart has at
+    // least one item, the OTHER category card is locked (greyed out,
+    // clicking it just explains why) until every item is removed.
+    function updateCategoryLockState() {
+        var lockedCat = null;
+        if (cartOrder.length) {
+            var firstItem = cart[cartOrder[0]];
+            var p = productCatalog.find(function (x) { return x.id === firstItem.id; });
+            lockedCat = p ? p.category : null;
+        }
+        $('#productCategoryFilter .category-card').each(function () {
+            var cat = this.getAttribute('data-cat');
+            this.classList.toggle('cat-locked', !!lockedCat && cat !== lockedCat);
+        });
+        return lockedCat;
     }
     $(document).on('click', '#productCategoryFilter .category-card', function () {
-        activeProductCategory = this.getAttribute('data-cat');
+        var clickedCat = this.getAttribute('data-cat');
+        var lockedCat = updateCategoryLockState();
+        if (lockedCat && clickedCat !== lockedCat) {
+            alert('This order already has ' + lockedCat.charAt(0).toUpperCase() + lockedCat.slice(1) + ' products in it. Remove them first to switch to ' + clickedCat.charAt(0).toUpperCase() + clickedCat.slice(1) + '.');
+            return;
+        }
+        activeProductCategory = clickedCat;
         $('#productCategoryFilter .category-card').each(function () {
             var active = (this.getAttribute('data-cat') === activeProductCategory);
             this.classList.toggle('active', active);
             this.style.borderColor = active ? '#4f6ef7' : '#e5e7eb';
             this.style.background = active ? '#eef2ff' : '#fff';
         });
-        applyProductCategoryFilter($('#dataTable'));
+        renderSkuGrid();
     });
 
-    // Row 0 is the header labels row — the actual template to clone is row 1.
-    function addRow(tableID) {
-        var table    = document.getElementById(tableID);
-        var rowCount = table.rows.length;
-        if (rowCount < 100) {
-            var row      = table.insertRow(rowCount);
-            var colCount = table.rows[1].cells.length;
-            for (var i = 0; i < colCount; i++) {
-                var newcell = row.insertCell(i);
-                newcell.innerHTML = (i === productCellIndex && productCellTemplate !== null)
-                    ? productCellTemplate
-                    : table.rows[1].cells[i].innerHTML;
-            }
-            initProductSearch($(row));
-            applyProductCategoryFilter($(row));
-            recalcOrderLine(row.querySelector('.order-qty'));
-        } else {
-            alert("Maximum allowed record is 100.");
-        }
-    }
+    $('#skuSearchBox').on('input', renderSkuGrid);
 
     $(document).ready(function() {
         if (document.getElementById('shopTpMatchHint')) { initShopSelect2(); }
@@ -775,89 +920,9 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         // full-width dropdown like Shop/Product, since nothing here ever
         // sets its width. Matching the Shop select's own init, 2026-11-13.
         if (document.getElementById('cp_select')) { $('#cp_select').select2({ width: '100%' }); }
-        var tbl = document.getElementById('dataTable');
-        if (tbl && tbl.rows.length > 1) {
-            // Row 0 is just the header labels row (no real <select> in it since
-            // the mobile-stacked redesign) — row 1 is the actual data row and
-            // has the real product <select>, still pristine at this point
-            // because initProductSearch() below hasn't touched it yet.
-            productCellTemplate = tbl.rows[1].cells[productCellIndex].innerHTML;
-        }
-        initProductSearch($('#dataTable'));
-        applyProductCategoryFilter($('#dataTable'));
+        renderSkuGrid();
+        renderCart();
     });
-
-    function deleteRow(tableID) {
-        var table    = document.getElementById(tableID);
-        var rowCount = table.rows.length;
-        for (var i = 1; i < rowCount; i++) { // start at 1 — row 0 is the header labels row
-            var row    = table.rows[i];
-            var chkbox = row.cells[0].childNodes[0];
-            if (null != chkbox && true == chkbox.checked) {
-                if (rowCount <= 2) { // header + 1 data row — keep at least one product row
-                    alert("Cannot remove all rows.");
-                    break;
-                }
-                table.deleteRow(i);
-                rowCount--;
-                i--;
-            }
-        }
-        recalcOrderGrandTotal();
-    }
-
-    // ── Per-line Actual / After-Discount amount, plus an order grand total ──
-    function recalcOrderLine(el) {
-        if (!el) { return; }
-        var row = el.closest ? el.closest('tr') : null;
-        if (!row) { return; }
-
-        var prSelect = row.querySelector('.order-pr-select');
-        var qtyInput = row.querySelector('.order-qty');
-        var discInput = row.querySelector('.order-disc');
-        var actualEl = row.querySelector('.order-line-actual');
-        var finalEl  = row.querySelector('.order-line-final');
-        if (!prSelect || !qtyInput || !discInput || !actualEl || !finalEl) { return; }
-
-        var opt   = prSelect.options[prSelect.selectedIndex];
-        var price = opt ? (parseFloat(opt.getAttribute('data-price')) || 0) : 0;
-        var qty   = parseFloat(qtyInput.value) || 0;
-        var disc  = Math.min(100, Math.max(0, parseFloat(discInput.value) || 0));
-
-        var actual = price * qty;
-        var final  = actual * (1 - disc / 100);
-
-        actualEl.textContent = 'Actual: ₹' + actual.toFixed(2);
-        finalEl.textContent  = 'After Disc: ₹' + final.toFixed(2);
-
-        recalcOrderGrandTotal();
-    }
-
-    function recalcOrderGrandTotal() {
-        var table = document.getElementById('dataTable');
-        if (!table) { return; }
-        var actualTotal = 0, finalTotal = 0;
-        for (var i = 1; i < table.rows.length; i++) { // skip header row
-            var row = table.rows[i];
-            var prSelect = row.querySelector('.order-pr-select');
-            var qtyInput = row.querySelector('.order-qty');
-            var discInput = row.querySelector('.order-disc');
-            if (!prSelect || !qtyInput || !discInput) { continue; }
-            var opt   = prSelect.options[prSelect.selectedIndex];
-            var price = opt ? (parseFloat(opt.getAttribute('data-price')) || 0) : 0;
-            var qty   = parseFloat(qtyInput.value) || 0;
-            var disc  = Math.min(100, Math.max(0, parseFloat(discInput.value) || 0));
-            var actual = price * qty;
-            actualTotal += actual;
-            finalTotal  += actual * (1 - disc / 100);
-        }
-        var totalEl = document.getElementById('orderGrandTotal');
-        if (totalEl) {
-            totalEl.textContent = (actualTotal > 0 || finalTotal > 0)
-                ? 'Order Total — Actual: ₹' + actualTotal.toFixed(2) + '  |  After Discount: ₹' + finalTotal.toFixed(2)
-                : '';
-        }
-    }
 
     // ── District → Taluk → Shop chained filter ───────────────────────────────
     // District/taluk are matched by the clean partner_location_nodes id
@@ -1247,6 +1312,16 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
         var GET_ORDER_MAX_METERS = 100;
         var SKIP_LOCATION_CHECK = <?php echo $skipLocationCheckForThisDm ? 'true' : 'false'; ?>;
         window.confirmGetOrderSubmit = function confirmGetOrderSubmit() {
+            if (cartOrder.length === 0) {
+                alert('Please add at least one product to this order.');
+                return false;
+            }
+            for (var ci = 0; ci < cartOrder.length; ci++) {
+                if (!(cart[cartOrder[ci]].qty > 0)) {
+                    alert('Please enter a valid Qty for every selected product.');
+                    return false;
+                }
+            }
             if (SKIP_LOCATION_CHECK) { return confirm('Please confirm'); }
             if (capturedLat === null || capturedLng === null) {
                 alert('Could not get your current location. Please enable location access and try again — Get Order requires you to be at the shop.');

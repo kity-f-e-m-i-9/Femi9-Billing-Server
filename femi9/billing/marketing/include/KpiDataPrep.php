@@ -314,15 +314,33 @@ $companyDmIdList = implode(',', $companyDmIds ?: [0]);
 // District Sales Target Overachievement (10%) — same Napkin-only
 // Target/Achieved as the Monthly Napkin Sales KPI, but company-wide: only
 // DMs over 100% are eligible, and the highest achiever among them gets
-// full marks.
-$companyDmTargetStats = getRawTargetAchievedStats($db_conn, $companyDmIds, $fromDate, $toDate);
+// full marks. Must use the SAME napkin-only TP Invoice Amount override
+// every DM's own KPI #1 Achieved uses (the per-subtree-leaf loop at the top
+// of this file), not the old Get-Order-only getRawTargetAchievedStats() —
+// otherwise a DM who legitimately crosses 100% mainly via direct TP
+// invoices (little/no Get Order) never counts toward this company-wide
+// ranking, so $companyMaxOverachPct can stay 0 even when real DMs are over
+// 100%, showing "Not eligible" for everyone including the DM who IS over
+// 100% on their own card. 2026-12-01, user-reported (own Achieved 113%,
+// card still said "Not eligible") — this was the exact gap flagged
+// 2026-11-23 as "could understate a high-performing DM's ranking if they
+// sell mostly via direct TP invoice", now confirmed actually happening.
+// Costs ~5 extra queries per active company DM (same tradeoff already
+// accepted for KPI #6/#7's own company-wide ranking loop below).
 $companyMaxOverachPct = 0.0;
-foreach ($companyDmTargetStats as $stat) {
-    $t = (float)($stat['target'] ?? 0); $a = (float)($stat['achieved'] ?? 0);
-    if ($t > 0) {
-        $pct = $a / $t;
-        if ($pct > 1 && $pct > $companyMaxOverachPct) { $companyMaxOverachPct = $pct; }
-    }
+foreach ($companyDmIds as $_cdmId) {
+    $_cdmScopeNodes = getMsAssignedTargetScopeNodes($db_conn, $_cdmId);
+    if (empty($_cdmScopeNodes)) { continue; }
+    $_cdmScopeIds = array_column($_cdmScopeNodes, 'id');
+    $_cdmTarget = (float)(getMsNodeTargetAndFirkaStats($db_conn, $_cdmScopeIds)['district_total_target'] ?? 0);
+    if ($_cdmTarget <= 0) { continue; }
+    $_cdmTpIds = getMsNodeTpIds($db_conn, $_cdmScopeIds, true);
+    if (empty($_cdmTpIds)) { continue; }
+    $_cdmDistrictIds = districtIdsFromScopeNodeIds($db_conn, $_cdmScopeIds);
+    if (empty($_cdmDistrictIds)) { continue; }
+    $_cdmAchieved = getTpInvoiceAmountForDistricts($db_conn, $_cdmTpIds, $_cdmDistrictIds, $fromDate, $toDate);
+    $_cdmPct = $_cdmAchieved / $_cdmTarget;
+    if ($_cdmPct > 1 && $_cdmPct > $companyMaxOverachPct) { $companyMaxOverachPct = $_cdmPct; }
 }
 
 // New Shop Onboarding (5%) / New Category Outlets Onboarding (5%) —
@@ -588,16 +606,6 @@ function kpiMarketWorkUnionDays(array $ids, array $datesByMsId): int {
     return count($union);
 }
 
-// Which quarter (1-4, clipped) of the selected date range a date falls in —
-// quarter 1 = earliest, quarter 4 = latest. Generalises the original
-// "which week of the month" idea to work with any From/To range, not just a
-// calendar month.
-function kpiQuarterIndexOfRange(string $date, string $rangeStart, int $daysInRange): int {
-    $daysSinceStart = (int)floor((strtotime($date) - strtotime($rangeStart)) / 86400);
-    $quarterLen = max(1, $daysInRange / 4);
-    return min(4, (int)floor($daysSinceStart / $quarterLen) + 1);
-}
-
 // Weekly-view row — Target/Achieved/Balance per calendar week of the month,
 // same hierarchy rollup as renderKpiRow() but scoped to $monthlyRawStats/
 // $monthlyDailyByMsId (the whole month) instead of the From/To range.
@@ -699,11 +707,34 @@ function computeKpiRowValues(
         ? min(1, $salesAchPct / $kx['companyMaxOverachPct'])
         : 0.0;
 
-    // 4. Early Monthly Target Achievement (5%) — PLAN is always 4 (quarters
-    // of the selected range); quarter 1 completion = 4/4, quarter 4 = 1/4,
-    // not completed within the range = 0/4.
-    $earlyMonthAch = $completedDate !== null ? max(1, 5 - kpiQuarterIndexOfRange($completedDate, $fromDate, $daysInRange)) : 0;
-    $earlyMonthAchPct = $earlyMonthAch / 4;
+    // 4. Early Month Target Achievement (5%) — 2026-12-01, user-redefined
+    // away from "quarter of the selected range" to days-before-the-REAL-
+    // calendar-month-end (not the range's own end): completed ON month-end
+    // day = 0, 1 day before = 1, 2 before = 2, 3 before = 3, 4 before = 4,
+    // 5+ days before = 5 (the capped "4 + 1 bonus point" the user described)
+    // — so Plan is 5, not 4.
+    //
+    // $completedDate (kpiCompletedDate(), above) is the raw day the running
+    // total first reaches target — but a target crossed partway through a
+    // day doesn't mean that SAME day opened with Balance already 0, only
+    // the NEXT day does. User explicitly wants credit based on the first
+    // day that opens already fully done ("innaikku morning 12 clock eluntha
+    // na balance 0 nu varanum" — e.g. crossed on the 27th -> credited date
+    // is the 28th, not the 27th), so +1 day is applied before measuring
+    // against month-end.
+    $earlyMonthAch = 0;
+    if ($completedDate !== null) {
+        $_earlyMonthCreditDate = date('Y-m-d', strtotime($completedDate . ' +1 day'));
+        // $toDate isn't itself a param here — reconstructed from $fromDate +
+        // $daysInRange (both already passed in), same range this function's
+        // caller already built, so this stays in sync without adding a
+        // redundant third date param.
+        $_earlyMonthRangeEnd = date('Y-m-d', strtotime($fromDate . ' +' . ($daysInRange - 1) . ' days'));
+        $_earlyMonthMonthEnd = date('Y-m-t', strtotime($_earlyMonthRangeEnd));
+        $_earlyMonthDaysBefore = (int)floor((strtotime($_earlyMonthMonthEnd) - strtotime($_earlyMonthCreditDate)) / 86400);
+        $earlyMonthAch = max(0, min(5, $_earlyMonthDaysBefore));
+    }
+    $earlyMonthAchPct = $earlyMonthAch / 5;
 
     // 6. Monthly New Shop Onboarding (5%) — total new shops, summed across
     // the subtree (shops don't overlap between different DMs' areas).
@@ -817,8 +848,8 @@ function renderKpiRow(
     $html .= '<td>' . number_format($v['weekly_ach_pct'] * 100, 0) . '%</td>';
     $html .= kpiScoreCell($v['weekly_ach_pct'], 5);
 
-    // 4. Early Monthly Target Achievement (5%)
-    $html .= '<td>4</td>';
+    // 4. Early Month Target Achievement (5%)
+    $html .= '<td>5</td>';
     $html .= '<td>' . $v['early_month_ach'] . '</td>';
     $html .= '<td>' . number_format($v['early_month_ach_pct'] * 100, 0) . '%</td>';
     $html .= kpiScoreCell($v['early_month_ach_pct'], 5);
@@ -888,8 +919,8 @@ function renderKpiCards(array $v): string {
         'pct' => number_format($v['weekly_ach_pct'] * 100, 0) . '%', 'score' => $v['weekly_ach_pct'] * 5, 'max' => 5];
 
     $cards[] = ['icon' => 'bolt', 'title' => '4. Early Month Target Achievement', 'weight' => 5,
-        'desc' => 'Complete the full target before this period ends. Quarter 1 of the range = full marks, each later quarter scores less.',
-        'plan' => '4', 'ach' => (string)$v['early_month_ach'],
+        'desc' => 'Scored by how many days before the actual calendar month-end your target was fully done (credited from the day AFTER it crossed, since that\'s the first day Balance truly opens at 0) — 5+ days early = full marks, day-of-month-end = 0.',
+        'plan' => '5', 'ach' => (string)$v['early_month_ach'],
         'pct' => number_format($v['early_month_ach_pct'] * 100, 0) . '%', 'score' => $v['early_month_ach_pct'] * 5, 'max' => 5];
 
     $cards[] = ['icon' => 'storefront', 'title' => '5. Daily Market Visit & Order', 'weight' => 10,

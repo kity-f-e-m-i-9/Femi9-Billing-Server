@@ -226,16 +226,16 @@ $myLayer2CanSeeBreakdown = !empty($_SESSION['LOGGED_IN_VIA_COMPANY']) || !empty(
                         <div class="row mt-3">
                             <div class="col">
                                 <p class="text-muted" style="font-size:11px;margin-bottom:6px;">
-                                    Layer 2 &mdash; Professional Excellence. Scored here from your own TPs' month-end feedback (5 questions, 1-5 stars each = out of 25 per TP per month) &mdash; the cumulative average of every rating received within the From/To range selected above.
+                                    Layer 2 &mdash; Professional Excellence. Scored here from your own TPs' month-end feedback (5 questions, each star-rating worth up to 1 mark &mdash; 1st star 0.2, 2nd 0.4, 3rd 0.6, 4th 0.8, 5th 1.0 &mdash; so out of 5 per TP per month) &mdash; the cumulative average of every rating received within the From/To range selected above.
                                 </p>
                                 <div class="kpi-card-grid">
                                     <div class="kpi-card">
                                         <div class="kpi-card-head"><i class="material-icons-outlined">star_rate</i> 1. Your Total Score</div>
-                                        <div class="kpi-card-desc">Average TP feedback score for the selected date range (out of 25 per rating).</div>
+                                        <div class="kpi-card-desc">Average TP feedback score for the selected date range (out of 5 per rating).</div>
                                         <div class="kpi-card-stats">
                                             <div>
                                                 <span class="kpi-card-label">Average Score</span>
-                                                <span class="kpi-card-val"><?php echo $myLayer2Score['count'] > 0 ? number_format($myLayer2Score['avg_score_25'], 1) . ' / 25' : 'No ratings yet'; ?></span>
+                                                <span class="kpi-card-val"><?php echo $myLayer2Score['count'] > 0 ? number_format($myLayer2Score['avg_score_5'], 1) . ' / 5' : 'No ratings yet'; ?></span>
                                             </div>
                                             <div>
                                                 <span class="kpi-card-label">Ratings Received</span>
@@ -249,7 +249,7 @@ $myLayer2CanSeeBreakdown = !empty($_SESSION['LOGGED_IN_VIA_COMPANY']) || !empty(
                                                 <?php foreach ($myLayer2Score['rows'] as $_r2): ?>
                                                 <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;border-bottom:1px dotted #f1f5f9;">
                                                     <span><?php echo htmlspecialchars($_r2['tp_name'] ?? '-'); ?> (<?php echo htmlspecialchars($_r2['tp_code'] ?? '-'); ?>) &mdash; <?php echo htmlspecialchars($_r2['period_month']); ?></span>
-                                                    <span style="font-weight:600;"><?php echo (int)$_r2['score_25']; ?> / 25</span>
+                                                    <span style="font-weight:600;"><?php echo number_format((float)$_r2['score_5'], 1); ?> / 5</span>
                                                 </div>
                                                 <?php endforeach; ?>
                                             </div>

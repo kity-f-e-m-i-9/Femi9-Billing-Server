@@ -29,13 +29,62 @@ $msId = (int)$Login_user_IDvl;
 $scopeNodes = getMsAssignedTargetScopeNodes($db_conn, $msId);
 $scopeIds = array_column($scopeNodes, 'id');
 
-$rows = fetchTodayWorkStartRows($db_conn, $scopeIds);
+// Date filter — defaults to today. The live lock gate below always checks
+// TODAY specifically (dmHasBlockingWorkStartToday() is hardcoded to
+// CURDATE()), so switching this filter to a past date never bypasses
+// anything — it only changes which day's roster this page displays.
+// 2026-11-25, user-requested ("date filter vechu, ethana per waiting, ethana
+// per accept nu therinjum").
+$__dwsViewDate = date('Y-m-d');
+if (!empty($_GET['date'])) {
+    $__dwsParsed = DateTime::createFromFormat('Y-m-d', $_GET['date']);
+    if ($__dwsParsed && $__dwsParsed->format('Y-m-d') === $_GET['date']) {
+        $__dwsViewDate = $_GET['date'];
+    }
+}
+
+$rows = fetchTodayWorkStartRows($db_conn, $scopeIds, $__dwsViewDate);
+
+// Summary counts for the filtered date — "Waiting" = still escalated and
+// unresolved; "Resolved/Working" = either the company resolved it or the TP
+// itself is marked accepted (old pre-2026-11-30 flow, kept for historical
+// rows); everything else ('none' with no escalation yet, or a Vacant Area
+// never escalated) falls into "Not Yet Escalated".
+$__dwsCountWaiting  = 0;
+$__dwsCountResolved = 0;
+$__dwsCountOther    = 0;
+foreach ($rows as $__r) {
+    if ($__r['company_request_status'] === 'pending') { $__dwsCountWaiting++; }
+    elseif ($__r['company_request_status'] === 'resolved' || $__r['tp_approval_status'] === 'accepted') { $__dwsCountResolved++; }
+    else { $__dwsCountOther++; }
+}
+
+// Whether THIS viewer can act as "ASM/Company" and resolve a pending
+// escalation right here — same subordinate check work-start-resolve-
+// action.php itself enforces (getMsSubtreeIds() always includes the caller,
+// so >1 means at least one real subordinate). An ASM/SM who also happens to
+// hold their own direct District/Division assignment sees their
+// subordinates' escalated Firka rows on THIS page (same reason
+// checksession.php's self-lock had to learn to skip them) but previously had
+// no way to resolve one without a separate trip to work-start-requests.php —
+// 2026-11-25, user-reported ("ASM um work start panna request approve
+// pannanum").
+require_once __DIR__ . '/include/TeamSubtree.php';
+$__dwsSubtreeIds = getMsSubtreeIds($db_conn, $msId);
+$__dwsCanResolve = count($__dwsSubtreeIds) > 1;
 
 // While checksession.php's gate is actively forcing the DM here (something
 // today is still unresolved), hide the sidebar entirely so they can't click
 // away to another page and bounce right back — once everything clears, a
-// voluntary visit to this page shows the normal sidebar again.
-$__dwsGateLocked = dmHasBlockingWorkStartToday($db_conn, $scopeIds);
+// voluntary visit to this page shows the normal sidebar again. This only
+// ever applies to a plain DM (checksession.php's self-lock itself now skips
+// anyone with subordinates, see 2026-11-25 note there) — an ASM/SM landing
+// here to resolve a subordinate's escalation was never actually locked out
+// of the rest of the portal, so hiding their sidebar too was just a
+// confusing leftover of the same gate query being reused here without that
+// same exemption. 2026-11-25, user-reported ("sidebar enga, idhu ipadi
+// iruka koodathu").
+$__dwsGateLocked = !$__dwsCanResolve && dmHasBlockingWorkStartToday($db_conn, $scopeIds);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -70,6 +119,10 @@ $__dwsGateLocked = dmHasBlockingWorkStartToday($db_conn, $scopeIds);
         .dws-tp.filled { color:#4bad48; }
         .dws-reason { background:#fff5f5; border:1px solid #ffd2d6; border-radius:7px; padding:9px 13px; font-size:12.5px; color:#ff4857; max-width:100%; }
         .dws-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+        .dws-filter-bar { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+        .dws-summary { display:flex; gap:10px; flex-wrap:wrap; }
+        .dws-summary .badge { font-size:12.5px; padding:7px 13px; }
+        .dws-resolved-meta { font-size:11.5px; color:#4bad48; margin-top:2px; text-align:right; }
         @media (max-width: 575px) {
             .dws-row { flex-direction:column; align-items:stretch; }
             .dws-side { align-items:stretch; }
@@ -94,7 +147,7 @@ $__dwsGateLocked = dmHasBlockingWorkStartToday($db_conn, $scopeIds);
                     <div class="row">
                         <div class="col">
                             <div class="page-description">
-                                <h1>Daily Work Start — <?php echo date('d M Y'); ?></h1>
+                                <h1>Daily Work Start — <?php echo date('d M Y', strtotime($__dwsViewDate)); ?></h1>
                             </div>
                         </div>
                     </div>
@@ -103,15 +156,31 @@ $__dwsGateLocked = dmHasBlockingWorkStartToday($db_conn, $scopeIds);
                     <div class="alert alert-warning" style="border-radius:10px;">
                         Complete today's work-start confirmation for every Firka below to continue using the portal — other pages are locked until each one is Resolved by ASM/Company.
                     </div>
+                    <?php else: ?>
+                    <div class="dws-filter-bar">
+                        <form method="get" action="daily-work-start.php" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
+                            <div>
+                                <label class="form-label" style="margin-bottom:4px;">Date</label>
+                                <input type="date" name="date" class="form-control form-control-sm" value="<?php echo htmlspecialchars($__dwsViewDate); ?>" onchange="this.form.submit();">
+                            </div>
+                        </form>
+                        <div class="dws-summary">
+                            <span class="badge badge-style-bordered badge-primary"><?php echo $__dwsCountWaiting; ?> Waiting for ASM/Company</span>
+                            <span class="badge badge-style-bordered badge-success"><?php echo $__dwsCountResolved; ?> Resolved / Working</span>
+                            <?php if ($__dwsCountOther > 0): ?>
+                            <span class="badge badge-style-bordered badge-secondary"><?php echo $__dwsCountOther; ?> Not Yet Escalated</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                     <?php endif; ?>
 
                     <div class="card">
                         <div class="card-body" style="padding:0;">
                             <div id="dwsList">
                                 <?php if (empty($rows)): ?>
-                                <div class="dws-empty">No Firka assigned for today in your area.</div>
+                                <div class="dws-empty">No Firka assigned for <?php echo htmlspecialchars(date('d M Y', strtotime($__dwsViewDate))); ?> in your area.</div>
                                 <?php else: foreach ($rows as $r): ?>
-                                <div class="dws-row" data-id="<?php echo (int)$r['id']; ?>" data-has-tp="<?php echo $r['territory_partner_id'] ? '1' : '0'; ?>" data-tp-name="<?php echo htmlspecialchars($r['tp_name'] ?? '', ENT_QUOTES); ?>" data-tp-code="<?php echo htmlspecialchars($r['tp_code'] ?? '', ENT_QUOTES); ?>">
+                                <div class="dws-row" data-id="<?php echo (int)$r['id']; ?>" data-has-tp="<?php echo $r['territory_partner_id'] ? '1' : '0'; ?>" data-tp-id="<?php echo (int)($r['territory_partner_id'] ?? 0); ?>" data-tp-name="<?php echo htmlspecialchars($r['tp_name'] ?? '', ENT_QUOTES); ?>" data-tp-code="<?php echo htmlspecialchars($r['tp_code'] ?? '', ENT_QUOTES); ?>">
                                     <div class="dws-main">
                                         <div class="dws-firka"><?php echo htmlspecialchars($r['firka_name']); ?></div>
                                         <div class="dws-meta"><?php echo htmlspecialchars($r['district_name']); ?></div>
@@ -125,10 +194,24 @@ $__dwsGateLocked = dmHasBlockingWorkStartToday($db_conn, $scopeIds);
                                     <div class="dws-side">
                                     <?php if ($r['company_request_status'] === 'pending'): ?>
                                         <span class="badge badge-style-bordered badge-primary">Waiting for ASM/Company</span>
+                                        <?php if (!empty($r['company_requested_at'])): ?>
+                                        <div class="dws-meta" style="margin-top:2px;">Requested: <?php echo htmlspecialchars(date('d-m-Y h:i A', strtotime($r['company_requested_at']))); ?></div>
+                                        <?php endif; ?>
+                                        <?php if ($__dwsCanResolve): ?>
+                                        <div class="dws-actions">
+                                            <button type="button" class="btn btn-sm btn-success" data-act="resolve">Resolve (Confirm TP)</button>
+                                        </div>
+                                        <?php endif; ?>
                                     <?php elseif ($r['company_request_status'] === 'resolved'): ?>
                                         <span class="badge badge-style-bordered badge-success">Resolved by Company — Working today</span>
+                                        <?php if (!empty($r['company_resolved_at'])): ?>
+                                        <div class="dws-resolved-meta">Accepted: <?php echo htmlspecialchars(date('d-m-Y h:i A', strtotime($r['company_resolved_at']))); ?><?php if (!empty($r['company_resolved_by'])): ?> by <?php echo htmlspecialchars($r['company_resolved_by']); ?><?php endif; ?></div>
+                                        <?php endif; ?>
                                     <?php elseif ($r['tp_approval_status'] === 'accepted'): ?>
                                         <span class="badge badge-style-bordered badge-success">Working today</span>
+                                        <?php if (!empty($r['tp_responded_at'])): ?>
+                                        <div class="dws-resolved-meta">Accepted: <?php echo htmlspecialchars(date('d-m-Y h:i A', strtotime($r['tp_responded_at']))); ?></div>
+                                        <?php endif; ?>
                                     <?php elseif ($r['tp_approval_status'] === 'requested'): ?>
                                         <span class="badge badge-style-bordered badge-warning">Waiting for TP to respond</span>
                                     <?php elseif ($r['tp_approval_status'] === 'denied'): ?>
@@ -168,7 +251,14 @@ $__dwsGateLocked = dmHasBlockingWorkStartToday($db_conn, $scopeIds);
         var id = $row.data('id');
         var act = $btn.data('act');
         $row.find('button').prop('disabled', true);
-        $.post('daily-work-start-action.php', { id: id, action: act }, function (resp) {
+
+        // "resolve" (ASM/SM confirming a subordinate's escalated Firka right
+        // here) hits the same endpoint work-start-requests.php itself posts
+        // to — keeps the TP already on the row instead of clearing it.
+        var url = (act === 'resolve') ? 'work-start-resolve-action.php' : 'daily-work-start-action.php';
+        var payload = (act === 'resolve') ? { id: id, tp_id: $row.data('tp-id') || '' } : { id: id, action: act };
+
+        $.post(url, payload, function (resp) {
             if (resp && resp.success) {
                 location.reload();
             } else {

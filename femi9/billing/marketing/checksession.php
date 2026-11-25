@@ -162,6 +162,9 @@ $__dwsExemptPages = [
     'change-password.php', 'logout.php',
     'manage-daily-assign-district-tps.php', 'get-tp-assign-staff.php', 'get-tp-assign-districts.php',
     'get-tp-assign-divisions.php', 'get-tp-assign-firkas.php', 'get-tp-assign-tp-for-firka.php', 'tp-assign-firka-action.php',
+    // Read-only report — no reason to ever block it. 2026-11-25, user-reported
+    // (clicking this link from the sidebar hit the same lock screen).
+    'daily-assign-report.php', 'get-daily-assign-report.php', 'export-daily-assign-report-xlsx.php',
 ];
 $__dwsCurrentPage = basename($_SERVER['PHP_SELF'] ?? '');
 if (!in_array($__dwsCurrentPage, $__dwsExemptPages, true)) {
@@ -170,11 +173,33 @@ if (!in_array($__dwsCurrentPage, $__dwsExemptPages, true)) {
         if ($__dwsChk && $__dwsChk->num_rows > 0) {
             $__dwsColChk = $db_conn->query("SHOW COLUMNS FROM tp_daily_assignments LIKE 'tp_approval_status'");
             if ($__dwsColChk && $__dwsColChk->num_rows > 0) {
+                // This hard self-lock is only meant for a plain DM, who
+                // physically works a Firka themselves and so must personally
+                // confirm Daily Work Start for it. An ASM/SM (anyone with
+                // subordinates) can ALSO hold their own direct location
+                // assignment at District/Division depth for oversight
+                // purposes — dmHasBlockingWorkStartToday()'s recursive match
+                // then catches a SUBORDINATE DM's own Firka assignment too
+                // (it's a descendant of that broader district/division node),
+                // locking the ASM's entire portal the moment they use "Daily
+                // Assign District TPs" to help a subordinate, even though
+                // it's that DM's confirmation to give, not theirs. An ASM/SM
+                // still reaches work-start-requests.php (exempted above) to
+                // resolve an escalated request — this only removes the
+                // blanket self-lock for managers. 2026-11-25, user-reported.
+                $__dwsHasSubordinates = false;
+                if ((int) $Login_user_IDvl > 0) {
+                    $__dwsTeamChk = $db_conn->prepare("SELECT COUNT(*) AS n FROM marketing_staff WHERE manager_id=?");
+                    $__dwsTeamChk->bind_param('i', $Login_user_IDvl);
+                    $__dwsTeamChk->execute();
+                    $__dwsHasSubordinates = (int) ($__dwsTeamChk->get_result()->fetch_assoc()['n'] ?? 0) > 0;
+                    $__dwsTeamChk->close();
+                }
                 require_once __DIR__ . '/include/AssignedLocations.php';
                 require_once __DIR__ . '/../shared/TpWorkStart.php';
-                $__dwsScopeNodes = getMsAssignedTargetScopeNodes($db_conn, (int) $Login_user_IDvl);
+                $__dwsScopeNodes = $__dwsHasSubordinates ? [] : getMsAssignedTargetScopeNodes($db_conn, (int) $Login_user_IDvl);
                 $__dwsScopeIds = array_column($__dwsScopeNodes, 'id');
-                if (dmHasBlockingWorkStartToday($db_conn, $__dwsScopeIds)) {
+                if (!$__dwsHasSubordinates && dmHasBlockingWorkStartToday($db_conn, $__dwsScopeIds)) {
                     // An AJAX/action/export endpoint hit from an already-open tab
                     // while blocked otherwise got this HTML redirect instead of
                     // the JSON/binary payload its caller expects — JSON.parse on
