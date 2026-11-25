@@ -22,9 +22,27 @@ require_once __DIR__ . '/StockService.php'; // for StockException
  * StockService for the raw product itself — except covers have no
  * underlying stock row at all).
  */
+// DDL (even CREATE TABLE IF NOT EXISTS) implicitly COMMITS the open
+// transaction. These ensure_*() helpers run inside the batch transaction of
+// the Convert Pieces<->Packs page (via consume_covers()), so an unguarded
+// CREATE silently committed every earlier row of the batch — and when a
+// later row then failed ("Not enough covers"), its rollback no longer
+// covered the rows already committed, leaving a bundle drawn down with no
+// stock credit (CONV-20261124110843-437, 2026-11-24). Checking existence
+// first (a plain SHOW TABLES commits nothing) means DDL runs only the one
+// time a table is genuinely missing.
+function pc_create_table_if_missing(mysqli $db_conn, string $table, string $createSql): void
+{
+    $res = $db_conn->query("SHOW TABLES LIKE '" . $db_conn->real_escape_string($table) . "'");
+    if ($res && $res->num_rows > 0) {
+        return;
+    }
+    $db_conn->query($createSql);
+}
+
 function ensure_product_covers_table(mysqli $db_conn): void
 {
-    $db_conn->query(
+    pc_create_table_if_missing($db_conn, 'product_covers',
         "CREATE TABLE IF NOT EXISTS product_covers (
             id INT AUTO_INCREMENT PRIMARY KEY,
             company_product_id INT NOT NULL,
@@ -48,7 +66,7 @@ function ensure_product_covers_table(mysqli $db_conn): void
  */
 function ensure_product_cover_adjustments_table(mysqli $db_conn): void
 {
-    $db_conn->query(
+    pc_create_table_if_missing($db_conn, 'product_cover_adjustments',
         "CREATE TABLE IF NOT EXISTS product_cover_adjustments (
             id INT AUTO_INCREMENT PRIMARY KEY,
             cover_id INT NOT NULL,

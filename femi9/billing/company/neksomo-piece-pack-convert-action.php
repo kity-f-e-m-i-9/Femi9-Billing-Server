@@ -236,6 +236,13 @@ $createdBy    = $_SESSION['LOGIN_USER'] ?? 'system';
 ensure_raw_material_bundles_table($db_conn);
 ensure_raw_material_bundle_draws_table($db_conn);
 ensure_raw_material_bucket_tables($db_conn);
+// Also the tables used mid-batch by consume_covers()/record_damaged_*()/
+// add_extra_pieces_to_bundle() — these must never run DDL inside the
+// transaction (see the note above pc_create_table_if_missing()).
+ensure_product_covers_table($db_conn);
+ensure_product_cover_adjustments_table($db_conn);
+ensure_bundle_reason_tables($db_conn);
+ensure_raw_material_bundle_adjustments_table($db_conn);
 $db_conn->begin_transaction();
 try {
     $summaries = [];

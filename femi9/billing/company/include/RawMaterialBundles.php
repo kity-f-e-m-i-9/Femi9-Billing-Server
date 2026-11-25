@@ -555,7 +555,7 @@ function get_raw_material_buckets(mysqli $db_conn): array
 function ensure_bundle_reason_tables(mysqli $db_conn): void
 {
     foreach (['damage_reason_master', 'extra_reason_master'] as $table) {
-        $db_conn->query(
+        rm_create_table_if_missing($db_conn, $table,
             "CREATE TABLE IF NOT EXISTS $table (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 label VARCHAR(150) NOT NULL,
