@@ -96,6 +96,9 @@ if ($res) { while ($r = $res->fetch_assoc()) { $allTps[] = $r; } }
                                         <?php if ($r['territory_partner_id']): ?>
                                         &middot; Currently assigned: <b><?php echo htmlspecialchars($r['tp_name']); ?> (<?php echo htmlspecialchars($r['tp_code']); ?>)</b>
                                         <?php endif; ?>
+                                        <?php if (!empty($r['company_requested_at'])): ?>
+                                        &middot; Requested: <?php echo htmlspecialchars(date('d-m-Y h:i A', strtotime($r['company_requested_at']))); ?>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="wsr-note"><?php echo htmlspecialchars($r['company_request_note'] ?? ''); ?></div>
                                     <div class="wsr-resolve">

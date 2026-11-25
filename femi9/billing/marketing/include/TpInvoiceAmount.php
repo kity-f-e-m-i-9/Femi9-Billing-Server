@@ -55,21 +55,83 @@ function ensureTpInvoiceAmountIndexes($db_conn): void {
     }
 }
 
+// For a TP currently assigned to exactly ONE district, that district IS the
+// ground truth, full stop — shop-invoice-action.php only ever lets such a TP
+// pick that same one district on the invoice form (invoice_district_id is
+// re-validated server-side against getTpAssignedDistricts()), so there is no
+// scenario where a single-district TP's real invoice_district_id disagrees
+// with their home district. This function therefore checks the TP's OWN
+// single-district map FIRST, before even looking at the per-invoice
+// COALESCE(invoice_district_id, shop.district_id) resolution (rd.id below) —
+// 2026-12-01, broadened after a second, more common failure mode than the
+// original "completely unresolvable" one: shop.district_id can be a REAL,
+// VALID district, just the WRONG one (a TP reassigned Firkas keeps her old
+// shops' old, now-stale district_id — e.g. several Tiruppur-only TPs had
+// shops stuck at Perambalur). A plain NULL-check (the original 2026-11-30
+// fix) never catches "valid but wrong", only "unresolvable" (literal '0', or
+// an id from an old, now-nonexistent location scheme like '17') — checking
+// the TP's own single-district map first catches BOTH, since for such a TP
+// there's no invoice-level signal worth trusting over "the one district they
+// actually work". A TP assigned to 2+ districts is unaffected — rd.id (the
+// validated per-invoice resolution) still decides for them, same as before,
+// so the double-count bug invoice_district_id was built to fix (2026-11-20)
+// can't resurface. Reported by Nirmal Claudius R (2026-11-30, Trichy) and
+// ARAVINDSAMY (2026-12-01, Tiruppur) — both had single-district TPs losing
+// real sales this way, for two different underlying data-corruption shapes.
+function getSingleDistrictTpMap($db_conn): array {
+    static $cache = null;
+    if ($cache !== null) { return $cache; }
+    $cache = [];
+    $res = $db_conn->query("
+        SELECT tpl.territory_partner_id AS tp_id, MIN(d.id) AS district_id, COUNT(DISTINCT d.id) AS dcnt
+        FROM territory_partner_locations tpl
+        INNER JOIN territory_partners tp ON tp.id = tpl.territory_partner_id AND tp.deleted_at IS NULL
+        INNER JOIN partner_location_nodes f  ON f.id  = tpl.location_id
+        INNER JOIN partner_location_nodes t  ON t.id  = f.parent_id
+        INNER JOIN partner_location_nodes dv ON dv.id = t.parent_id
+        INNER JOIN partner_location_nodes d  ON d.id  = dv.parent_id
+        GROUP BY tpl.territory_partner_id
+        HAVING COUNT(DISTINCT d.id) = 1
+    ");
+    if ($res) {
+        while ($r = $res->fetch_assoc()) { $cache[(int)$r['tp_id']] = (int)$r['district_id']; }
+    }
+    return $cache;
+}
+
+// Builds a `CASE ui.from_user_id WHEN t1 THEN d1 ... ELSE NULL END` SQL
+// fragment, restricted to the TPs actually in $tpIds (not the whole map) so
+// the CASE stays small even on a company-wide call.
+function buildSingleDistrictFallbackCaseSql($db_conn, array $tpIds): string {
+    $map = getSingleDistrictTpMap($db_conn);
+    $whens = '';
+    foreach ($tpIds as $tpId) {
+        $tpId = (int)$tpId;
+        if (isset($map[$tpId])) {
+            $whens .= " WHEN $tpId THEN " . (int)$map[$tpId];
+        }
+    }
+    if ($whens === '') { return 'NULL'; }
+    return "(CASE ui.from_user_id$whens ELSE NULL END)";
+}
+
 function getTpInvoiceAmountForDistricts($db_conn, array $tpIds, array $districtIds, string $from, string $to): float {
     if (empty($tpIds) || empty($districtIds)) { return 0.0; }
     ensureTpInvoiceAmountIndexes($db_conn);
     $tpList   = implode(',', array_map('intval', $tpIds));
     $distList = implode(',', array_map('intval', $districtIds));
+    $fallback = buildSingleDistrictFallbackCaseSql($db_conn, $tpIds);
     $stmt = $db_conn->prepare("
         SELECT COALESCE(SUM(uii.total),0) AS amt
         FROM user_invoice ui
         STRAIGHT_JOIN shop s ON s.temp_id = ui.to_user_id
         STRAIGHT_JOIN user_invoice_items uii ON uii.inv_id = ui.inv_id
         STRAIGHT_JOIN products p ON p.id = uii.pr_id
+        LEFT JOIN partner_location_nodes rd ON rd.id = COALESCE(ui.invoice_district_id, s.district_id) AND rd.depth = 3
         WHERE ui.from_user_type='territory_partner' AND ui.to_user_type='shop'
           AND ui.from_user_id IN ($tpList)
           AND ui.`date` BETWEEN ? AND ?
-          AND COALESCE(ui.invoice_district_id, s.district_id) IN ($distList)
+          AND COALESCE($fallback, rd.id) IN ($distList)
           AND p.category = 'napkin'
     ");
     $stmt->bind_param('ss', $from, $to);
@@ -86,16 +148,18 @@ function getTpInvoiceAmountByDateForDistricts($db_conn, array $tpIds, array $dis
     ensureTpInvoiceAmountIndexes($db_conn);
     $tpList   = implode(',', array_map('intval', $tpIds));
     $distList = implode(',', array_map('intval', $districtIds));
+    $fallback = buildSingleDistrictFallbackCaseSql($db_conn, $tpIds);
     $res = $db_conn->query("
         SELECT ui.`date`, COALESCE(SUM(uii.total),0) AS amt
         FROM user_invoice ui
         STRAIGHT_JOIN shop s ON s.temp_id = ui.to_user_id
         STRAIGHT_JOIN user_invoice_items uii ON uii.inv_id = ui.inv_id
         STRAIGHT_JOIN products p ON p.id = uii.pr_id
+        LEFT JOIN partner_location_nodes rd ON rd.id = COALESCE(ui.invoice_district_id, s.district_id) AND rd.depth = 3
         WHERE ui.from_user_type='territory_partner' AND ui.to_user_type='shop'
           AND ui.from_user_id IN ($tpList)
           AND ui.`date` BETWEEN '" . $db_conn->real_escape_string($from) . "' AND '" . $db_conn->real_escape_string($to) . "'
-          AND COALESCE(ui.invoice_district_id, s.district_id) IN ($distList)
+          AND COALESCE($fallback, rd.id) IN ($distList)
           AND p.category = 'napkin'
         GROUP BY ui.`date`
     ");
@@ -117,16 +181,18 @@ function getTpDiaperInvoiceAmountForDistricts($db_conn, array $tpIds, array $dis
     ensureTpInvoiceAmountIndexes($db_conn);
     $tpList   = implode(',', array_map('intval', $tpIds));
     $distList = implode(',', array_map('intval', $districtIds));
+    $fallback = buildSingleDistrictFallbackCaseSql($db_conn, $tpIds);
     $stmt = $db_conn->prepare("
         SELECT COALESCE(SUM(uii.total),0) AS amt
         FROM user_invoice ui
         STRAIGHT_JOIN shop s ON s.temp_id = ui.to_user_id
         STRAIGHT_JOIN user_invoice_items uii ON uii.inv_id = ui.inv_id
         STRAIGHT_JOIN products p ON p.id = uii.pr_id
+        LEFT JOIN partner_location_nodes rd ON rd.id = COALESCE(ui.invoice_district_id, s.district_id) AND rd.depth = 3
         WHERE ui.from_user_type='territory_partner' AND ui.to_user_type='shop'
           AND ui.from_user_id IN ($tpList)
           AND ui.`date` BETWEEN ? AND ?
-          AND COALESCE(ui.invoice_district_id, s.district_id) IN ($distList)
+          AND COALESCE($fallback, rd.id) IN ($distList)
           AND p.category = 'diaper'
     ");
     $stmt->bind_param('ss', $from, $to);
@@ -149,18 +215,20 @@ function getTpReturnAmountForDistrictsByCategory($db_conn, array $tpIds, array $
     ensureTpInvoiceAmountIndexes($db_conn);
     $tpList   = implode(',', array_map('intval', $tpIds));
     $distList = implode(',', array_map('intval', $districtIds));
+    $fallback = buildSingleDistrictFallbackCaseSql($db_conn, $tpIds);
     $stmt = $db_conn->prepare("
         SELECT COALESCE(SUM(r.total),0) AS amt
         FROM user_return_stock_items r
         STRAIGHT_JOIN user_invoice ui ON ui.inv_number = r.invnumber
         STRAIGHT_JOIN shop s ON s.temp_id = ui.to_user_id
         STRAIGHT_JOIN products p ON p.id = r.prid
+        LEFT JOIN partner_location_nodes rd ON rd.id = COALESCE(ui.invoice_district_id, s.district_id) AND rd.depth = 3
         WHERE r.to_usertype='territory_partner' AND r.from_usertype='shop' AND r.deleted_at IS NULL
           AND r.to_userid IN ($tpList)
           AND ui.from_user_type='territory_partner' AND ui.to_user_type='shop'
           AND ui.from_user_id IN ($tpList)
           AND ui.`date` BETWEEN ? AND ?
-          AND COALESCE(ui.invoice_district_id, s.district_id) IN ($distList)
+          AND COALESCE($fallback, rd.id) IN ($distList)
           AND p.category = ?
     ");
     $stmt->bind_param('sss', $from, $to, $category);

@@ -43,11 +43,19 @@ if ($tp_id > 0 && !empty($allTalukIds)) {
 
 $shops = [];
 if ($allowed) {
+    // shop.district_name/taluk_name don't exist on this table (that's an
+    // ms_shop-only pair of free-text columns) — shop only has district_id/
+    // taluk_id referencing partner_location_nodes, so the names are resolved
+    // via a join instead. 2026-12-01, user-reported (this page was a blank
+    // white screen — the query itself was throwing a SQL error that
+    // error_reporting(0) silently swallowed).
     $shops = $db_conn->query(
-        "SELECT id, name, mobile_number, district_name, taluk_name
-         FROM shop
-         WHERE onboard_userID = $tp_id AND onboard_userTYPE = 'territory_partner' AND deleted_at IS NULL
-         ORDER BY name ASC"
+        "SELECT s.id, s.name, s.mobile_number, dn.name AS district_name, tn.name AS taluk_name
+         FROM shop s
+         LEFT JOIN partner_location_nodes dn ON dn.id = s.district_id
+         LEFT JOIN partner_location_nodes tn ON tn.id = s.taluk_id
+         WHERE s.onboard_userID = $tp_id AND s.onboard_userTYPE = 'territory_partner' AND s.deleted_at IS NULL
+         ORDER BY s.name ASC"
     )->fetch_all(MYSQLI_ASSOC);
 }
 ?>

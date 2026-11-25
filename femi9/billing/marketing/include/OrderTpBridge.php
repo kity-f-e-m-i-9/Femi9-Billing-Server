@@ -7,6 +7,18 @@
 //
 // $lines: array of ['pr_id' => int, 'qty' => int]
 
+// Same normalised name + clean 10-digit mobile dedupe key as
+// territory-partner/order-confirm-shop.php's ocsDedupeKey() / marketing/
+// dashboard.php's shopOnboardDedupeKey() — kept as its own copy (same
+// convention as those two) rather than a shared include, matching this
+// codebase's existing per-file-copy pattern for this exact small helper.
+function otbDedupeKey($name, $mobile): ?string {
+    $digits = preg_replace('/\D+/', '', (string)$mobile);
+    $nm = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$name)));
+    if (strlen($digits) === 10 && $nm !== '') { return $nm . '|' . $digits; }
+    return null;
+}
+
 function bridgeOrderToTp($db_conn, int $tp_id, $ms_id, $shop_id, string $order_id, string $order_date, array $lines): void
 {
     if ($tp_id <= 0 || empty($lines)) {
@@ -42,29 +54,50 @@ function bridgeOrderToTp($db_conn, int $tp_id, $ms_id, $shop_id, string $order_i
             $bridgedShopId = (int)$found['id'];
         } else {
             // Before creating a new row, check whether this TP already has a
-            // shop with the SAME mobile number — added independently via
+            // shop that's really the SAME real shop — added independently via
             // their own "Add Shop" (source_ms_shop_id NULL, no way for the
             // source_ms_shop_id lookup above to have found it). Without this,
             // every DM whose ms_shop happens to be a shop the TP already
             // onboarded themselves would get a second, duplicate shop row on
             // the TP's own Manage Shop the moment a Get Order bridges it.
             // Confirmed 2026-09-23.
+            //
+            // Matched by mobile number ALONE until 2026-12-01 — user-reported
+            // real failure: the SAME mobile number can legitimately belong to
+            // several genuinely different shops a TP has onboarded (one person
+            // running more than one shop on one phone isn't rare), so a
+            // mobile-only match silently hijacked an unrelated existing shop
+            // ("jayadeepa Femi9WD") for a DM order actually meant for a
+            // different shop ("Testing2") that just happened to share that
+            // phone number — the invoice then went out under the WRONG shop's
+            // name with no visible warning. Now requires BOTH the normalised
+            // name AND the mobile to match (same dedupe key
+            // territory-partner/order-confirm-shop.php's own shop-matching
+            // and marketing/dashboard.php's New Shop Onboarding dedupe both
+            // already use) — same real shop re-contacted only has the SAME
+            // name, not just the same number.
             $bridgedShopId = null;
             $mobile_for_match = trim((string)($msShop['mobile_number'] ?? ''));
-            if ($mobile_for_match !== '') {
+            $key_for_match = otbDedupeKey($msShop['name'] ?? '', $mobile_for_match);
+            if ($mobile_for_match !== '' && $key_for_match !== null) {
                 $stmtMobile = $db_conn->prepare(
-                    "SELECT id FROM shop WHERE onboard_userTYPE = 'territory_partner' AND onboard_userID = ?
-                     AND mobile_number = ? LIMIT 1"
+                    "SELECT id, name FROM shop WHERE onboard_userTYPE = 'territory_partner' AND onboard_userID = ?
+                     AND mobile_number = ?"
                 );
                 $stmtMobile->bind_param('ss', $tp_id_str, $mobile_for_match);
                 $stmtMobile->execute();
-                $mobileMatch = $stmtMobile->get_result()->fetch_assoc();
+                $candidates = $stmtMobile->get_result()->fetch_all(MYSQLI_ASSOC);
                 $stmtMobile->close();
-                if ($mobileMatch) {
-                    $bridgedShopId = (int)$mobileMatch['id'];
+                foreach ($candidates as $candidate) {
+                    if (otbDedupeKey($candidate['name'], $mobile_for_match) === $key_for_match) {
+                        $bridgedShopId = (int)$candidate['id'];
+                        break;
+                    }
+                }
+                if ($bridgedShopId !== null) {
                     // Backfill so the cheap source_ms_shop_id lookup above
                     // finds this row directly next time, instead of
-                    // re-matching by mobile on every single order.
+                    // re-matching by name+mobile on every single order.
                     $stmtBackfill = $db_conn->prepare("UPDATE shop SET source_ms_shop_id = ? WHERE id = ? AND source_ms_shop_id IS NULL");
                     $stmtBackfill->bind_param('ii', $shop_id_int, $bridgedShopId);
                     $stmtBackfill->execute();
@@ -74,9 +107,26 @@ function bridgeOrderToTp($db_conn, int $tp_id, $ms_id, $shop_id, string $order_i
         }
 
         if ($bridgedShopId === null) {
-            // Best-effort text match against the state/district master tables.
-            // If unmatched, left as 0 — order-to-invoice.php's inner/outer GST
-            // detection will default to "outer" in that case (known limitation).
+            // state_id: best-effort text match against the `state` MASTER
+            // table — shop.state_id is a `state` table id (e.g. 7=Tamilnadu),
+            // confirmed from shared/ShopInvoiceData.php's own comment and
+            // every GST-calculation file that reads it. Correct as-is.
+            //
+            // district_id: NOT the legacy `district` table — shop.district_id
+            // is a partner_location_nodes id everywhere else this column is
+            // read (TpInvoiceAmount.php, the whole district-attribution fix
+            // earlier this session, shop-edit.php's own geo_layers.php
+            // cascade). The legacy `district` table uses a COMPLETELY
+            // different id space (confirmed: Erode=8 there, but
+            // partner_location_nodes' real ERODE node is id=18) — matching
+            // against it here wrote the WRONG id into shop.district_id for
+            // every newly-bridged shop, which then couldn't resolve on
+            // territory-partner/shop-edit.php's District dropdown at all
+            // (the id simply doesn't exist among the TP's own real districts)
+            // — same class of bug as the shop.state_id fix (2026-12-01),
+            // just the district twin of it. 2026-12-01, user-reported
+            // ("yes review & invoice button ah click panna district name ah
+            // kanam thaluk ah kanam").
             $state_id = 0;
             $district_id = 0;
             if (!empty($msShop['state_name'])) {
@@ -87,12 +137,26 @@ function bridgeOrderToTp($db_conn, int $tp_id, $ms_id, $shop_id, string $order_i
                 $stmtState->close();
             }
             if (!empty($msShop['district_name'])) {
-                $stmtDist = $db_conn->prepare("SELECT id FROM district WHERE TRIM(LOWER(dist_name)) = TRIM(LOWER(?)) LIMIT 1");
+                $stmtDist = $db_conn->prepare("SELECT id FROM partner_location_nodes WHERE depth = 3 AND TRIM(LOWER(name)) = TRIM(LOWER(?)) LIMIT 1");
                 $stmtDist->bind_param('s', $msShop['district_name']);
                 $stmtDist->execute();
                 $district_id = (int)($stmtDist->get_result()->fetch_assoc()['id'] ?? 0);
                 $stmtDist->close();
             }
+            // taluk_id deliberately left at 0, NOT resolved from
+            // ms_shop.taluk_name — tried this 2026-12-01, reverted same day:
+            // a Taluk name can be a real partner_location_nodes match
+            // somewhere under the matched district while still falling
+            // OUTSIDE this specific TP's own narrower assigned coverage
+            // (e.g. TP-0150 covers only Gobichettipalayam Division's two
+            // Taluks under Erode district, not Erode district's own
+            // same-named Taluk) — silently writing that mismatched id in
+            // looked plausible but was wrong, worse than leaving it for the
+            // TP to pick themselves on the review screen (same reasoning
+            // already applied to firka_id, which was never attempted here
+            // at all for the identical reason — ms_shop doesn't even carry a
+            // firka name to try).
+            $taluk_id = 0;
 
             $randomPart = '';
             for ($x = 0; $x < 5; $x++) { $randomPart .= random_int(1, 9); }

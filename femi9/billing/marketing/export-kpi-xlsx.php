@@ -89,7 +89,7 @@ function writeKpiExportRow(
     $sheet->setCellValue("H{$rowNum}", $v['overach_pct'] > 0 ? (number_format($v['overach_pct'] * 100, 0) . '%') : '-');
     $sheet->setCellValue("I{$rowNum}", round($v['overach_pct'] * 10, 1));
     $sheet->setCellValue("J{$rowNum}", round($v['weekly_ach_pct'] * 5, 1));
-    $sheet->setCellValue("K{$rowNum}", 4);
+    $sheet->setCellValue("K{$rowNum}", 5);
     $sheet->setCellValue("L{$rowNum}", $v['early_month_ach']);
     $sheet->setCellValue("M{$rowNum}", round($v['early_month_ach_pct'] * 5, 1));
     $sheet->setCellValue("N{$rowNum}", $v['working_days_plan']);

@@ -73,5 +73,26 @@ while ($_row = $_lr->fetch_assoc()) {
 }
 $maxDepth = !empty($layers) ? max(array_column($layers, 'depth')) : 3;
 
-// depth → shop table column name
-$depthToField = [2 => 'state_id', 3 => 'district_id', 4 => 'taluk_id', 5 => 'firka_id'];
+// depth → shop table column name. Real depths are 2=State, 3=District,
+// 4=Division, 5=Taluk, 6=Firka (AREA) — confirmed against
+// partner_location_layers — but `shop` only has 4 location columns
+// (state_id/district_id/taluk_id/firka_id, no division_id), a holdover from
+// before Division was inserted into the hierarchy. This mapping used to
+// assume only 4 depth levels existed (2,3,4,5), so Division's real depth
+// (4) silently got 'taluk_id' and Taluk's real depth (5) got 'firka_id' —
+// every Edit/Add Shop save was writing the DIVISION's node id into
+// taluk_id and the TALUK's node id into firka_id, while the real Firka
+// selection (depth 6, no mapping at all, fell through to the harmless/
+// unread "loc_6" field name) was silently dropped and never saved at all.
+// 2026-12-01, user-reported (Edit Shop's District dropdown showing empty on
+// load for a real shop). Depth 4 (Division) is intentionally left OUT of
+// this map — shop has nowhere to store it, so it falls through to the
+// generic "loc_4" field name, which shop-edit-action.php/shop-action.php
+// never read, exactly like depth 6 did before — same harmless-ignore
+// pattern, just applied to the right depth now.
+
+// shop.state_id's own real-table resolution helper lives in
+// ShopStateIdResolver.php (not here) — this file does a full per-request
+// scan to build the TP's own allowed location subtree, which an action
+// script saving a single field has no reason to pay for.
+$depthToField = [2 => 'state_id', 3 => 'district_id', 5 => 'taluk_id', 6 => 'firka_id'];

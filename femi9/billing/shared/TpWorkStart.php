@@ -86,12 +86,17 @@ function tpDailyAssignSave($db_conn, string $assignDate, int $firkaId, ?int $tpI
     $stmt->close();
 }
 
-// Today's Firka assignments under $locationScopeIds (District/Division depth
-// nodes), for the DM's "Daily Work Start" page — one row per Firka, whatever
-// its current tp_approval_status/company_request_status is, so the page can
-// render the right action button per row.
-function fetchTodayWorkStartRows($db_conn, array $locationScopeIds): array {
+// A single day's Firka assignments under $locationScopeIds (District/Division
+// depth nodes), for the DM's "Daily Work Start" page — one row per Firka,
+// whatever its current tp_approval_status/company_request_status is, so the
+// page can render the right action button per row. $date defaults to today
+// (the live gate only ever cares about today — see dmHasBlockingWorkStart-
+// Today() below — but the page itself also needs to look up a past date to
+// show when a since-resolved request was actually accepted). 2026-11-25,
+// user-requested: a date filter + accept/resolve timestamps, not just today.
+function fetchTodayWorkStartRows($db_conn, array $locationScopeIds, ?string $date = null): array {
     if (empty($locationScopeIds)) return [];
+    $date = $date ?: date('Y-m-d');
     $scopeList = implode(',', array_map('intval', $locationScopeIds));
     $stmt = $db_conn->prepare("
         WITH RECURSIVE node_tree AS (
@@ -100,8 +105,9 @@ function fetchTodayWorkStartRows($db_conn, array $locationScopeIds): array {
             SELECT n.id FROM partner_location_nodes n JOIN node_tree nt ON n.parent_id = nt.id
         )
         SELECT tda.id, tda.location_id, tda.territory_partner_id,
-               tda.tp_approval_status, tda.tp_denial_reason,
+               tda.tp_approval_status, tda.tp_denial_reason, tda.tp_responded_at,
                tda.company_request_status, tda.company_request_note,
+               tda.company_requested_at, tda.company_resolved_by, tda.company_resolved_at,
                f.name AS firka_name, d.name AS district_name,
                tp.name AS tp_name, tp.tp_id AS tp_code
         FROM tp_daily_assignments tda
@@ -110,10 +116,11 @@ function fetchTodayWorkStartRows($db_conn, array $locationScopeIds): array {
         JOIN partner_location_nodes dv ON dv.id = t.parent_id
         JOIN partner_location_nodes d  ON d.id  = dv.parent_id
         LEFT JOIN territory_partners tp ON tp.id = tda.territory_partner_id
-        WHERE tda.assign_date = CURDATE()
+        WHERE tda.assign_date = ?
           AND tda.location_id IN (SELECT id FROM node_tree)
         ORDER BY f.name ASC
     ");
+    $stmt->bind_param('s', $date);
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -125,7 +132,7 @@ function fetchTodayWorkStartRows($db_conn, array $locationScopeIds): array {
 // subtree); null means company's unrestricted, org-wide view.
 function fetchPendingCompanyWorkStartRequests($db_conn, ?array $locationScopeIds): array {
     $sql = "
-        SELECT tda.id, tda.assign_date, tda.territory_partner_id, tda.company_request_note,
+        SELECT tda.id, tda.assign_date, tda.territory_partner_id, tda.company_request_note, tda.company_requested_at,
                f.id AS firka_id, f.name AS firka_name, d.name AS district_name,
                tp.name AS tp_name, tp.tp_id AS tp_code
         FROM tp_daily_assignments tda

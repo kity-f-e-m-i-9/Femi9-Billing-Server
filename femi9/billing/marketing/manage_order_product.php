@@ -1,7 +1,6 @@
 <?php include("checksession.php");
 include("config.php");
 require_once("include/TeamSubtree.php");
-require_once(__DIR__ . '/../shared/TpOrderInvoiceLookup.php');
 error_reporting(0);
 
 // A manager (SM/ASM) can view a report scoped to any person in their own
@@ -386,11 +385,9 @@ $tpOrderMeta = [];
 if (!empty($orderIdsInRange)) {
     $oidList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $orderIdsInRange)) . "'";
     // tp.shop_id/s.temp_id/s.name/s.mobile_number — the TP-side `shop` (billing)
-    // record this order is bridged to, NOT ms_shop above (a different table) —
-    // needed for the Convert button's invoice lookup, same as
-    // territory-partner/manage-orders.php. invoiced_at — when Convert was
-    // actually clicked, self-migrating (see shared/TpOrderInvoiceLookup.php).
-    // 2026-11-24, user-requested.
+    // record this order is bridged to, NOT ms_shop above (a different table).
+    // invoiced_at — when the order got linked to an invoice (via the TP's own
+    // "Invoice" button on manage-orders.php), self-migrating.
     $_chkInvoicedAt2 = $db_conn->query("SHOW COLUMNS FROM tp_orders LIKE 'invoiced_at'");
     if ($_chkInvoicedAt2 && $_chkInvoicedAt2->num_rows === 0) {
         $db_conn->query("ALTER TABLE tp_orders ADD COLUMN invoiced_at DATETIME NULL DEFAULT NULL AFTER invoiced_inv_id");
@@ -425,27 +422,6 @@ foreach ($orderIdsInRange as $_oid) {
 
 if ($tp_status_filter !== 'all') {
     $orderIdsInRange = array_values(array_filter($orderIdsInRange, fn($_oid) => $orderStatusMap[$_oid] === $tp_status_filter));
-}
-
-// Shop invoices the assigned TP has already raised to a "Pending with TP"
-// order's own shop — lets the DM Convert it too, same button/modal as the
-// TP's own manage-orders.php, via the shared duplicate-shop-aware lookup
-// (shared/TpOrderInvoiceLookup.php). Grouped by tp_id since different orders
-// here can be assigned to different TPs. 2026-11-24, user-requested
-// ("dm ku location pakkathula convert aprm not convert nu button vechuru...
-// ithey tp pannitangalum saei ivarey pannitalum saei").
-$invoicesByShopTempId = [];
-$_pendingShopsByTp = [];
-foreach ($orderIdsInRange as $_oid) {
-    if (($orderStatusMap[$_oid] ?? null) !== 'pending') { continue; }
-    $_tp = $tpOrderMeta[$_oid] ?? null;
-    if (!$_tp || empty($_tp['tp_id']) || empty($_tp['shop_temp_id'])) { continue; }
-    $_pendingShopsByTp[(int)$_tp['tp_id']][$_tp['shop_temp_id']] = ['name' => $_tp['shop_name'] ?? '', 'mobile' => $_tp['shop_mobile'] ?? ''];
-}
-// shop_temp_id is unique regardless of TP, so this flattens to one map —
-// simpler for the Convert modal's JS to look up by shop_temp_id alone.
-foreach ($_pendingShopsByTp as $_tpId => $_shops) {
-    $invoicesByShopTempId += getInvoicesByShopTempIdForTp($db_conn, $_tpId, $_shops);
 }
 
 // Which CP (if any) a Vacant Area order was attributed to — record only, see
@@ -909,16 +885,12 @@ if (!$tpRow) {
         $detailLines[] = "<div class='tp-status-pending'>Reason: " . htmlspecialchars($tpRow['void_reason']) . "</div>";
     }
 } elseif (empty($tpRow['invoiced_inv_id'])) {
+    // Convert/Not Convert removed from the DM's own view 2026-12-01, user-
+    // requested ("intha convert not convert nu dm ku also venam dm login la
+    // also") — only the assigned TP acts on this now, via manage-orders.php's
+    // own "Invoice" button; the DM just watches the status here.
     $headerBadge = "<span class='badge badge-style-bordered badge-warning'>Pending with TP</span>";
     $detailLines[] = "<div class='tp-status-pending'>Not yet invoiced</div>";
-    // Convert/Not Convert — the DM can do this too, same as the TP's own
-    // manage-orders.php (pick one of the TP's already-raised invoices for
-    // this shop, or mark it Not Converted). 2026-11-24, user-requested.
-    $_momShopTempId = $tpRow['shop_temp_id'] ?? '';
-    $detailLines[] = "<div class='tp-status-link' style='margin-top:4px;'>"
-        . "<a href='javascript:void(0);' onclick=\"openMopConvertModal('" . htmlspecialchars($orderid, ENT_QUOTES) . "','" . htmlspecialchars($_momShopTempId, ENT_QUOTES) . "','" . htmlspecialchars($tpRow['shop_name'] ?? '', ENT_QUOTES) . "');\" class='btn btn-sm btn-primary' style='margin-right:4px;'>Convert</a>"
-        . "<a href='javascript:void(0);' onclick=\"openMopNotConvertModal('" . htmlspecialchars($orderid, ENT_QUOTES) . "');\" class='btn btn-sm btn-outline-danger'>Not Convert</a>"
-        . "</div>";
 } else {
     $invId = $tpRow['invoiced_inv_id'];
     $invTotal = $invTotals[$invId] ?? 0.0;
@@ -1150,96 +1122,9 @@ $tpStatusHtml = "<div class='tp-status-box'>{$headerHtml}{$detailHtml}</div>";
 	});
 	</script>
 
-	<!-- Convert / Not Convert — same capability as the TP's own
-		 manage-orders.php, usable from the DM side too. 2026-11-24,
-		 user-requested. -->
-	<div class="modal fade" id="mopConvertModal" tabindex="-1" role="dialog" aria-hidden="true">
-		<div class="modal-dialog modal-dialog-centered" role="document">
-			<div class="modal-content">
-				<form method="post" action="convert-order-invoice.php" id="mopConvertForm">
-					<div class="modal-header">
-						<h5 class="modal-title">Convert — <span id="mopConvertShopName"></span></h5>
-						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-					</div>
-					<div class="modal-body">
-						<input type="hidden" name="order_id" id="mopConvertOrderIdField" value="">
-						<label class="form-label">Pick the invoice already raised to this shop</label>
-						<div id="mopConvertInvoiceList" style="max-height:300px;overflow-y:auto;"></div>
-					</div>
-					<div class="modal-footer">
-						<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-						<button type="submit" id="mopConvertConfirmBtn" class="btn" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;" disabled>Confirm Convert</button>
-					</div>
-				</form>
-			</div>
-		</div>
-	</div>
-
-	<div class="modal fade" id="mopNotConvertModal" tabindex="-1" role="dialog" aria-hidden="true">
-		<div class="modal-dialog modal-dialog-centered" role="document">
-			<div class="modal-content">
-				<form method="post" action="void-order.php" id="mopNotConvertForm">
-					<div class="modal-header">
-						<h5 class="modal-title">Not Convert</h5>
-						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-					</div>
-					<div class="modal-body">
-						<input type="hidden" name="order_id" id="mopNotConvertOrderIdField" value="">
-						<label class="form-label">Reason for not converting this order <span style="color:red;">*</span></label>
-						<textarea name="void_reason" id="mopNotConvertReasonField" class="form-control" rows="3" required maxlength="255" placeholder="e.g. Shop no longer wants this product"></textarea>
-					</div>
-					<div class="modal-footer">
-						<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-						<button type="submit" class="btn btn-danger">Confirm</button>
-					</div>
-				</form>
-			</div>
-		</div>
-	</div>
-
-	<script>
-	var mopInvoicesByShopTempId = <?php echo json_encode($invoicesByShopTempId); ?>;
-
-	function openMopConvertModal(orderId, shopTempId, shopName) {
-		document.getElementById('mopConvertOrderIdField').value = orderId;
-		document.getElementById('mopConvertShopName').textContent = shopName;
-		var listEl = document.getElementById('mopConvertInvoiceList');
-		var invoices = mopInvoicesByShopTempId[shopTempId] || [];
-		if (!invoices.length) {
-			listEl.innerHTML = '<p class="text-muted">No invoices found for this shop yet.</p>';
-		} else {
-			listEl.innerHTML = invoices.map(function (inv) {
-				var badge = inv.completed
-					? '<span class="badge badge-style-bordered badge-success" style="margin-left:6px;">Completed</span>'
-					: '<span class="badge badge-style-bordered badge-secondary" style="margin-left:6px;">Draft</span>';
-				var placedLine = inv.placed_at ? '<div class="text-muted" style="font-size:11px;">Invoice placed: ' + inv.placed_at + '</div>' : '';
-				return '<label style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #e1e0d9;cursor:pointer;">' +
-					'<input type="radio" name="inv_id" value="' + inv.inv_id + '" required>' +
-					'<div><span>' + inv.inv_number + ' &mdash; ' + inv.date + '</span>' + badge + placedLine + '</div>' +
-					'</label>';
-			}).join('');
-		}
-		// Single Confirm Convert button lives in the modal-footer (not
-		// duplicated inside the list) — disabled until a radio is picked, or
-		// whenever there's nothing to convert to. 2026-11-24, user-reported.
-		var mopConfirmBtn = document.getElementById('mopConvertConfirmBtn');
-		if (mopConfirmBtn) {
-			mopConfirmBtn.disabled = true;
-			listEl.onchange = function () { mopConfirmBtn.disabled = false; };
-		}
-		var modalEl = document.getElementById('mopConvertModal');
-		var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-		modal.show();
-	}
-
-	function openMopNotConvertModal(orderId) {
-		document.getElementById('mopNotConvertOrderIdField').value = orderId;
-		document.getElementById('mopNotConvertReasonField').value = '';
-		var modalEl = document.getElementById('mopNotConvertModal');
-		var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-		modal.show();
-	}
-	</script>
+	<!-- Convert/Not Convert modals removed 2026-12-01 — DM no longer acts on
+		 a pending order here, only the assigned TP does (manage-orders.php's
+		 own "Invoice" button). -->
 </body>
 
 </html>

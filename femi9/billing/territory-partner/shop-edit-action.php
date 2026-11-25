@@ -1,6 +1,7 @@
 <?php require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/include/ShopStateIdResolver.php';
 error_reporting(0);
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
@@ -16,7 +17,7 @@ $email        = str_replace("'", "&#39;", $_POST["email"]        ?? '');
 $address      = str_replace("'", "&#39;", $_POST["address"]      ?? '');
 $gstin        = str_replace("'", "&#39;", $_POST["gstin"]        ?? '');
 $country_code = $_POST["country_code"]  ?? '';
-$state_id    = (int)($_POST["state_id"]    ?? 0);
+$state_id    = resolveRealStateId($db_conn, (int)($_POST["state_id"] ?? 0));
 $district_id = (int)($_POST["district_id"] ?? 0);
 $taluk_id    = (int)($_POST["taluk_id"]    ?? 0);
 $firka_id    = (int)($_POST["firka_id"]    ?? 0);
@@ -30,5 +31,26 @@ mysqli_query($db_conn,
         taluk_id='".db_esc($taluk_id)."', firka_id='".db_esc($firka_id)."'
      WHERE id='".db_esc($update_id)."'"
 );
+
+// order-confirm-shop.php's "new shop, review details first" path
+// (shop-edit.php carries order_id through as a hidden field) — once the
+// reviewed/corrected shop details are saved, continue straight into the
+// invoice instead of going back to Manage Shop. A real POST (not a GET
+// redirect) since order-to-invoice-action.php only accepts POST; order_id
+// ownership/pending-state is re-validated there regardless of what's passed
+// here. 2026-12-01, user-requested.
+$order_id_for_invoice = $_POST['order_id'] ?? '';
+if ($order_id_for_invoice !== '') {
+    ?>
+    <!DOCTYPE html><html><body>
+    <form id="ocsContinueForm" method="post" action="order-to-invoice-action.php">
+        <input type="hidden" name="order_id" value="<?php echo htmlspecialchars($order_id_for_invoice, ENT_QUOTES); ?>">
+        <input type="hidden" name="shop_id" value="<?php echo (int)$update_id; ?>">
+    </form>
+    <script>document.getElementById('ocsContinueForm').submit();</script>
+    </body></html>
+    <?php
+    exit;
+}
 
 echo "<script>window.location='shop-manage.php?updatedSuccess';</script>";

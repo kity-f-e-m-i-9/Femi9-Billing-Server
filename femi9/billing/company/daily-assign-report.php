@@ -110,10 +110,11 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
                                                     <th>DM Name</th>
                                                     <th>TP Name</th>
                                                     <th>Assigned By</th>
+                                                    <th>Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="repBody">
-                                                <tr><td colspan="7" class="dar-empty">Select filters and click Search.</td></tr>
+                                                <tr><td colspan="8" class="dar-empty">Select filters and click Search.</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -177,6 +178,7 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
             + '<td>' + escHtml(r.dm_name || 'Unassigned') + '</td>'
             + '<td>' + tpHtml + '</td>'
             + '<td>' + escHtml(r.assigned_by || '') + '</td>'
+            + '<td><button type="button" class="btn btn-sm btn-outline-danger btn-dar-delete" data-id="' + escHtml(String(r.id)) + '">Delete</button></td>'
             + '</tr>';
     }
 
@@ -188,7 +190,7 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
         var pageRows = allRows.slice(start, start + PAGE_SIZE);
         var $body = $('#repBody');
         if (!pageRows.length) {
-            $body.html('<tr><td colspan="7" class="dar-empty">No assignment records found for this filter.</td></tr>');
+            $body.html('<tr><td colspan="8" class="dar-empty">No assignment records found for this filter.</td></tr>');
         } else {
             $body.html(pageRows.map(renderRow).join(''));
         }
@@ -226,7 +228,7 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
 
     function runSearch() {
         var $body = $('#repBody');
-        $body.html('<tr><td colspan="7" class="dar-empty">Loading&hellip;</td></tr>');
+        $body.html('<tr><td colspan="8" class="dar-empty">Loading&hellip;</td></tr>');
         $('#repPagination').empty();
         $.getJSON('get-daily-assign-report.php', {
             ms_id: $('#repStaff').val(),
@@ -237,6 +239,25 @@ require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
             renderPage(1);
         });
     }
+
+    $('#repBody').on('click', '.btn-dar-delete', function () {
+        var $btn = $(this);
+        var id = $btn.data('id');
+        if (!confirm('Delete this assignment entry? This cannot be undone.')) return;
+        $btn.prop('disabled', true);
+        $.post('delete-daily-assign-entry.php', { id: id }, function (resp) {
+            if (resp && resp.success) {
+                allRows = allRows.filter(function (r) { return String(r.id) !== String(id); });
+                renderPage(curPage);
+            } else {
+                alert((resp && resp.error) || 'Failed to delete.');
+                $btn.prop('disabled', false);
+            }
+        }, 'json').fail(function () {
+            alert('Failed to delete.');
+            $btn.prop('disabled', false);
+        });
+    });
 
     $('#repSearch').on('click', runSearch);
     $('#repExport').on('click', function () {
