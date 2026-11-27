@@ -20,13 +20,18 @@
 // page load. A shop with district_id=0/NULL is left untouched (nothing
 // reliable to backfill from) and reported separately for manual review.
 //
-// Dry-run by default (?apply=1 to actually write). CLI or browser; no
-// state-changing side effects on a dry run.
-require_once __DIR__ . '/../shared/env-loader.php';
+// Dry-run by default (?apply=1 to actually write). Browser only (needs a
+// real logged-in company session) — rewritten 2026-11-27 to reuse the
+// normal company checksession.php/config.php $db_conn instead of the
+// standalone shared/env-loader.php path, after that path's expected
+// `shared/.env` turned out not to resolve the same way on live as it does
+// locally (".env file not found" on live, env-loader.php itself loaded
+// fine — only the file lookup under it failed). Every other company page
+// already connects this same way, so this removes the live-environment
+// guesswork entirely.
+include("checksession.php");
+include("config.php");
 header('Content-Type: text/plain');
-
-$db_conn = mysqli_connect($_ENV['DB_HOST'], $_ENV['DB_USERNAME'], $_ENV['DB_PASSWORD'], $_ENV['DB_NAME'], (int)($_ENV['DB_PORT'] ?? 3306));
-if (!$db_conn) { die("DB connect failed\n"); }
 
 $apply = (($_GET['apply'] ?? $argv[1] ?? '') === '1');
 

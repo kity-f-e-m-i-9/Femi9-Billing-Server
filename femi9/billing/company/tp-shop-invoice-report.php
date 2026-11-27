@@ -95,6 +95,7 @@ $invoiceTotal  = 0.0;  // Tab 1's own total (Invoice Amount only)
 $returnTotals  = ['return_amount' => 0.0, 'removed_amount' => 0.0, 'net_amount' => 0.0]; // Tab 2's own totals
 $tpNameForHeader = '';
 $multiTp = false; // whether more than one TP is in scope (shows a TP column) -- 2026-11-27 v3, user-requested: Territory Partner is now OPTIONAL; picking only a District (no TP) combines every TP under that District instead of forcing a single TP choice ("ella tps ku oru district full ah kuda na paapen").
+$products = []; // product-quantity matrix columns, built below once $allRows exists
 
 // Scope of TP ids this report runs against: a single explicitly-picked TP,
 // or every TP $tpOptions already resolved for the selected District (or
@@ -128,7 +129,10 @@ if (!empty($tpIdsInScope)) {
     $tpIdList = implode(',', $tpIdsInScope);
     $stmt = $db_conn->prepare("
         SELECT ui.inv_id, ui.inv_number, ui.to_user_id AS shop_temp_id, COALESCE(s.name,'(unknown shop)') AS shop_name,
-            COALESCE(CONCAT(tp.tp_id, ' — ', CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci), '') AS tp_label,
+            COALESCE(s.mobile_number, '') AS buyer_mobile,
+            COALESCE(tp.tp_id, '') AS tp_code,
+            COALESCE(CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci, '') AS tp_name,
+            COALESCE(tp.mobile, '') AS tp_mobile,
             COALESCE((
                 SELECT SUM(uii.total) FROM user_invoice_items uii JOIN products p ON p.id = uii.pr_id
                 WHERE uii.inv_id = ui.inv_id AND p.category = 'napkin'
@@ -156,7 +160,10 @@ if (!empty($tpIdsInScope)) {
         $allRows[$r['inv_id']] = [
             'inv_number'      => $r['inv_number'],
             'shop_name'       => $r['shop_name'],
-            'tp_label'        => $r['tp_label'],
+            'buyer_mobile'    => $r['buyer_mobile'],
+            'tp_code'         => $r['tp_code'],
+            'tp_name'         => $r['tp_name'],
+            'tp_mobile'       => $r['tp_mobile'],
             'buyer_category'  => 'Shop',
             'invoice_amount'  => $amt,
             'return_amount'   => 0.0,
@@ -183,7 +190,10 @@ if (!empty($tpIdsInScope)) {
     }
     $stmtCust = $db_conn->prepare("
         SELECT i.inv_id, i.inv_number, COALESCE(c.name,'(unknown customer)') AS cust_name,
-            COALESCE(CONCAT(tp.tp_id, ' — ', CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci), '') AS tp_label,
+            COALESCE(c.mobile, '') AS buyer_mobile,
+            COALESCE(tp.tp_id, '') AS tp_code,
+            COALESCE(CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci, '') AS tp_name,
+            COALESCE(tp.mobile, '') AS tp_mobile,
             COALESCE((
                 SELECT SUM(ii.total) FROM invoice_items ii JOIN products p ON p.id = ii.pr_id
                 WHERE ii.inv_id = i.inv_id AND p.category = 'napkin'
@@ -211,7 +221,10 @@ if (!empty($tpIdsInScope)) {
         $allRows[$r['inv_id']] = [
             'inv_number'      => $r['inv_number'],
             'shop_name'       => $r['cust_name'],
-            'tp_label'        => $r['tp_label'],
+            'buyer_mobile'    => $r['buyer_mobile'],
+            'tp_code'         => $r['tp_code'],
+            'tp_name'         => $r['tp_name'],
+            'tp_mobile'       => $r['tp_mobile'],
             'buyer_category'  => 'Customer',
             'invoice_amount'  => $amt,
             'return_amount'   => 0.0,
@@ -272,8 +285,42 @@ if (!empty($tpIdsInScope)) {
         }
     }
 
+    // Per-product Quantity matrix columns — 2026-11-27 v5, user-requested
+    // ("product la", after seeing Report-TP-Details.php's own per-product
+    // columns and asking for the same here). Same product list convention
+    // (excludes Neksomo temp_id-prefixed products), scoped by Product Type
+    // when that filter is active. Items batched in ONE query across every
+    // invoice id already found (Shop + Customer) rather than per-row.
+    $products = [];
+    $prodQuery = "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL)";
+    if ($selected_product_type !== '') {
+        $prodQuery .= " AND category = '" . $db_conn->real_escape_string($selected_product_type) . "'";
+    }
+    $prodQuery .= " ORDER BY id ASC";
+    $prodRes = $db_conn->query($prodQuery);
+    if ($prodRes) { while ($pr = $prodRes->fetch_assoc()) { $products[(int)$pr['id']] = $pr['productName']; } }
+
+    $itemsByInvId = [];
+    if (!empty($allRows)) {
+        $invIdList = "'" . implode("','", array_map(fn($v) => $db_conn->real_escape_string($v), array_keys($allRows))) . "'";
+        $resItems = $db_conn->query("
+            SELECT inv_id, pr_id, SUM(qty) AS qty FROM (
+                SELECT inv_id, pr_id, qty FROM user_invoice_items WHERE inv_id IN ($invIdList)
+                UNION ALL
+                SELECT inv_id, pr_id, qty FROM invoice_items WHERE inv_id IN ($invIdList)
+            ) combined
+            GROUP BY inv_id, pr_id
+        ");
+        if ($resItems) {
+            while ($ir = $resItems->fetch_assoc()) {
+                $itemsByInvId[$ir['inv_id']][(int)$ir['pr_id']] = (int)$ir['qty'];
+            }
+        }
+    }
+
     foreach ($allRows as $invId => &$row) {
         $row['net_amount'] = $row['invoice_amount'] - $row['return_amount'] - $row['removed_amount'];
+        $row['items'] = $itemsByInvId[$invId] ?? [];
         if ($row['return_amount'] > 0 || $row['removed_amount'] > 0) {
             $returnTotals['return_amount']  += $row['return_amount'];
             $returnTotals['removed_amount'] += $row['removed_amount'];
@@ -303,10 +350,15 @@ $netGrandTotal = $invoiceTotal - $returnTotals['return_amount'] - $returnTotals[
     <link href="../../assets/css/custom.css" rel="stylesheet">
     <link rel="icon" type="image/png" href="../../assets/images/neptune.png">
     <style>
-        .table th { background:#f8f9fa; font-weight:600; white-space:nowrap; font-size:14px; padding:12px 8px; }
-        .table td { font-size:13px; padding:10px 8px; vertical-align:middle; }
-        .card { border:none; box-shadow:0 2px 12px rgba(0,0,0,.08); border-radius:12px; }
-        .tr-total { font-weight:700; background:#eef2ff; }
+        /* Same table/card convention as Report-TP-Details.php / Retail-Report-Details-TP.php — 2026-11-27, user-requested ("alignment proper ah venum antha table mathiri"). */
+        .table th { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); font-weight: 600; white-space: nowrap; font-size: 14px; padding: 12px 8px; border-color: #dee2e6; color: #495057; }
+        .table td { white-space: nowrap; font-size: 13px; padding: 10px 8px; vertical-align: middle; border-color: #dee2e6; }
+        .table-bordered { border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
+        .product-col { background: linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%); text-align: center; min-width: 80px; font-weight: 500; }
+        .table-hover tbody tr:hover { background-color: rgba(0,123,255,0.05); }
+        .card { border: none; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border-radius: 12px; }
+        .card-header { background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-bottom: 1px solid #e9ecef; border-radius: 12px 12px 0 0; }
+        .tr-total { font-weight:700; background:#e9ecef; }
         .tpsir-stat { border-radius:10px; padding:14px 16px; text-align:center; }
         .tpsir-stat h4 { margin:0; font-weight:700; font-size:19px; }
         .tpsir-stat span { font-size:12px; color:#6b7280; }
@@ -433,23 +485,40 @@ $netGrandTotal = $invoiceTotal - $returnTotals['return_amount'] - $returnTotals[
                                     <table class="table table-bordered table-hover" id="invoicesTable">
                                         <thead>
                                             <tr>
-                                                <th>S.No</th>
-                                                <?php if ($multiTp): ?><th>Territory Partner</th><?php endif; ?>
-                                                <th>Name</th>
-                                                <th>Category</th>
-                                                <th>Invoice Number</th>
-                                                <th class="text-end">Invoice Amount</th>
+                                                <th rowspan="2">S.No</th>
+                                                <?php if ($multiTp): ?><th rowspan="2">Seller Details</th><?php endif; ?>
+                                                <th rowspan="2">Buyer Details</th>
+                                                <th rowspan="2">Category</th>
+                                                <th rowspan="2">Invoice Number</th>
+                                                <th rowspan="2" class="text-end">Invoice Amount</th>
+                                                <?php if (!empty($products)): ?><th colspan="<?php echo count($products); ?>" style="text-align:center; background:linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%);">Product Quantities</th><?php endif; ?>
                                             </tr>
+                                            <?php if (!empty($products)): ?>
+                                            <tr>
+                                                <?php foreach ($products as $pr_id => $pr_name): ?>
+                                                <th class="product-col" title="<?php echo htmlspecialchars($pr_name); ?>">
+                                                    <?php $short = strlen($pr_name) > 24 ? substr($pr_name, 0, 21) . '...' : $pr_name; echo htmlspecialchars($short); ?>
+                                                </th>
+                                                <?php endforeach; ?>
+                                            </tr>
+                                            <?php endif; ?>
                                         </thead>
                                         <tbody>
+                                            <?php $prodColTotals = array_fill_keys(array_keys($products), 0); ?>
                                             <?php foreach ($allRows as $i => $row): ?>
                                             <tr>
                                                 <td><?php echo $i + 1; ?></td>
-                                                <?php if ($multiTp): ?><td><?php echo htmlspecialchars($row['tp_label']); ?></td><?php endif; ?>
-                                                <td><?php echo htmlspecialchars($row['shop_name']); ?></td>
+                                                <?php if ($multiTp): ?><td><strong><?php echo htmlspecialchars($row['tp_name']); ?></strong><br/><small>(<?php echo htmlspecialchars($row['tp_code']); ?>)</small><br/><small><?php echo htmlspecialchars($row['tp_mobile']); ?></small></td><?php endif; ?>
+                                                <td><?php echo htmlspecialchars($row['shop_name']); ?><br/><small><b>M:</b> <?php echo htmlspecialchars($row['buyer_mobile']); ?></small></td>
                                                 <td><?php echo htmlspecialchars($row['buyer_category']); ?></td>
                                                 <td><?php echo htmlspecialchars($row['inv_number']); ?></td>
                                                 <td class="text-end">&#8377;<?php echo number_format($row['invoice_amount'], 2); ?></td>
+                                                <?php foreach ($products as $pr_id => $pr_name):
+                                                    $qty = $row['items'][$pr_id] ?? 0;
+                                                    $prodColTotals[$pr_id] += $qty;
+                                                ?>
+                                                <td align="center" class="product-col"><?php if ($qty > 0): ?><strong><?php echo $qty; ?></strong><?php else: ?><span style="color:#ccc;">-</span><?php endif; ?></td>
+                                                <?php endforeach; ?>
                                             </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -457,6 +526,7 @@ $netGrandTotal = $invoiceTotal - $returnTotals['return_amount'] - $returnTotals[
                                             <tr class="tr-total">
                                                 <td colspan="<?php echo $multiTp ? 5 : 4; ?>">TOTAL</td>
                                                 <td class="text-end">&#8377;<?php echo number_format($invoiceTotal, 2); ?></td>
+                                                <?php foreach ($prodColTotals as $t): ?><td align="center" class="product-col"><?php echo $t; ?></td><?php endforeach; ?>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -473,27 +543,44 @@ $netGrandTotal = $invoiceTotal - $returnTotals['return_amount'] - $returnTotals[
                                     <table class="table table-bordered table-hover" id="returnsTable">
                                         <thead>
                                             <tr>
-                                                <th>S.No</th>
-                                                <?php if ($multiTp): ?><th>Territory Partner</th><?php endif; ?>
-                                                <th>Name</th>
-                                                <th>Category</th>
-                                                <th>Invoice Number</th>
-                                                <th class="text-end">Return Amount</th>
-                                                <th class="text-end">Removed Amount</th>
-                                                <th class="text-end">Net Amount</th>
+                                                <th rowspan="2">S.No</th>
+                                                <?php if ($multiTp): ?><th rowspan="2">Seller Details</th><?php endif; ?>
+                                                <th rowspan="2">Buyer Details</th>
+                                                <th rowspan="2">Category</th>
+                                                <th rowspan="2">Invoice Number</th>
+                                                <th rowspan="2" class="text-end">Return Amount</th>
+                                                <th rowspan="2" class="text-end">Removed Amount</th>
+                                                <th rowspan="2" class="text-end">Net Amount</th>
+                                                <?php if (!empty($products)): ?><th colspan="<?php echo count($products); ?>" style="text-align:center; background:linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%);">Product Quantities</th><?php endif; ?>
                                             </tr>
+                                            <?php if (!empty($products)): ?>
+                                            <tr>
+                                                <?php foreach ($products as $pr_id => $pr_name): ?>
+                                                <th class="product-col" title="<?php echo htmlspecialchars($pr_name); ?>">
+                                                    <?php $short = strlen($pr_name) > 24 ? substr($pr_name, 0, 21) . '...' : $pr_name; echo htmlspecialchars($short); ?>
+                                                </th>
+                                                <?php endforeach; ?>
+                                            </tr>
+                                            <?php endif; ?>
                                         </thead>
                                         <tbody>
+                                            <?php $prodColTotalsR = array_fill_keys(array_keys($products), 0); ?>
                                             <?php foreach ($returnRows as $i => $row): ?>
                                             <tr>
                                                 <td><?php echo $i + 1; ?></td>
-                                                <?php if ($multiTp): ?><td><?php echo htmlspecialchars($row['tp_label']); ?></td><?php endif; ?>
-                                                <td><?php echo htmlspecialchars($row['shop_name']); ?></td>
+                                                <?php if ($multiTp): ?><td><strong><?php echo htmlspecialchars($row['tp_name']); ?></strong><br/><small>(<?php echo htmlspecialchars($row['tp_code']); ?>)</small><br/><small><?php echo htmlspecialchars($row['tp_mobile']); ?></small></td><?php endif; ?>
+                                                <td><?php echo htmlspecialchars($row['shop_name']); ?><br/><small><b>M:</b> <?php echo htmlspecialchars($row['buyer_mobile']); ?></small></td>
                                                 <td><?php echo htmlspecialchars($row['buyer_category']); ?></td>
                                                 <td><?php echo htmlspecialchars($row['inv_number']); ?></td>
                                                 <td class="text-end">&#8377;<?php echo number_format($row['return_amount'], 2); ?></td>
                                                 <td class="text-end">&#8377;<?php echo number_format($row['removed_amount'], 2); ?></td>
                                                 <td class="text-end"><strong>&#8377;<?php echo number_format($row['net_amount'], 2); ?></strong></td>
+                                                <?php foreach ($products as $pr_id => $pr_name):
+                                                    $qty = $row['items'][$pr_id] ?? 0;
+                                                    $prodColTotalsR[$pr_id] += $qty;
+                                                ?>
+                                                <td align="center" class="product-col"><?php if ($qty > 0): ?><strong><?php echo $qty; ?></strong><?php else: ?><span style="color:#ccc;">-</span><?php endif; ?></td>
+                                                <?php endforeach; ?>
                                             </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -503,6 +590,7 @@ $netGrandTotal = $invoiceTotal - $returnTotals['return_amount'] - $returnTotals[
                                                 <td class="text-end">&#8377;<?php echo number_format($returnTotals['return_amount'], 2); ?></td>
                                                 <td class="text-end">&#8377;<?php echo number_format($returnTotals['removed_amount'], 2); ?></td>
                                                 <td class="text-end">&#8377;<?php echo number_format($returnTotals['net_amount'], 2); ?></td>
+                                                <?php foreach ($prodColTotalsR as $t): ?><td align="center" class="product-col"><?php echo $t; ?></td><?php endforeach; ?>
                                             </tr>
                                         </tfoot>
                                     </table>
