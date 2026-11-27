@@ -496,14 +496,39 @@ $districtStats  = getMsNodeTargetAndFirkaStats($db_conn, $statsScopeIds);
 // their own target.
 $_targetCompletionMsIds = !empty($myDms) ? array_column($myDms, 'id') : [$msId];
 $dailyAchievedByMsId = getRawAchievedDailyByMsId($db_conn, $_targetCompletionMsIds, $from, $to);
+
+// Target Completed Date must track the SAME "Achieved" signal the Balance
+// Target Amount card itself uses — napkin-only TP Invoice Amount — NOT the
+// Get-Order-only $dailyAchievedByMsId above (that one is kept exactly as-is
+// for the Weekly modal's own, deliberately separate, Get-Order "Achieved"
+// column). Without this, Balance could reach ₹0 (fully met via direct TP
+// invoicing, the common case) while this card still said "Not yet" forever,
+// since it never left the Get-Order-only total — same bug class as the
+// earlier KPI#1 Achieved fix (2026-11-23), just never applied to this
+// dashboard card. 2026-11-27, user-reported ("intha target completed date
+// proper ah calculate aagutha").
+function _targetCompletionTpInvByDate($db_conn, int $leafMsId, string $from, string $to): array {
+    $_scopeNodes = getMsAssignedTargetScopeNodes($db_conn, $leafMsId);
+    $_scopeIds = array_column($_scopeNodes, 'id');
+    if (empty($_scopeIds)) { return []; }
+    $_tpIds = getMsNodeTpIds($db_conn, $_scopeIds, true);
+    if (empty($_tpIds)) { return []; }
+    $_distIds = districtIdsFromScopeNodeIds($db_conn, $_scopeIds);
+    return getTpInvoiceAmountByDateForDistricts($db_conn, $_tpIds, $_distIds, $from, $to);
+}
+$_targetCompletionTpInvByMsId = [];
+foreach ($_targetCompletionMsIds as $_tcMsId) {
+    $_targetCompletionTpInvByMsId[(int)$_tcMsId] = _targetCompletionTpInvByDate($db_conn, (int)$_tcMsId, $from, $to);
+}
+
 if (!empty($myDms)) {
     foreach ($myDms as &$_dmRef2) {
-        $_dmRef2['target_completed_date'] = getTargetCompletedDate($dailyAchievedByMsId, (int)$_dmRef2['id'], (float)$_dmRef2['target']);
+        $_dmRef2['target_completed_date'] = getTargetCompletedDate($_targetCompletionTpInvByMsId, (int)$_dmRef2['id'], (float)$_dmRef2['target']);
     }
     unset($_dmRef2);
     $myOwnTargetCompletedDate = null;
 } else {
-    $myOwnTargetCompletedDate = getTargetCompletedDate($dailyAchievedByMsId, $msId, (float)$districtStats['district_total_target']);
+    $myOwnTargetCompletedDate = getTargetCompletedDate($_targetCompletionTpInvByMsId, $msId, (float)$districtStats['district_total_target']);
 }
 
 // ── Per-DM Weekly Breakdown (Target, Achieved, TP Invoice, Total) — each
