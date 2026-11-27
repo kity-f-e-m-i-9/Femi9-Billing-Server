@@ -1799,13 +1799,24 @@ function undo_auto_transfer(mysqli $db_conn, string $tempidN2, int $productId, s
 
     $db_conn->begin_transaction();
     try {
+        // reverseTransferOut()'s own result was never checked here — same gap
+        // fixed in internal_transfer_return_action.php 2026-11-26 (a
+        // 'no_stock_row' failure there went unnoticed, silently leaving the
+        // source godown's stock un-restored while the rest of the undo
+        // still committed). reverseTransferIn() was already checked for ANY
+        // failure (not just one reason), so those two calls were already
+        // safe — only reverseTransferOut() needed this.
         if ($qtyLeg2 > 0) {
             $reverseIn2 = $stockService->reverseTransferIn($productId, $userType, $llpStr, $qtyLeg2, 'transfer', $tempidN2, $createdBy, true, $leg2DestWarehouse);
             if (($reverseIn2['success'] ?? false) === false) {
                 $db_conn->rollback();
                 return $reverseIn2;
             }
-            $stockService->reverseTransferOut($productId, $userType, $healthcareStr, $qtyLeg2, 'transfer', $tempidN2, $createdBy, true, $leg2SourceWarehouse);
+            $reverseOut2 = $stockService->reverseTransferOut($productId, $userType, $healthcareStr, $qtyLeg2, 'transfer', $tempidN2, $createdBy, true, $leg2SourceWarehouse);
+            if (($reverseOut2['success'] ?? false) === false) {
+                $db_conn->rollback();
+                return $reverseOut2;
+            }
         }
 
         if ($qtyLeg1 > 0) {
@@ -1814,7 +1825,11 @@ function undo_auto_transfer(mysqli $db_conn, string $tempidN2, int $productId, s
                 $db_conn->rollback();
                 return $reverseIn1;
             }
-            $stockService->reverseTransferOut($productId, $userType, $neksomoStr, $qtyLeg1, 'transfer', $tempidN1, $createdBy, true, $leg1SourceWarehouse);
+            $reverseOut1 = $stockService->reverseTransferOut($productId, $userType, $neksomoStr, $qtyLeg1, 'transfer', $tempidN1, $createdBy, true, $leg1SourceWarehouse);
+            if (($reverseOut1['success'] ?? false) === false) {
+                $db_conn->rollback();
+                return $reverseOut1;
+            }
         }
 
         foreach ([$tempidN1, $tempidN2] as $t) {

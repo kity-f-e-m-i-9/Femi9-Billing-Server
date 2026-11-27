@@ -52,7 +52,7 @@ if (!empty($lines[0]['invoiced_inv_id'])) {
 // trust the raw POSTed shop_id otherwise (same validate-against-owner
 // pattern used throughout this codebase for TP-submitted ids).
 $stmtShop = $db_conn->prepare(
-    "SELECT temp_id, gstin, state_id, firka_id FROM shop WHERE id=? AND onboard_userID=? AND onboard_userTYPE='territory_partner' LIMIT 1"
+    "SELECT temp_id, gstin, state_id, firka_id, district_id FROM shop WHERE id=? AND onboard_userID=? AND onboard_userTYPE='territory_partner' LIMIT 1"
 );
 $stmtShop->bind_param('is', $shop_id, $tp_id);
 $stmtShop->execute();
@@ -192,19 +192,38 @@ $inv_number = $inv_id;
 $inv_date   = date('Y-m-d');
 $inv_year   = date('Y', strtotime($inv_date));
 
+// invoice_district_id — same self-migrating column shop-invoice-action.php
+// already added; frozen here to the shop's CURRENT district_id at the
+// moment of conversion, so this invoice's district attribution never again
+// depends on whatever shop.district_id happens to be later (which can go
+// stale after a future Firka reassignment, same class of bug this column
+// exists to prevent). This whole DM-Order auto-conversion path never wrote
+// it before — invoice_district_id silently stayed NULL, so every such
+// invoice's dashboard attribution fell back to shop.district_id LIVE,
+// un-frozen — for a multi-district TP, this let some of their own orders
+// mis-attribute depending on which shop happened to still have an accurate
+// district_id. 2026-11-27, user-reported (Suganya Manirajan/TP-0088, 11
+// DM-order conversions, only 5 showing correctly on the DM's own
+// dashboard).
+$chkDistCol = $db_conn->query("SHOW COLUMNS FROM user_invoice LIKE 'invoice_district_id'");
+if ($chkDistCol && $chkDistCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE user_invoice ADD COLUMN invoice_district_id INT NULL DEFAULT NULL AFTER source_ms_order_id");
+}
+$invoice_district_id = !empty($shopRow['district_id']) ? (int)$shopRow['district_id'] : null;
+
 $db_conn->begin_transaction();
 try {
     $zero = '0'; $one = '1'; $nil = 'Nil';
     $stmtIns = $db_conn->prepare(
         "INSERT INTO user_invoice
          (inv_id,id_only,inv_number,date,inv_year,sub_total,discount,total,to_user_type,to_user_id,
-          from_user_type,from_user_id,gst_type,credit,roundoff,courier_charges,rwpoints_enable,buyer_gsttype,username,usertype)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+          from_user_type,from_user_id,gst_type,credit,roundoff,courier_charges,rwpoints_enable,buyer_gsttype,username,usertype,invoice_district_id)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
     );
-    $stmtIns->bind_param('ssssssssssssssssssss',
+    $stmtIns->bind_param('ssssssssssssssssssssi',
         $inv_id, $zero, $inv_number, $inv_date, $inv_year, $zero, $zero, $zero,
         $invuser, $customer_id, $Login_user_TYPEvl, $tp_id,
-        $gst_type, $zero, $zero, $zero, $one, $buyer_gsttype, $nil, $nil
+        $gst_type, $zero, $zero, $zero, $one, $buyer_gsttype, $nil, $nil, $invoice_district_id
     );
     $stmtIns->execute();
     $stmtIns->close();

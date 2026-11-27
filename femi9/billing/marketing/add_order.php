@@ -389,18 +389,23 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     </div>
                                                     <style>
                                                         .mt-status-card.selected { border-color:#4f6ef7 !important; background:#eef2ff; color:#4f46e5 !important; }
+                                                        @media (max-width:480px) { .mt-status-card { flex:1 1 100% !important; min-width:0 !important; } }
                                                         #mtToolsBlock { display:none; border:1px solid #e5e7eb; border-radius:9px; padding:10px 14px; margin-bottom:10px; }
                                                         #mtToolsBlock label { display:flex; align-items:center; gap:8px; font-weight:400; padding:5px 0; margin:0; cursor:pointer; }
                                                         #mtToolsBlock input[type=checkbox] { width:16px; height:16px; }
                                                         #mtToolsLabel { font-size:12px; color:#6b7280; font-weight:600; margin-bottom:4px; display:block; }
+                                                        .mt-tools-grid { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(4, auto); grid-auto-flow:column; column-gap:20px; }
+                                                        @media (max-width:480px) { .mt-tools-grid { grid-template-columns:1fr; grid-template-rows:none; grid-auto-flow:row; } }
                                                     </style>
                                                     <div id="mtToolsBlock">
                                                         <span id="mtToolsLabel">Which tools are at this shop?</span>
                                                         <label style="border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:4px;font-weight:600;"><input type="checkbox" id="mtSelectAll" onchange="toggleMtSelectAll(this.checked)"> Select All</label>
-                                                        <?php $mtTools = ['Touch & Feel', 'Rack Sticker', 'Dangler', 'Medical Shop Backing Sheet - Femi9', 'Medical Shop Backing Sheet - Lumi9']; ?>
+                                                        <?php $mtTools = ['Touch & Feel', 'Rack Sticker', 'Dangler', 'Floor Desk', 'Counter Desk', 'Roll-Up Standee', 'Medical Shop Backing Sheet - Femi9', 'Medical Shop Backing Sheet - Lumi9']; ?>
+                                                        <div class="mt-tools-grid">
                                                         <?php foreach ($mtTools as $mtIdx => $mtTool): ?>
                                                         <label><input type="checkbox" class="mt-tool-check" value="<?=htmlspecialchars($mtTool)?>" onchange="updateMarketingToolValue()"><?=htmlspecialchars($mtTool)?></label>
                                                         <?php endforeach; ?>
+                                                        </div>
                                                     </div>
                                                     <script>
                                                         var mtCurrentStatus = '';
@@ -607,18 +612,23 @@ $isNoOrder = (isset($_REQUEST['actorder']) && $_REQUEST['actorder'] == "femi9noo
                                                     </div>
                                                     <style>
                                                         .mt-status-card.selected { border-color:#4f6ef7 !important; background:#eef2ff; color:#4f46e5 !important; }
+                                                        @media (max-width:480px) { .mt-status-card { flex:1 1 100% !important; min-width:0 !important; } }
                                                         #mtToolsBlock { display:none; border:1px solid #e5e7eb; border-radius:9px; padding:10px 14px; margin-bottom:10px; }
                                                         #mtToolsBlock label { display:flex; align-items:center; gap:8px; font-weight:400; padding:5px 0; margin:0; cursor:pointer; }
                                                         #mtToolsBlock input[type=checkbox] { width:16px; height:16px; }
                                                         #mtToolsLabel { font-size:12px; color:#6b7280; font-weight:600; margin-bottom:4px; display:block; }
+                                                        .mt-tools-grid { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(4, auto); grid-auto-flow:column; column-gap:20px; }
+                                                        @media (max-width:480px) { .mt-tools-grid { grid-template-columns:1fr; grid-template-rows:none; grid-auto-flow:row; } }
                                                     </style>
                                                     <div id="mtToolsBlock">
                                                         <span id="mtToolsLabel">Which tools are at this shop?</span>
                                                         <label style="border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:4px;font-weight:600;"><input type="checkbox" id="mtSelectAll" onchange="toggleMtSelectAll(this.checked)"> Select All</label>
-                                                        <?php $mtTools = ['Touch & Feel', 'Rack Sticker', 'Dangler', 'Medical Shop Backing Sheet - Femi9', 'Medical Shop Backing Sheet - Lumi9']; ?>
+                                                        <?php $mtTools = ['Touch & Feel', 'Rack Sticker', 'Dangler', 'Floor Desk', 'Counter Desk', 'Roll-Up Standee', 'Medical Shop Backing Sheet - Femi9', 'Medical Shop Backing Sheet - Lumi9']; ?>
+                                                        <div class="mt-tools-grid">
                                                         <?php foreach ($mtTools as $mtIdx => $mtTool): ?>
                                                         <label><input type="checkbox" class="mt-tool-check" value="<?=htmlspecialchars($mtTool)?>" onchange="updateMarketingToolValue()"><?=htmlspecialchars($mtTool)?></label>
                                                         <?php endforeach; ?>
+                                                        </div>
                                                     </div>
                                                     <script>
                                                         var mtCurrentStatus = '';

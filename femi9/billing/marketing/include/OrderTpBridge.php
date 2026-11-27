@@ -19,6 +19,8 @@ function otbDedupeKey($name, $mobile): ?string {
     return null;
 }
 
+require_once __DIR__ . '/../../shared/ShopPendingReview.php';
+
 function bridgeOrderToTp($db_conn, int $tp_id, $ms_id, $shop_id, string $order_id, string $order_date, array $lines): void
 {
     if ($tp_id <= 0 || empty($lines)) {
@@ -158,6 +160,8 @@ function bridgeOrderToTp($db_conn, int $tp_id, $ms_id, $shop_id, string $order_i
             // firka name to try).
             $taluk_id = 0;
 
+            ensureShopPendingReviewColumn($db_conn);
+
             $randomPart = '';
             for ($x = 0; $x < 5; $x++) { $randomPart .= random_int(1, 9); }
             $tempId = $randomPart . 'FSHP' . date('dmy') . date('gis');
@@ -176,14 +180,14 @@ function bridgeOrderToTp($db_conn, int $tp_id, $ms_id, $shop_id, string $order_i
                   account_status, merchantOrderId, merchantTransactionId, merchantUserId,
                   taluk_id, firka_id, distributor_id, pincode_id, gstin, onboard_userTYPE, onboard_userID,
                   address, userid, useridtext, shop_cat, country_code, landline,
-                  latitude, longitude, source_ms_shop_id)
+                  latitude, longitude, source_ms_shop_id, pending_review)
                  VALUES
                  (?, ?, 'Nil', ?, ?, ?, ?, 'Nil', 'Nil',
                   0, 1, ?, ?, 'Nil', 'Nil', 'Nil',
                   'Nil', 'Nil', 'Nil', 'Nil',
                   0, 0, '', ?, ?, 'territory_partner', ?,
                   ?, ?, ?, ?, ?, ?,
-                  ?, ?, ?)"
+                  ?, ?, ?, 1)"
             );
             $name        = $msShop['name'] ?? '';
             $mobile      = $msShop['mobile_number'] ?? '';

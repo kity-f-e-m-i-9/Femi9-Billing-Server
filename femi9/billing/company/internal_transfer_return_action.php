@@ -71,26 +71,56 @@ $destWarehouseId   = auto_transfer_leg_warehouse($db_conn, $tempid, $product_id,
 $db_conn->begin_transaction();
 try {
     // Restore source godown stock (sent_qty ↓, closing_qty ↑)
-    $stockService->reverseTransferOut(
+    $reverseOutResult = $stockService->reverseTransferOut(
         $product_id, $Login_user_TYPEvl, $send_from, $returnQty,
         'transfer', $tempid, $createdBy,
         true, $sourceWarehouseId
     );
 
-    // Remove destination godown stock (input_qty ↓, closing_qty ↓)
+    // Both reverseTransferOut() and reverseTransferIn() can fail with
+    // 'no_stock_row' (no stock row at all for that exact warehouse_id —
+    // happens for an old, pre-warehouse-tracking transfer whose
+    // stock_ledger rows carry warehouse_id=NULL via
+    // auto_transfer_leg_warehouse(), while the godown's real current stock
+    // has since been split into warehouse-scoped rows with no NULL-
+    // warehouse row left at all) on top of reverseTransferIn()'s own
+    // 'insufficient_stock_to_reverse'. Only the latter used to be checked
+    // here — a 'no_stock_row' failure was silently ignored, so the Return
+    // still got recorded as successful (returned_qty incremented,
+    // internal_transfer_return snapshot written) even though the
+    // destination's stock was never actually reduced. Confirmed via a real
+    // case 2026-11-26 (7 product lines, Healthcare→LLP leg, all silently
+    // under-deducted this way) — fixed here to surface ANY failure from
+    // either call, not just one specific reason, and roll back instead of
+    // continuing. The already-broken historical cases were reconciled
+    // manually (see reconcile-internal-transfer-returns.php).
     $reverseInResult = $stockService->reverseTransferIn(
         $product_id, $Login_user_TYPEvl, $send_to, $returnQty,
         'transfer', $tempid, $createdBy,
         true, $destWarehouseId
     );
 
-    if (($reverseInResult['success'] ?? false) === false
-        && ($reverseInResult['reason'] ?? '') === 'insufficient_stock_to_reverse') {
+    if (($reverseOutResult['success'] ?? false) === false) {
         $db_conn->rollback();
-        $available = $reverseInResult['available'];
-        $_SESSION['errorMessage'] = "Cannot return this quantity — only {$available} units are "
-            . "still in stock at the destination (the rest has already been sold or moved on). "
-            . "Please reconcile manually.";
+        $_SESSION['errorMessage'] = "Could not restore stock at the source godown — "
+            . "no matching stock record found there for this product/warehouse. "
+            . "Please reconcile manually before returning this line.";
+        echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."';</script>";
+        exit;
+    }
+
+    if (($reverseInResult['success'] ?? false) === false) {
+        $db_conn->rollback();
+        if (($reverseInResult['reason'] ?? '') === 'insufficient_stock_to_reverse') {
+            $available = $reverseInResult['available'];
+            $_SESSION['errorMessage'] = "Cannot return this quantity — only {$available} units are "
+                . "still in stock at the destination (the rest has already been sold or moved on). "
+                . "Please reconcile manually.";
+        } else {
+            $_SESSION['errorMessage'] = "Could not remove stock at the destination godown — "
+                . "no matching stock record found there for this product/warehouse. "
+                . "Please reconcile manually before returning this line.";
+        }
         echo "<script>window.location='internal_transfer_details?tempid=".urlencode($tempid)."';</script>";
         exit;
     }
