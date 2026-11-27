@@ -473,6 +473,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $availableExecutions = getAvailableCpWalletCommissionExecutions($dbConn);
 
+// =====================================================================
+// SHOP INVOICE COMMISSION (3%) — READ-ONLY REVIEW SECTION
+// =====================================================================
+// 2026-11-27, user-requested: this 3% commission (shared/CpShopWalletCommission.php)
+// stays fully AUTOMATIC — credited the moment a CP-fulfilled DM-order Shop
+// Invoice becomes fully paid (via company/add-receipt.php) — nothing here
+// changes that. User explicitly did NOT want it folded into the existing
+// CP Commission (2%/6%) dry-run/execute/rollback tool above, to avoid
+// confusing the two concepts ("already iruka concept kuda confuse pannika
+// poguthu... athukku apram nee shop invoicce ku 3% thaniya innoru buton
+// vechuru... intha new shop invoice odathu thaniya kila kuda vechuru").
+// This section is a pure VIEW — a date-range GET filter, no POST, no write
+// path at all — so a CP's own per-shop 3% credits/clawbacks can be
+// reviewed here without touching the CP Commission tool's own state.
+function getShopWalletCommissionRows(mysqli $dbConn, string $from, string $to): array {
+    $stmt = $dbConn->prepare("
+        SELECT w.id, w.from_date, w.commission_percentage, w.commission_amount, w.remarks, w.created_at,
+               cp.cp_id AS cp_code, cp.name AS cp_name
+        FROM wallet_monthly_sls_report w
+        LEFT JOIN channel_partners cp ON cp.id = CAST(w.refer_by_userid AS UNSIGNED)
+        WHERE w.refer_by_usertype = 'channel_partner' AND w.commission_type = 'Shop Wallet'
+          AND w.from_date BETWEEN ? AND ?
+        ORDER BY w.created_at DESC
+    ");
+    $stmt->bind_param('ss', $from, $to);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $rows;
+}
+
+$shopWalletFrom = $_GET['shop_from'] ?? date('Y-m-01');
+$shopWalletTo   = $_GET['shop_to']   ?? date('Y-m-d');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $shopWalletFrom)) { $shopWalletFrom = date('Y-m-01'); }
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $shopWalletTo))   { $shopWalletTo   = date('Y-m-d'); }
+$shopWalletRows  = getShopWalletCommissionRows($dbConn, $shopWalletFrom, $shopWalletTo);
+$shopWalletTotal = 0.0;
+foreach ($shopWalletRows as $r) { $shopWalletTotal += (float)$r['commission_amount']; }
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -883,6 +922,97 @@ $availableExecutions = getAvailableCpWalletCommissionExecutions($dbConn);
                             </div>
 
                         <?php endif; ?>
+
+                        <!-- Shop Invoice Commission (3%) — read-only review, fully separate
+                             from the CP Commission (2%/6%) tool above. Nothing on this card
+                             writes anything; it only queries the same wallet_monthly_sls_report
+                             rows shared/CpShopWalletCommission.php already auto-credits. -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <i class="material-icons-outlined" style="vertical-align:middle;margin-right:8px">storefront</i>
+                                        Shop Invoice Commission (3%) — Review Only
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="alert alert-info" role="alert">
+                                            <strong>💡 This is automatic, not a trigger:</strong> every CP-fulfilled
+                                            DM-order Shop Invoice earns this 3% the moment it's fully paid
+                                            (Napkin only) — there's nothing to run here. This card just lets you
+                                            review which credits/clawbacks have already happened, by shop and date.
+                                        </div>
+
+                                        <form method="get" class="row g-3 align-items-end mb-4">
+                                            <div class="col-md-3">
+                                                <label class="form-label">From Date</label>
+                                                <input type="date" class="form-control" name="shop_from" value="<?php echo htmlspecialchars($shopWalletFrom, ENT_QUOTES, 'UTF-8'); ?>">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">To Date</label>
+                                                <input type="date" class="form-control" name="shop_to" value="<?php echo htmlspecialchars($shopWalletTo, ENT_QUOTES, 'UTF-8'); ?>">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="material-icons-outlined" style="vertical-align:middle;font-size:18px">search</i>
+                                                    Filter
+                                                </button>
+                                            </div>
+                                        </form>
+
+                                        <div class="row mb-3">
+                                            <div class="col-md-4 col-sm-6 mb-3">
+                                                <div class="stat-card primary">
+                                                    <div class="stat-label">Entries</div>
+                                                    <div class="stat-value"><?php echo count($shopWalletRows); ?></div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4 col-sm-6 mb-3">
+                                                <div class="stat-card success">
+                                                    <div class="stat-label">Net Total</div>
+                                                    <div class="stat-value" style="font-size:1.8rem;">₹<?php echo inr_format($shopWalletTotal, 2); ?></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Channel Partner</th>
+                                                        <th>Detail</th>
+                                                        <th>%</th>
+                                                        <th>Amount</th>
+                                                        <th>Credited On</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php if (empty($shopWalletRows)): ?>
+                                                    <tr><td colspan="5" class="text-center text-muted">No Shop Invoice commission entries in this date range.</td></tr>
+                                                    <?php else: foreach ($shopWalletRows as $r): $isNeg = (float)$r['commission_amount'] < 0; ?>
+                                                    <tr>
+                                                        <td>
+                                                            <strong style="color:#111827"><?php echo htmlspecialchars($r['cp_name'] ?? '(unknown CP)', ENT_QUOTES, 'UTF-8'); ?></strong><br>
+                                                            <small class="text-muted"><?php echo htmlspecialchars($r['cp_code'] ?? '', ENT_QUOTES, 'UTF-8'); ?></small>
+                                                        </td>
+                                                        <td><small><?php echo str_replace('&lt;br/&gt;', '<br/>', htmlspecialchars($r['remarks'] ?? '')); ?></small></td>
+                                                        <td><?php echo htmlspecialchars($r['commission_percentage'], ENT_QUOTES, 'UTF-8'); ?>%</td>
+                                                        <td>
+                                                            <?php if ($isNeg): ?>
+                                                            <span class="badge badge-danger">Reversal</span> ₹<?php echo inr_format(abs((float)$r['commission_amount']), 2); ?>
+                                                            <?php else: ?>
+                                                            <span class="badge badge-success">Credit</span> ₹<?php echo inr_format((float)$r['commission_amount'], 2); ?>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td><small class="text-muted"><?php echo htmlspecialchars(date('d M Y, h:i A', strtotime($r['created_at'])), ENT_QUOTES, 'UTF-8'); ?></small></td>
+                                                    </tr>
+                                                    <?php endforeach; endif; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                     </div>
                 </div>
