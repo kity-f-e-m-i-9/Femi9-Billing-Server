@@ -36,20 +36,24 @@ header('Content-Type: text/plain');
 $apply = (($_GET['apply'] ?? $argv[1] ?? '') === '1');
 
 $res = mysqli_query($db_conn, "
-    SELECT ui.inv_id, ui.to_user_id AS shop_temp_id, s.district_id
+    SELECT ui.inv_id, ui.inv_number, ui.from_user_id AS tp_id, ui.to_user_id AS shop_temp_id,
+           s.name AS shop_name, s.district_id,
+           tp.tp_id AS tp_code, CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci AS tp_name
     FROM user_invoice ui
     JOIN tp_orders o ON o.invoiced_inv_id = ui.inv_id
     JOIN shop s ON s.temp_id = ui.to_user_id
+    LEFT JOIN territory_partners tp ON tp.id = ui.from_user_id
     WHERE ui.invoice_district_id IS NULL
     GROUP BY ui.inv_id
 ");
 
-$fixed = 0; $skippedNoDistrict = 0; $total = 0;
+$fixed = 0; $skippedNoDistrict = 0; $total = 0; $skippedRows = [];
 while ($row = mysqli_fetch_assoc($res)) {
     $total++;
     $districtId = (int)$row['district_id'];
     if ($districtId <= 0) {
         $skippedNoDistrict++;
+        $skippedRows[] = $row;
         continue;
     }
     if ($apply) {
@@ -66,4 +70,10 @@ echo ($apply ? "Fixed (invoice_district_id set): " : "Would fix: ") . "$fixed\n"
 echo "Skipped (shop has no usable district_id, needs manual review): $skippedNoDistrict\n";
 if (!$apply) {
     echo "\nDry run only — nothing written. Re-run with ?apply=1 (browser) or pass 1 as the first CLI argument to actually apply.\n";
+}
+if ($skippedNoDistrict > 0) {
+    echo "\n--- Skipped invoices (shop has no district_id, needs manual review) ---\n";
+    foreach ($skippedRows as $r) {
+        echo "inv_id={$r['inv_id']} inv_number={$r['inv_number']} TP={$r['tp_code']} ({$r['tp_name']}) shop_temp_id={$r['shop_temp_id']} shop_name=\"{$r['shop_name']}\"\n";
+    }
 }
