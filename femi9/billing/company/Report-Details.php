@@ -908,8 +908,11 @@ $qparam = urlencode($search ?? '');
                                                     UNION ALL SELECT temp_id, 'candf' FROM c_and_f WHERE district_id = $bd
                                                     UNION ALL SELECT temp_id, 'outlet' FROM outlet WHERE district_id = $bd
                                                 ";
+                                                require_once __DIR__ . '/include/ReportJoinTables.php';
+                                                $bdf_table = report_join_table($db_conn, 'rpt_buyer_district',
+                                                    ['temp_id', 'utype'], ['temp_id', 'utype'], $buyer_district_ids_query);
                                                 $buyer_district_filter_query = " AND EXISTS (
-                                                    SELECT 1 FROM ($buyer_district_ids_query) bdf
+                                                    SELECT 1 FROM $bdf_table bdf
                                                     WHERE bdf.temp_id = ui.to_user_id AND bdf.utype = ui.to_user_type
                                                 )";
                                             }
@@ -987,6 +990,10 @@ $qparam = urlencode($search ?? '');
                                               WHERE 1=1 $buyer_district_filter
                                             ";
                                             $buyer_union_query = implode(" UNION ALL ", $buyer_union_parts);
+                                            require_once __DIR__ . '/include/ReportJoinTables.php';
+                                            $buyers_table = report_join_table($db_conn, 'rpt_buyers',
+                                                ['temp_id', 'state_id', 'district_id', 'taluk_id', 'name', 'mobile_number', 'user_type'],
+                                                ['temp_id', 'user_type'], $buyer_union_query);
                                             
                                             // SELLER GEO FILTER UNION - Find this section and replace
                                             $district_condition = !empty($selected_district) ? " AND district_id = " . (int)$selected_district : "";
@@ -1046,7 +1053,9 @@ $qparam = urlencode($search ?? '');
                                                 file_put_contents(__DIR__ . '/debug_step.log', "Joining unions...\n", FILE_APPEND);
 
                                                 $seller_union_query = implode(" UNION ALL ", $seller_union_parts);
-                                                $seller_geo_join = " INNER JOIN ($seller_union_query) seller_geo ON ui.from_user_id = seller_geo.temp_id AND ui.from_user_type = seller_geo.user_type ";
+                                                $seller_geo_table = report_join_table($db_conn, 'rpt_seller_geo',
+                                                    ['temp_id', 'user_type'], ['temp_id', 'user_type'], $seller_union_query);
+                                                $seller_geo_join = " INNER JOIN $seller_geo_table seller_geo ON ui.from_user_id = seller_geo.temp_id AND ui.from_user_type = seller_geo.user_type ";
                                             }
                                             
                                             // B2C seller geo (same logic for company)
@@ -1073,7 +1082,9 @@ $qparam = urlencode($search ?? '');
                                             $b2c_seller_geo_join = "";
                                             if(!empty($b2c_seller_union_parts)) {
                                                 $b2c_seller_union_query = implode(" UNION ALL ", $b2c_seller_union_parts);
-                                                $b2c_seller_geo_join = " INNER JOIN ($b2c_seller_union_query) b2c_seller_geo ON i.user_id = b2c_seller_geo.user_id AND i.user_type = b2c_seller_geo.user_type ";
+                                                $b2c_geo_table = report_join_table($db_conn, 'rpt_b2c_seller_geo',
+                                                    ['user_id', 'user_type'], ['user_id', 'user_type'], $b2c_seller_union_query);
+                                                $b2c_seller_geo_join = " INNER JOIN $b2c_geo_table b2c_seller_geo ON i.user_id = b2c_seller_geo.user_id AND i.user_type = b2c_seller_geo.user_type ";
                                             }
                                             
                                             // SELLER META (for name/mobile search across all seller types)
@@ -1127,8 +1138,14 @@ $qparam = urlencode($search ?? '');
                                               FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . "
                                             ";
                                             $seller_meta_union_query = implode(" UNION ALL ", $seller_meta_parts);
-                                            $seller_meta_join = " LEFT JOIN ($seller_meta_union_query) seller_meta
-                                                                  ON seller_meta.id = ui.from_user_id AND seller_meta.user_type = ui.from_user_type ";
+                                            // Only the search box reads seller_meta, so don't build or join it otherwise.
+                                            $seller_meta_join = "";
+                                            if ($search_esc !== '') {
+                                                $seller_meta_table = report_join_table($db_conn, 'rpt_seller_meta',
+                                                    ['id', 'user_type', 'name', 'mobile'], ['id', 'user_type'], $seller_meta_union_query);
+                                                $seller_meta_join = " LEFT JOIN $seller_meta_table seller_meta
+                                                                      ON seller_meta.id = ui.from_user_id AND seller_meta.user_type = ui.from_user_type ";
+                                            }
                                             
                                             // --- Search Filters (B2B / B2C) ---
                                             $search_filter_b2b = '';
@@ -1182,7 +1199,7 @@ $qparam = urlencode($search ?? '');
                                                 FROM user_invoice ui
                                                 $seller_geo_join
                                                 $seller_meta_join
-                                                INNER JOIN ($buyer_union_query) buyers 
+                                                INNER JOIN $buyers_table buyers 
                                                     ON ui.to_user_id = buyers.temp_id AND ui.to_user_type = buyers.user_type
                                                 WHERE ui.date BETWEEN '" . $db_conn->real_escape_string($from_date) . "' 
                                                 AND '" . $db_conn->real_escape_string($to_date) . "'
@@ -1258,7 +1275,7 @@ $qparam = urlencode($search ?? '');
                                                 FROM user_invoice ui
                                                 $seller_geo_join
                                                 $seller_meta_join
-                                                INNER JOIN ($buyer_union_query) buyers 
+                                                INNER JOIN $buyers_table buyers 
                                                     ON ui.to_user_id = buyers.temp_id AND ui.to_user_type = buyers.user_type
                                                 WHERE ui.date BETWEEN '" . $db_conn->real_escape_string($from_date) . "' 
                                                 AND '" . $db_conn->real_escape_string($to_date) . "'

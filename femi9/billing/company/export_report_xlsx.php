@@ -194,6 +194,10 @@ $buyer_union_parts[] = "SELECT
     WHERE 1=1 $buyer_district_filter";
 
 $buyer_union_query = implode(" UNION ALL ", $buyer_union_parts);
+require_once __DIR__ . '/include/ReportJoinTables.php';
+$buyers_table = report_join_table($db_conn, 'rpt_buyers',
+    ['temp_id', 'state_id', 'district_id', 'taluk_id', 'name', 'mobile_number', 'user_type'],
+    ['temp_id', 'user_type'], $buyer_union_query);
 
 // --------- Build seller geographic filter WITH explicit collation ----------
 $district_condition = !empty($selected_district) ? " AND district_id = " . (int)$selected_district : "";
@@ -248,7 +252,9 @@ if (empty($selected_seller_type) || $selected_seller_type != 'company') {
 $seller_geo_join = "";
 if (!empty($seller_union_parts)) {
     $seller_union_query = implode(" UNION ALL ", $seller_union_parts);
-    $seller_geo_join = " INNER JOIN ($seller_union_query) seller_geo 
+    $seller_geo_table = report_join_table($db_conn, 'rpt_seller_geo',
+        ['temp_id', 'user_type'], ['temp_id', 'user_type'], $seller_union_query);
+    $seller_geo_join = " INNER JOIN $seller_geo_table seller_geo 
                         ON ui.from_user_id = seller_geo.temp_id 
                         AND ui.from_user_type = seller_geo.user_type ";
 }
@@ -277,7 +283,9 @@ if (empty($selected_seller_type) || $selected_seller_type != 'company') {
 $b2c_seller_geo_join = "";
 if (!empty($b2c_seller_union_parts)) {
     $b2c_seller_union_query = implode(" UNION ALL ", $b2c_seller_union_parts);
-    $b2c_seller_geo_join = " INNER JOIN ($b2c_seller_union_query) b2c_seller_geo 
+    $b2c_geo_table = report_join_table($db_conn, 'rpt_b2c_seller_geo',
+        ['user_id', 'user_type'], ['user_id', 'user_type'], $b2c_seller_union_query);
+    $b2c_seller_geo_join = " INNER JOIN $b2c_geo_table b2c_seller_geo 
                             ON CAST(i.user_id AS CHAR) $collate = b2c_seller_geo.user_id 
                             AND i.user_type = b2c_seller_geo.user_type ";
 }
@@ -365,7 +373,11 @@ $seller_meta_union_parts[] = "SELECT
     FROM company_godown WHERE " . godown_finance_filter_sql($db_conn) . "";
 
 $seller_meta_union_query = implode(" UNION ALL ", $seller_meta_union_parts);
-$seller_meta_join = " LEFT JOIN ($seller_meta_union_query) seller_meta 
+$seller_meta_cols  = ['temp_id', 'user_type', 'district_id', 'taluk_id', 'name', 'mobile'];
+$seller_meta_table = report_join_table($db_conn, 'rpt_seller_meta', $seller_meta_cols, ['temp_id', 'user_type'], $seller_meta_union_query);
+// second copy for the B2C half of the same UNION query
+$s_meta_table      = report_join_table($db_conn, 'rpt_s_meta', $seller_meta_cols, ['temp_id', 'user_type'], $seller_meta_union_query);
+$seller_meta_join = " LEFT JOIN $seller_meta_table seller_meta 
                       ON ui.from_user_id = seller_meta.temp_id 
                       AND ui.from_user_type = seller_meta.user_type ";
 
@@ -421,7 +433,9 @@ $buyer_meta_union_parts[] = "SELECT
     FROM outlet";
 
 $buyer_meta_union_query = implode(" UNION ALL ", $buyer_meta_union_parts);
-$buyer_meta_join = " LEFT JOIN ($buyer_meta_union_query) buyer_meta 
+$buyer_meta_table = report_join_table($db_conn, 'rpt_buyer_meta',
+    ['temp_id', 'user_type', 'district_id', 'taluk_id'], ['temp_id', 'user_type'], $buyer_meta_union_query);
+$buyer_meta_join = " LEFT JOIN $buyer_meta_table buyer_meta 
                      ON ui.to_user_id = buyer_meta.temp_id 
                      AND ui.to_user_type = buyer_meta.user_type ";
 
@@ -452,7 +466,7 @@ FROM user_invoice ui
 $seller_geo_join
 $seller_meta_join
 $buyer_meta_join
-INNER JOIN ($buyer_union_query) buyers
+INNER JOIN $buyers_table buyers
         ON ui.to_user_id = buyers.temp_id
        AND ui.to_user_type = buyers.user_type
 WHERE ui.date BETWEEN '$from' AND '$to'
@@ -496,7 +510,7 @@ if (empty($selected_buyer_type) || $selected_buyer_type === 'customer') {
         FROM invoice i
         $b2c_seller_geo_join
         LEFT JOIN customers c ON i.customer_id = c.id
-        LEFT JOIN ($seller_meta_union_query) s_meta 
+        LEFT JOIN $s_meta_table s_meta 
             ON CAST(i.user_id AS CHAR) $collate = s_meta.temp_id 
             AND i.user_type = s_meta.user_type
         WHERE i.date BETWEEN '$from' AND '$to'
