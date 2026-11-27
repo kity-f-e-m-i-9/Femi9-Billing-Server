@@ -64,8 +64,16 @@ if ($row) {
             $sourceWarehouseId = auto_transfer_leg_warehouse($db_conn, $tempid, $product_id, 'transfer_out');
             $destWarehouseId   = auto_transfer_leg_warehouse($db_conn, $tempid, $product_id, 'transfer_in');
 
-            // Restore source godown stock (sent_qty ↓, closing_qty ↑) — FOR UPDATE + ledger
-            $stockService->reverseTransferOut(
+            // Restore source godown stock (sent_qty ↓, closing_qty ↑) — FOR UPDATE + ledger.
+            // Both calls' results are checked below for ANY failure, not just
+            // 'insufficient_stock_to_reverse' — same silent-failure gap fixed
+            // 2026-11-26 in internal_transfer_return_action.php /
+            // undo_auto_transfer() (a 'no_stock_row' failure here, from an old
+            // pre-warehouse-tracking transfer whose real current stock has
+            // since moved to a warehouse-scoped row, used to go unnoticed and
+            // this Delete would still commit without the stock ever actually
+            // moving).
+            $reverseOutResult = $stockService->reverseTransferOut(
                 $product_id, $Login_user_TYPEvl, $send_from, $qty,
                 'transfer', $tempid, $createdBy,
                 true, $sourceWarehouseId
@@ -79,13 +87,27 @@ if ($row) {
             );
         }
 
-        if (($reverseInResult['success'] ?? false) === false
-            && ($reverseInResult['reason'] ?? '') === 'insufficient_stock_to_reverse') {
+        if (($reverseOutResult['success'] ?? true) === false) {
             $db_conn->rollback();
-            $available = $reverseInResult['available'];
-            $_SESSION['errorMessage'] = "Cannot delete this transfer — only {$available} of the "
-                . "original {$qty} units are still in stock at the destination (the rest has "
-                . "already been sold or moved on). Please reconcile manually before deleting.";
+            $_SESSION['errorMessage'] = "Cannot delete this transfer — could not restore stock at the "
+                . "source godown (no matching stock record found there for this product/warehouse). "
+                . "Please reconcile manually before deleting.";
+            echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=".urlencode($tempid)."';</script>";
+            exit;
+        }
+
+        if (($reverseInResult['success'] ?? false) === false) {
+            $db_conn->rollback();
+            if (($reverseInResult['reason'] ?? '') === 'insufficient_stock_to_reverse') {
+                $available = $reverseInResult['available'];
+                $_SESSION['errorMessage'] = "Cannot delete this transfer — only {$available} of the "
+                    . "original {$qty} units are still in stock at the destination (the rest has "
+                    . "already been sold or moved on). Please reconcile manually before deleting.";
+            } else {
+                $_SESSION['errorMessage'] = "Cannot delete this transfer — could not remove stock at the "
+                    . "destination godown (no matching stock record found there for this product/warehouse). "
+                    . "Please reconcile manually before deleting.";
+            }
             echo "<script>window.location='internal_transfer_details?deletedDone&&tempid=".urlencode($tempid)."';</script>";
             exit;
         }

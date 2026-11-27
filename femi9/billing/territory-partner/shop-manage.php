@@ -1,6 +1,8 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/ShopPendingReview.php';
+ensureShopPendingReviewColumn($db_conn);
 error_reporting(0);
 
 $advBalance = 0;
@@ -117,7 +119,10 @@ $i = $start_from;
                                             </thead>
                                             <tbody>
 <?php
-$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID=? AND s.onboard_userTYPE=? AND s.deleted_at IS NULL";
+// pending_review=1 — a shop auto-bridged from a brand-new DM order shop that
+// this TP hasn't reviewed/saved yet (see shared/ShopPendingReview.php) —
+// stays hidden from Manage Shop until that review save clears the flag.
+$select_shops = "SELECT s.*, sc.catlable FROM shop s LEFT JOIN shop_category sc ON s.shop_cat = sc.id WHERE s.onboard_userID=? AND s.onboard_userTYPE=? AND s.deleted_at IS NULL AND s.pending_review = 0";
 $filter_types = "is";
 $filter_params = [$Login_user_IDvl, $Login_user_TYPEvl];
 if ($filter_district > 0) {

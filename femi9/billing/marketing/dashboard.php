@@ -261,6 +261,13 @@ if (!empty($_dmCandidates)) {
     // cards above use. Pulled fresh here via getMsDistrictTargetAndFirkaStats
     // instead, so a DM's chip always matches what that DM actually sees.
     $_dmTargetStats = getRawTargetAchievedStats($db_conn, $_dmIds, $from, $to);
+    // CP/Company-fulfilled Get Orders — unlike a TP-fulfilled Get Order
+    // (which lands in a real TP->shop invoice already counted under "TP
+    // Invoice Amount", see the Achieve Total fix below), a CP/Company
+    // invoice is from_user_type='channel_partner'/'company', so it never
+    // overlaps with TP Invoice Amount — safe to add into Achieve Total as
+    // its own "CP Invoice Amount" figure. 2026-11-27, user-requested.
+    $_dmChannelStats = getAchievedChannelBreakdown($db_conn, $_dmIds, $from, $to);
     foreach ($_dmCandidates as $_dm) {
         $_dmId = (int)$_dm['id'];
         $_dmScopeNodes = getMsAssignedTargetScopeNodes($db_conn, $_dmId);
@@ -285,10 +292,18 @@ if (!empty($_dmCandidates)) {
         $dmDistrictIdsById[$_dmId] = $_dmDistrictIds;
         $_dmInvoiced = getTpInvoiceAmountForDistricts($db_conn, $_dmTpIds, $_dmDistrictIds, $from, $to);
 
-        // Achieve Total = Achieved (this DM's own Get Order-converted sales)
-        // + TP Invoice Amount (every shop invoice this DM's TPs raised) —
-        // Balance is Target minus that combined total.
-        $_achieveTotal = $_a + $_dmInvoiced;
+        // Achieve Total = TP Invoice Amount only — NOT added to Achieved.
+        // A Get Order a TP fulfils gets invoiced as a real TP->shop invoice
+        // (tp_orders.invoiced_inv_id), which is the exact same invoice
+        // getTpInvoiceAmountForDistricts() already counts under "TP Invoice
+        // Amount" — adding "Achieved" on top double-counted that money.
+        // Same fix already applied to kpi.php's KPI #1/#2/#3 (2026-11-23);
+        // "Achieved" itself is kept as its own informational column, just no
+        // longer folded into the Total/Balance. 2026-11-27, user-reported.
+        // CP Invoice Amount (CP + Company-direct fulfilled Get Orders, Napkin-
+        // only) IS added — no double-count risk, see comment above.
+        $_cpInvoiced = ($_dmChannelStats[$_dmId]['cp'] ?? 0.0) + ($_dmChannelStats[$_dmId]['company'] ?? 0.0);
+        $_achieveTotal = $_dmInvoiced + $_cpInvoiced;
 
         $myDms[] = [
             'id'                => $_dmId,
@@ -298,6 +313,7 @@ if (!empty($_dmCandidates)) {
             'achieved'          => $_a,
             'balance'           => max($_t - $_a, 0),
             'tp_invoice_amount' => $_dmInvoiced,
+            'cp_invoice_amount' => $_cpInvoiced,
             'achieve_total'     => $_achieveTotal,
             'total_balance'     => max($_t - $_achieveTotal, 0),
         ];
@@ -399,16 +415,21 @@ if (!empty($myDms) && !empty($teamScopeIds)) {
         $zoneDistrictNames = array_map(fn($n) => mb_strtolower(trim($n)), getZoneDistrictNames($db_conn, $zoneId));
         $zoneAchieved = 0.0;
         $zoneTpInvoiced = 0.0;
+        $zoneCpInvoiced = 0.0;
         foreach ($myDms as $_dm) {
             foreach (explode(', ', $_dm['district']) as $_dn) {
                 if (in_array(mb_strtolower(trim($_dn)), $zoneDistrictNames, true)) {
                     $zoneAchieved   += $_dm['achieved'];
                     $zoneTpInvoiced += $_dm['tp_invoice_amount'];
+                    $zoneCpInvoiced += $_dm['cp_invoice_amount'] ?? 0.0;
                     break;
                 }
             }
         }
-        $zoneAchieveTotal = $zoneAchieved + $zoneTpInvoiced;
+        // Achieve Total = TP Invoice Amount + CP Invoice Amount (see the
+        // matching fix in the per-DM $_achieveTotal computation above for
+        // why) — zoneAchieved is still carried for display, just not added.
+        $zoneAchieveTotal = $zoneTpInvoiced + $zoneCpInvoiced;
         $zoneOverageAmt = $zoneAchieveTotal - $zoneTarget;
         $zoneOveragePct = $zoneTarget > 0 ? ($zoneAchieveTotal / $zoneTarget) * 100 : 0.0;
 
@@ -428,6 +449,7 @@ if (!empty($myDms) && !empty($teamScopeIds)) {
             'target'        => $zoneTarget,
             'achieved'      => $zoneAchieved,
             'tp_invoice'    => $zoneTpInvoiced,
+            'cp_invoice'    => $zoneCpInvoiced,
             'achieve_total' => $zoneAchieveTotal,
             'overage_amt'   => $zoneOverageAmt,
             'overage_pct'   => $zoneOveragePct,
@@ -496,11 +518,16 @@ if (!empty($myDms)) {
 $teamWeeklyBreakdown = [];
 if (!empty($myDms)) {
     foreach ($calendarWeeks as $_wk) {
-        $teamWeeklyBreakdown[] = ['start' => $_wk['start'], 'end' => $_wk['end'], 'target' => 0.0, 'achieved' => 0.0, 'tp_invoice' => 0.0, 'total' => 0.0];
+        $teamWeeklyBreakdown[] = ['start' => $_wk['start'], 'end' => $_wk['end'], 'target' => 0.0, 'achieved' => 0.0, 'tp_invoice' => 0.0, 'cp_invoice' => 0.0, 'total' => 0.0];
     }
+    // Day-by-day CP/Company-fulfilled Get Order figure, batched for every DM
+    // at once — see getRawCpCompanyAchievedDailyByMsId()'s own doc comment
+    // for why this is safe to ADD into Total (no TP-invoice overlap).
+    $_dmCpByMsId = getRawCpCompanyAchievedDailyByMsId($db_conn, array_column($myDms, 'id'), $from, $to);
     foreach ($myDms as &$_dmWeekRef) {
         $_dmPerDay = $_daysInMonth > 0 ? $_dmWeekRef['target'] / $_daysInMonth : 0.0;
         $_dmAchievedByDate = $dailyAchievedByMsId[(int)$_dmWeekRef['id']] ?? [];
+        $_dmCpByDate = $_dmCpByMsId[(int)$_dmWeekRef['id']] ?? [];
 
         $_dmTpInvByDate = [];
         $_dmTpIdsForWeekly = $dmTpIdsById[(int)$_dmWeekRef['id']] ?? [];
@@ -522,13 +549,20 @@ if (!empty($myDms)) {
             foreach ($_dmTpInvByDate as $_d => $_amt) {
                 if ($_d >= $_wk['start'] && $_d <= $_wk['end']) { $_wkInvoiced += $_amt; }
             }
-            $_wkTotal = $_wkAchieved + $_wkInvoiced;
+            $_wkCpInvoiced = 0.0;
+            foreach ($_dmCpByDate as $_d => $_amt) {
+                if ($_d >= $_wk['start'] && $_d <= $_wk['end']) { $_wkCpInvoiced += $_amt; }
+            }
+            // Total = TP Invoice Amount + CP Invoice Amount (see the matching
+            // fix above — CP/Company Get Orders never overlap TP invoices).
+            $_wkTotal = $_wkInvoiced + $_wkCpInvoiced;
 
-            $_dmWeeks[] = ['start' => $_wk['start'], 'end' => $_wk['end'], 'target' => $_wkTarget, 'achieved' => $_wkAchieved, 'tp_invoice' => $_wkInvoiced, 'total' => $_wkTotal];
+            $_dmWeeks[] = ['start' => $_wk['start'], 'end' => $_wk['end'], 'target' => $_wkTarget, 'achieved' => $_wkAchieved, 'tp_invoice' => $_wkInvoiced, 'cp_invoice' => $_wkCpInvoiced, 'total' => $_wkTotal];
 
             $teamWeeklyBreakdown[$_wkIdx]['target']     += $_wkTarget;
             $teamWeeklyBreakdown[$_wkIdx]['achieved']   += $_wkAchieved;
             $teamWeeklyBreakdown[$_wkIdx]['tp_invoice'] += $_wkInvoiced;
+            $teamWeeklyBreakdown[$_wkIdx]['cp_invoice'] += $_wkCpInvoiced;
             $teamWeeklyBreakdown[$_wkIdx]['total']      += $_wkTotal;
         }
         $_dmWeekRef['weeks'] = $_dmWeeks;
@@ -827,14 +861,46 @@ $vacantFirkas   = getMsNodeVacantFirkas($db_conn, $statsScopeIds, $districtLabel
 $allTpIds       = getMsNodeTpIds($db_conn, $statsScopeIds, true);
 
 $invoicedAmount = 0.0;
+$cpInvoiceAmount = 0.0;
 $invoiceRows    = [];
 $itemsByInvId   = [];
 $napkinInvoiceAmount = 0.0;
 $diaperInvoiceAmount = 0.0;
+$allDistrictIds = [];
+// Real District-depth names for $allDistrictIds — NOT the same thing as
+// $districtNames (the raw scope-node names, which for a Division-scoped DM
+// like Prakashraj S are DIVISION names, e.g. "Chengalpattu Division"). An
+// invoice's own `inv_district` is always resolved at District depth (e.g.
+// "Chengalpattu"), so matching it against $districtNames silently matched
+// NOTHING for a Division-scoped DM, zeroing out Napkin/Diaper Invoice Amount
+// both server-side ($_myOwnInvoiceRows below) and in the JS recompute
+// (myDistrictNamesLower) even though $invoicedAmount/the TP roster itself
+// were already correctly depth-agnostic. 2026-11-26, user-reported.
+$realDistrictNames = [];
 if (!empty($allTpIds)) {
     $idList = implode(',', $allTpIds);
     $allDistrictIds = districtIdsFromScopeNodeIds($db_conn, $statsScopeIds);
+    if (!empty($allDistrictIds)) {
+        $_didList = implode(',', array_map('intval', $allDistrictIds));
+        $resDn = $db_conn->query("SELECT name FROM partner_location_nodes WHERE id IN ($_didList) AND depth = 3");
+        if ($resDn) {
+            while ($_dnRow = $resDn->fetch_assoc()) { $realDistrictNames[] = $_dnRow['name']; }
+        }
+    }
     $invoicedAmount = getTpInvoiceAmountForDistricts($db_conn, $allTpIds, $allDistrictIds, $from, $to);
+
+    // CP/Company-fulfilled Get Orders for this same scope — every ms_id this
+    // page's own view covers (just this person if solo, or them + their own
+    // DMs below if ASM/SM), since a CP/Company invoice is tied to
+    // ms_orders.ms_id (who placed the Get Order), not the shop's district.
+    // Safe to show/add alongside TP Invoice Amount — never the same invoice
+    // (see getRawCpCompanyAchievedDailyByMsId()'s doc comment). 2026-11-27,
+    // user-requested.
+    $_topCpMsIds = !empty($myDms) ? array_merge([$msId], array_column($myDms, 'id')) : [$msId];
+    $_topCpStats = getAchievedChannelBreakdown($db_conn, $_topCpMsIds, $from, $to);
+    foreach ($_topCpStats as $_s) {
+        $cpInvoiceAmount += ($_s['cp'] ?? 0.0) + ($_s['company'] ?? 0.0);
+    }
 
     // Per-TP target = sum of target_amount of every Firka that TP is assigned
     // to — computed as its own GROUP BY query (one row per TP) instead of a
@@ -960,7 +1026,7 @@ if (!empty($allTpIds)) {
     // district — see the "Your TPs' Invoice Amount" fix above) so this
     // doesn't disagree with that card by including invoices a TP billed to
     // a district outside this DM/ASM's own area. 2026-11-21, user-requested.
-    $_myDistrictNamesLower = array_map('mb_strtolower', $districtNames);
+    $_myDistrictNamesLower = array_map('mb_strtolower', $realDistrictNames);
     $_myOwnInvoiceRows = array_filter($invoiceRows, function ($r) use ($_myDistrictNamesLower) {
         return empty($_myDistrictNamesLower) || in_array(mb_strtolower($r['inv_district'] ?? ''), $_myDistrictNamesLower, true);
     });
@@ -978,6 +1044,7 @@ if (empty($myDms) && !empty($allTpIds)) {
     $_myPerDay = $_daysInMonth > 0 ? $districtStats['district_total_target'] / $_daysInMonth : 0.0;
     $_myAchievedByDate = $dailyAchievedByMsId[$msId] ?? [];
     $_myTpInvByDate = getTpInvoiceAmountByDateForDistricts($db_conn, $allTpIds, $allDistrictIds, $from, $to);
+    $_myCpByDate = getRawCpCompanyAchievedDailyByMsId($db_conn, [$msId], $from, $to)[$msId] ?? [];
     foreach ($calendarWeeks as $_wk) {
         $_wkDays = (int)floor((strtotime($_wk['end']) - strtotime($_wk['start'])) / 86400) + 1;
         $_wkTarget = $_myPerDay * $_wkDays;
@@ -989,7 +1056,13 @@ if (empty($myDms) && !empty($allTpIds)) {
         foreach ($_myTpInvByDate as $_d => $_amt) {
             if ($_d >= $_wk['start'] && $_d <= $_wk['end']) { $_wkInvoiced += $_amt; }
         }
-        $myOwnWeeklyBreakdown[] = ['start' => $_wk['start'], 'end' => $_wk['end'], 'target' => $_wkTarget, 'achieved' => $_wkAchieved, 'tp_invoice' => $_wkInvoiced, 'total' => $_wkAchieved + $_wkInvoiced];
+        $_wkCpInvoiced = 0.0;
+        foreach ($_myCpByDate as $_d => $_amt) {
+            if ($_d >= $_wk['start'] && $_d <= $_wk['end']) { $_wkCpInvoiced += $_amt; }
+        }
+        // Total = TP Invoice Amount + CP Invoice Amount (see the matching
+        // fix above — CP/Company Get Orders never overlap TP invoices).
+        $myOwnWeeklyBreakdown[] = ['start' => $_wk['start'], 'end' => $_wk['end'], 'target' => $_wkTarget, 'achieved' => $_wkAchieved, 'tp_invoice' => $_wkInvoiced, 'cp_invoice' => $_wkCpInvoiced, 'total' => $_wkInvoiced + $_wkCpInvoiced];
     }
 }
 
@@ -1005,7 +1078,11 @@ if (empty($myDms) && !empty($allTpIds)) {
 // Balance figures are affected.
 $napkinTargetAmount = $districtStats['district_total_target'];
 $diaperTargetAmount = $districtStats['district_total_target'] * 0.5;
-$napkinBalanceAmount = max($napkinTargetAmount - $invoicedAmount, 0);
+// Napkin Balance now also nets off CP/Company Invoice Amount alongside TP
+// Invoice Amount — both are real Napkin sales against this same target, and
+// (unlike a TP-fulfilled Get Order) a CP/Company invoice never double-counts
+// with $invoicedAmount. 2026-11-27, user-requested.
+$napkinBalanceAmount = max($napkinTargetAmount - $invoicedAmount - $cpInvoiceAmount, 0);
 $diaperBalanceAmount = max($diaperTargetAmount - $diaperInvoiceAmount, 0);
 
 // TP roster for the tabs — All / Active / Inactive. Scoped to this person's
@@ -1015,6 +1092,18 @@ $diaperBalanceAmount = max($diaperTargetAmount - $diaperInvoiceAmount, 0);
 // same union $myDms above was already built from — so the roster, and the
 // "Team Districts" breakdown below, reflect the whole team, not just
 // whatever happens to be assigned straight to the ASM/SM themselves.
+// $teamDistrictNames is still needed below (cross-district TP-split labels),
+// but $teamTpIds itself must NOT be recomputed from it via
+// getMsDistrictTpIds() -- that function only matches DISTRICT-depth node
+// names, so a person assigned at DIVISION depth (whose $districtNames holds
+// a Division's name, not a District's) silently matched nothing, emptying
+// the whole TP roster/invoice table even though Firka Coverage (built from
+// the already-correct, depth-agnostic node-id-based $statsScopeIds) showed
+// real filled Firkas. Same "Division-scoped DM" bug class already fixed
+// elsewhere (my-assigned-tps.php) -- found 2026-11-26, Prakashraj S
+// (Division-scoped DM) reporting 0 TPs/0 invoices despite 8 filled Firkas.
+// $allTpIds (above) is already this exact self+team union, computed via the
+// division-aware getMsNodeTpIds($statsScopeIds) -- just reuse it.
 $teamDistrictNames = $districtNames;
 foreach ($myDms as $_dm) {
     foreach (explode(', ', $_dm['district']) as $_dn) {
@@ -1025,7 +1114,7 @@ foreach ($myDms as $_dm) {
 $teamDistrictNames = array_values(array_unique($teamDistrictNames));
 sort($teamDistrictNames);
 
-$teamTpIds = !empty($teamDistrictNames) ? getMsDistrictTpIds($db_conn, $teamDistrictNames, true) : $allTpIds;
+$teamTpIds = $allTpIds;
 
 $tpRoster = [];
 if (!empty($teamTpIds)) {
@@ -1209,6 +1298,46 @@ if (!empty($myDms)) {
         $_dmTpReturnRef['tp_removed_amt'] = $_tpRemovedByDm[(int)$_dmTpReturnRef['id']] ?? 0.0;
     }
     unset($_dmTpReturnRef);
+
+    // CP Return / CP Removed — same Return/Removed concept as TP Return/TP
+    // Removed above, but for CP Invoice Amount's own invoice set (CP/Company-
+    // fulfilled Get Orders) instead of every TP shop invoice. These invoices
+    // have no TP owner to key off (shop_invoice_change_log.changed_by_user_id
+    // for a CP/Company-fulfilled invoice is never a territory_partner id), so
+    // this is computed by invoice id instead — the same CP/Company invoice
+    // set getCpCompanyGetOrderInvoiceIdsByMsId() already resolves for CP
+    // Invoice Amount itself. Purely informational, same as TP Return/Removed
+    // (neither nets into Achieve Total/Balance). 2026-11-27, user-requested.
+    $_cpInvIdsByMs = getCpCompanyGetOrderInvoiceIdsByMsId($db_conn, array_column($myDms, 'id'), $from, $to);
+    $_allCpInvIds = [];
+    foreach ($_cpInvIdsByMs as $_ids) { $_allCpInvIds = array_merge($_allCpInvIds, $_ids); }
+    $_allCpInvIds = array_values(array_unique($_allCpInvIds));
+    $_cpReturnByInv = [];
+    if (!empty($_allCpInvIds)) {
+        $_cpInvIdList = "'" . implode("','", array_map(fn($v) => $db_conn->real_escape_string($v), $_allCpInvIds)) . "'";
+        $_resCpReturn = $db_conn->query("
+            SELECT invnumber, returnid, MAX(total) AS total
+            FROM user_return_stock
+            WHERE invnumber IN ($_cpInvIdList) AND deleted_at IS NULL
+            GROUP BY invnumber, returnid
+        ");
+        while ($_r = $_resCpReturn->fetch_assoc()) {
+            $_cpReturnByInv[$_r['invnumber']] = ($_cpReturnByInv[$_r['invnumber']] ?? 0) + (float)$_r['total'];
+        }
+    }
+    $_cpRemovedByInv = getShopInvoiceRemovedAmountByInvId($db_conn, $_allCpInvIds);
+    foreach ($myDms as &$_dmCpReturnRef) {
+        $_dmCpInvIds = $_cpInvIdsByMs[(int)$_dmCpReturnRef['id']] ?? [];
+        $_cpReturnAmt = 0.0;
+        $_cpRemovedAmt = 0.0;
+        foreach ($_dmCpInvIds as $_invId) {
+            $_cpReturnAmt  += $_cpReturnByInv[$_invId] ?? 0.0;
+            $_cpRemovedAmt += $_cpRemovedByInv[$_invId] ?? 0.0;
+        }
+        $_dmCpReturnRef['cp_return_amt'] = $_cpReturnAmt;
+        $_dmCpReturnRef['cp_removed_amt'] = $_cpRemovedAmt;
+    }
+    unset($_dmCpReturnRef);
 }
 
 // Per-district target total (sum of each TP's own target, once per TP) —
@@ -1574,7 +1703,7 @@ ksort($districtTpCounts);
                              ambiguous Target + Napkin-only Invoice + Balance; now explicitly
                              labeled Napkin, with a matching Diaper row below). -->
                         <div class="row">
-                            <div class="col-12 col-md-6 col-xl-4">
+                            <div class="col-12 col-md-6 col-xl-3">
                                 <div class="stat-card purple">
                                     <div>
                                         <h3 id="statDistrictTarget">&#8377;<?php echo inr_format($napkinTargetAmount, 0); ?></h3>
@@ -1583,7 +1712,7 @@ ksort($districtTpCounts);
                                     <div class="stat-icon-wrap"><i class="material-icons-outlined">flag</i></div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-6 col-xl-4">
+                            <div class="col-12 col-md-6 col-xl-3">
                                 <div class="stat-card green stat-card-hoverable" tabindex="0">
                                     <div>
                                         <h3 id="statInvoiceAmount">&#8377;<?php echo inr_format($invoicedAmount, 0); ?></h3>
@@ -1593,7 +1722,16 @@ ksort($districtTpCounts);
                                     <div class="stat-card-tooltip" id="statInvoiceAmountTooltip"></div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-6 col-xl-4">
+                            <div class="col-12 col-md-6 col-xl-3">
+                                <div class="stat-card blue">
+                                    <div>
+                                        <h3 id="statCpInvoiceAmount">&#8377;<?php echo inr_format($cpInvoiceAmount, 0); ?></h3>
+                                        <p title="Get Orders this scope's CP/Company fulfilled directly (not via a TP), Napkin-only — never the same invoice as Napkin Invoice Amount above">CP Invoice Amount</p>
+                                    </div>
+                                    <div class="stat-icon-wrap"><i class="material-icons-outlined">handshake</i></div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-xl-3">
                                 <div class="stat-card red">
                                     <div>
                                         <h3 id="statBalanceTarget">&#8377;<?php echo inr_format($napkinBalanceAmount, 0); ?></h3>
@@ -1702,16 +1840,18 @@ ksort($districtTpCounts);
                                                     <th class="text-end">Target Amount</th>
                                                     <th class="text-end" title="Your own Get Order-converted, Napkin-only sales">Achieved</th>
                                                     <th class="text-end" title="Every shop invoice your TPs raised, attributed to your district">TP Invoice Amount</th>
-                                                    <th class="text-end" title="Achieved + TP Invoice Amount">Total</th>
+                                                    <th class="text-end" title="Get Orders CP/Company fulfilled directly (not via a TP), Napkin-only">CP Invoice Amount</th>
+                                                    <th class="text-end" title="TP Invoice Amount + CP Invoice Amount — not Achieved">Total</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <?php
-                                                $_myWkTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice' => 0, 'total' => 0];
+                                                $_myWkTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice' => 0, 'cp_invoice' => 0, 'total' => 0];
                                                 foreach ($myOwnWeeklyBreakdown as $_wk):
                                                     $_myWkTotal['target']     += $_wk['target'];
                                                     $_myWkTotal['achieved']   += $_wk['achieved'];
                                                     $_myWkTotal['tp_invoice'] += $_wk['tp_invoice'];
+                                                    $_myWkTotal['cp_invoice'] += $_wk['cp_invoice'] ?? 0;
                                                     $_myWkTotal['total']      += $_wk['total'];
                                                 ?>
                                                 <tr>
@@ -1719,6 +1859,7 @@ ksort($districtTpCounts);
                                                     <td class="text-end">&#8377;<?php echo inr_format($_wk['target'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_wk['achieved'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_wk['tp_invoice'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_wk['cp_invoice'] ?? 0, 0); ?></td>
                                                     <td class="text-end" style="font-weight:600;">&#8377;<?php echo inr_format($_wk['total'], 0); ?></td>
                                                 </tr>
                                                 <?php endforeach; ?>
@@ -1729,6 +1870,7 @@ ksort($districtTpCounts);
                                                     <td class="text-end">&#8377;<?php echo inr_format($_myWkTotal['target'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_myWkTotal['achieved'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_myWkTotal['tp_invoice'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_myWkTotal['cp_invoice'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_myWkTotal['total'], 0); ?></td>
                                                 </tr>
                                             </tfoot>
@@ -2171,6 +2313,7 @@ ksort($districtTpCounts);
                                             <span style="background:#fef3c7;color:#92400e;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;">Diaper Orders: <?php echo (int)$napkinDiaperSplit['diaper_orders']; ?></span>
                                             <span style="background:#fef3c7;color:#92400e;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;">Diaper Shops: <?php echo (int)$napkinDiaperSplit['diaper_shops']; ?></span>
                                             <span style="background:#dcfce7;color:#15803d;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;" title="TP shop invoice amount — Napkin lines only">Napkin Invoice Amount: &#8377;<?php echo inr_format($napkinInvoiceAmount, 0); ?></span>
+                                            <span style="background:#dbeafe;color:#1d4ed8;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;" title="Get Orders CP/Company fulfilled directly (not via a TP), Napkin-only">CP Invoice Amount: &#8377;<?php echo inr_format($cpInvoiceAmount, 0); ?></span>
                                             <span style="background:#fef3c7;color:#92400e;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;" title="TP shop invoice amount — Diaper lines only">Diaper Invoice Amount: &#8377;<?php echo inr_format($diaperInvoiceAmount, 0); ?></span>
                                             <?php if ($napkinDiaperSplit['mixed_orders'] > 0): ?>
                                             <span style="background:#e5e7eb;color:#374151;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;" title="One Get Order with both Napkin and Diaper products in it">Mixed Orders: <?php echo (int)$napkinDiaperSplit['mixed_orders']; ?></span>
@@ -2434,10 +2577,13 @@ ksort($districtTpCounts);
                                                     <th class="text-end">Target Amount</th>
                                                     <th class="text-end" title="This DM's own Get Order-converted, Napkin-only sales">Achieved</th>
                                                     <th class="text-end" title="Every shop invoice this DM's TPs raised in the period">TP Invoice Amount</th>
-                                                    <th class="text-end" title="Achieved + TP Invoice Amount">Achieve Total</th>
+                                                    <th class="text-end" title="Get Orders this DM's shops CP/Company fulfilled directly (not via a TP), Napkin-only">CP Invoice Amount</th>
+                                                    <th class="text-end" title="TP Invoice Amount + CP Invoice Amount — not Achieved">Achieve Total</th>
                                                     <th class="text-end" title="Return amount against invoices this DM's own Get Orders converted into">Get Order Return</th>
                                                     <th class="text-end" title="Return amount against every shop invoice this DM's own TPs raised (broader than Get Order Return)">TP Return</th>
                                                     <th class="text-end" title="₹ value taken off this DM's TPs' shop invoices via Remove / qty-reduction / Void (from 21 Nov 2026 onward)">TP Removed</th>
+                                                    <th class="text-end" title="Return amount against this DM's CP/Company-fulfilled Get Order invoices">CP Return</th>
+                                                    <th class="text-end" title="₹ value taken off this DM's CP/Company-fulfilled Get Order invoices via Remove / qty-reduction / Void">CP Removed</th>
                                                     <th class="text-end" title="Target Amount − Achieve Total">Balance</th>
                                                     <th class="text-center" title="Date this DM's cumulative Napkin-only (no Diaper) sales first reached their Target Amount">Target Completed Date</th>
                                                     <th class="text-center">Weekly</th>
@@ -2445,26 +2591,32 @@ ksort($districtTpCounts);
                                             </thead>
                                             <tbody>
                                                 <?php
-                                                $_dmTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice_amount' => 0, 'achieve_total' => 0, 'total_balance' => 0, 'get_order_return_amt' => 0, 'tp_return_amt' => 0, 'tp_removed_amt' => 0];
+                                                $_dmTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice_amount' => 0, 'cp_invoice_amount' => 0, 'achieve_total' => 0, 'total_balance' => 0, 'get_order_return_amt' => 0, 'tp_return_amt' => 0, 'tp_removed_amt' => 0, 'cp_return_amt' => 0, 'cp_removed_amt' => 0];
                                                 foreach ($myDms as $_dmIdx => $_dmRow):
                                                     $_dmTotal['target'] += $_dmRow['target'];
                                                     $_dmTotal['achieved'] += $_dmRow['achieved'];
                                                     $_dmTotal['tp_invoice_amount'] += $_dmRow['tp_invoice_amount'];
+                                                    $_dmTotal['cp_invoice_amount'] += $_dmRow['cp_invoice_amount'] ?? 0;
                                                     $_dmTotal['achieve_total'] += $_dmRow['achieve_total'];
                                                     $_dmTotal['total_balance'] += $_dmRow['total_balance'];
                                                     $_dmTotal['get_order_return_amt'] += $_dmRow['get_order_return_amt'] ?? 0;
                                                     $_dmTotal['tp_return_amt'] += $_dmRow['tp_return_amt'] ?? 0;
                                                     $_dmTotal['tp_removed_amt'] += $_dmRow['tp_removed_amt'] ?? 0;
+                                                    $_dmTotal['cp_return_amt'] += $_dmRow['cp_return_amt'] ?? 0;
+                                                    $_dmTotal['cp_removed_amt'] += $_dmRow['cp_removed_amt'] ?? 0;
                                                 ?>
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($_dmRow['name']); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmRow['target'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmRow['achieved'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmRow['tp_invoice_amount'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmRow['cp_invoice_amount'] ?? 0, 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmRow['achieve_total'], 0); ?></td>
                                                     <td class="text-end" style="color:<?php echo ($_dmRow['get_order_return_amt'] ?? 0) > 0 ? '#dc2626' : '#9ca3af'; ?>;">&#8377;<?php echo inr_format($_dmRow['get_order_return_amt'] ?? 0, 0); ?></td>
                                                     <td class="text-end" style="color:<?php echo ($_dmRow['tp_return_amt'] ?? 0) > 0 ? '#dc2626' : '#9ca3af'; ?>;">&#8377;<?php echo inr_format($_dmRow['tp_return_amt'] ?? 0, 0); ?></td>
                                                     <td class="text-end" style="color:<?php echo ($_dmRow['tp_removed_amt'] ?? 0) > 0 ? '#dc2626' : '#9ca3af'; ?>;">&#8377;<?php echo inr_format($_dmRow['tp_removed_amt'] ?? 0, 0); ?></td>
+                                                    <td class="text-end" style="color:<?php echo ($_dmRow['cp_return_amt'] ?? 0) > 0 ? '#dc2626' : '#9ca3af'; ?>;">&#8377;<?php echo inr_format($_dmRow['cp_return_amt'] ?? 0, 0); ?></td>
+                                                    <td class="text-end" style="color:<?php echo ($_dmRow['cp_removed_amt'] ?? 0) > 0 ? '#dc2626' : '#9ca3af'; ?>;">&#8377;<?php echo inr_format($_dmRow['cp_removed_amt'] ?? 0, 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmRow['total_balance'], 0); ?></td>
                                                     <td class="text-center">
                                                         <?php if (!empty($_dmRow['target_completed_date'])): ?>
@@ -2485,10 +2637,13 @@ ksort($districtTpCounts);
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['target'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['achieved'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['tp_invoice_amount'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['cp_invoice_amount'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['achieve_total'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['get_order_return_amt'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['tp_return_amt'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['tp_removed_amt'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['cp_return_amt'], 0); ?></td>
+                                                    <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['cp_removed_amt'], 0); ?></td>
                                                     <td class="text-end">&#8377;<?php echo inr_format($_dmTotal['total_balance'], 0); ?></td>
                                                     <td></td>
                                                     <td></td>
@@ -2514,16 +2669,18 @@ ksort($districtTpCounts);
                                                                 <th class="text-end">Target Amount</th>
                                                                 <th class="text-end" title="Sum of every DM's own Get Order-converted, Napkin-only sales">Achieved</th>
                                                                 <th class="text-end" title="Sum of every shop invoice this team's TPs raised">TP Invoice Amount</th>
-                                                                <th class="text-end" title="Achieved + TP Invoice Amount">Total</th>
+                                                                <th class="text-end" title="Sum of Get Orders CP/Company fulfilled directly (not via a TP), Napkin-only">CP Invoice Amount</th>
+                                                                <th class="text-end" title="TP Invoice Amount + CP Invoice Amount — not Achieved">Total</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             <?php
-                                                            $_teamWkTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice' => 0, 'total' => 0];
+                                                            $_teamWkTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice' => 0, 'cp_invoice' => 0, 'total' => 0];
                                                             foreach ($teamWeeklyBreakdown as $_wk):
                                                                 $_teamWkTotal['target']     += $_wk['target'];
                                                                 $_teamWkTotal['achieved']   += $_wk['achieved'];
                                                                 $_teamWkTotal['tp_invoice'] += $_wk['tp_invoice'];
+                                                                $_teamWkTotal['cp_invoice'] += $_wk['cp_invoice'] ?? 0;
                                                                 $_teamWkTotal['total']      += $_wk['total'];
                                                             ?>
                                                             <tr>
@@ -2531,6 +2688,7 @@ ksort($districtTpCounts);
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_wk['target'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_wk['achieved'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_wk['tp_invoice'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_wk['cp_invoice'] ?? 0, 0); ?></td>
                                                                 <td class="text-end" style="font-weight:600;">&#8377;<?php echo inr_format($_wk['total'], 0); ?></td>
                                                             </tr>
                                                             <?php endforeach; ?>
@@ -2541,6 +2699,7 @@ ksort($districtTpCounts);
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_teamWkTotal['target'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_teamWkTotal['achieved'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_teamWkTotal['tp_invoice'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_teamWkTotal['cp_invoice'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_teamWkTotal['total'], 0); ?></td>
                                                             </tr>
                                                         </tfoot>
@@ -2568,16 +2727,18 @@ ksort($districtTpCounts);
                                                                 <th class="text-end">Target Amount</th>
                                                                 <th class="text-end" title="This DM's own Get Order-converted, Napkin-only sales">Achieved</th>
                                                                 <th class="text-end" title="Every shop invoice this DM's TPs raised">TP Invoice Amount</th>
-                                                                <th class="text-end" title="Achieved + TP Invoice Amount">Total</th>
+                                                                <th class="text-end" title="Get Orders this DM's shops CP/Company fulfilled directly (not via a TP), Napkin-only">CP Invoice Amount</th>
+                                                                <th class="text-end" title="TP Invoice Amount + CP Invoice Amount — not Achieved">Total</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             <?php
-                                                            $_dmWkTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice' => 0, 'total' => 0];
+                                                            $_dmWkTotal = ['target' => 0, 'achieved' => 0, 'tp_invoice' => 0, 'cp_invoice' => 0, 'total' => 0];
                                                             foreach (($_dmRow['weeks'] ?? []) as $_wk):
                                                                 $_dmWkTotal['target']     += $_wk['target'];
                                                                 $_dmWkTotal['achieved']   += $_wk['achieved'];
                                                                 $_dmWkTotal['tp_invoice'] += $_wk['tp_invoice'];
+                                                                $_dmWkTotal['cp_invoice'] += $_wk['cp_invoice'] ?? 0;
                                                                 $_dmWkTotal['total']      += $_wk['total'];
                                                             ?>
                                                             <tr>
@@ -2585,6 +2746,7 @@ ksort($districtTpCounts);
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_wk['target'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_wk['achieved'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_wk['tp_invoice'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_wk['cp_invoice'] ?? 0, 0); ?></td>
                                                                 <td class="text-end" style="font-weight:600;">&#8377;<?php echo inr_format($_wk['total'], 0); ?></td>
                                                             </tr>
                                                             <?php endforeach; ?>
@@ -2595,6 +2757,7 @@ ksort($districtTpCounts);
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_dmWkTotal['target'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_dmWkTotal['achieved'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_dmWkTotal['tp_invoice'], 0); ?></td>
+                                                                <td class="text-end">&#8377;<?php echo inr_format($_dmWkTotal['cp_invoice'], 0); ?></td>
                                                                 <td class="text-end">&#8377;<?php echo inr_format($_dmWkTotal['total'], 0); ?></td>
                                                             </tr>
                                                         </tfoot>
@@ -2678,6 +2841,8 @@ ksort($districtTpCounts);
                                                 <strong><?php echo htmlspecialchars($_zone['name']); ?></strong>
                                                 <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                                                     Target: &#8377;<?php echo inr_format($_zone['target'], 0); ?>
+                                                    &nbsp;|&nbsp; <span title="TP Invoice Amount">TP: &#8377;<?php echo inr_format($_zone['tp_invoice'], 0); ?></span>
+                                                    &nbsp;|&nbsp; <span title="Get Orders CP/Company fulfilled directly (not via a TP), Napkin-only">CP: &#8377;<?php echo inr_format($_zone['cp_invoice'] ?? 0, 0); ?></span>
                                                     &nbsp;|&nbsp; Achieve Total: &#8377;<?php echo inr_format($_zone['achieve_total'], 0); ?>
                                                     &nbsp;|&nbsp; <?php echo $_zone['overage_amt'] >= 0 ? 'Over' : 'Under'; ?> Target:
                                                     <span style="font-weight:600;color:<?php echo $_zone['overage_amt'] >= 0 ? '#16a34a' : '#dc2626'; ?>;">
@@ -2737,9 +2902,6 @@ ksort($districtTpCounts);
                                                 <p class="header-sub">TP sales to shops in your district</p>
                                             </div>
                                         </div>
-                                        <a class="btn btn-sm btn-success" id="shopInvExportLink" href="export-shop-invoices-xlsx.php?from=<?php echo urlencode($from); ?>&to=<?php echo urlencode($to); ?>">
-                                            <i class="material-icons-outlined" style="font-size:15px;vertical-align:text-bottom;">file_download</i> Export
-                                        </a>
                                     </div>
 
                                     <div style="padding:14px 20px 0;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
@@ -2876,8 +3038,14 @@ ksort($districtTpCounts);
                             // District field) still inflated "all" here, even though the
                             // single-district "Erode" filter already correctly excluded it.
                             // 2026-11-21, user-reported.
-                            var myDistrictNamesLower = <?php echo json_encode(array_map('mb_strtolower', $districtNames)); ?>;
+                            var myDistrictNamesLower = <?php echo json_encode(array_map('mb_strtolower', $realDistrictNames)); ?>;
                             var overallTarget = <?php echo (float)$districtStats['district_total_target']; ?>;
+                            // CP/Company Invoice Amount is scoped by ms_id (who placed the Get
+                            // Order), not by the shop's district the way $invoiceRows/napkin_total
+                            // are — so it can't be re-split per district filter here. It's kept
+                            // constant across every district filter (same as the server-rendered
+                            // $cpInvoiceAmount card), and always netted off the Balance figure.
+                            var cpInvoiceAmountJs = <?php echo (float)$cpInvoiceAmount; ?>;
 
                             var escDiv = document.createElement('div');
                             function esc(s) { escDiv.textContent = (s == null ? '' : s); return escDiv.innerHTML; }
@@ -2923,8 +3091,10 @@ ksort($districtTpCounts);
                                 // here is the invoice's REAL (both-category) total, which must
                                 // NOT feed this specific sum. 2026-11-21.
                                 var invoiced = districtOnlyRows(currentDistrict).reduce(function (sum, r) { return sum + (r.napkin_total || 0); }, 0);
-                                // Balance = Target - TP Invoice Amount only — 2026-11-30, user-corrected.
-                                var balance = Math.max(0, target - invoiced);
+                                // Balance = Target - TP Invoice Amount - CP Invoice Amount.
+                                // 2026-11-27, user-requested (CP/Company-fulfilled Get Orders never
+                                // overlap a TP invoice, so both are safely netted off here).
+                                var balance = Math.max(0, target - invoiced - cpInvoiceAmountJs);
                                 targetEl.innerHTML = money(target);
                                 invoiceEl.innerHTML = money(invoiced);
                                 balanceEl.innerHTML = money(balance);

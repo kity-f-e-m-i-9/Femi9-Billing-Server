@@ -9,6 +9,8 @@
 // complexity for a TP's own, usually-small shop list.
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../shared/ShopPendingReview.php';
+ensureShopPendingReviewColumn($db_conn);
 header('Content-Type: application/json');
 error_reporting(0);
 
@@ -34,6 +36,7 @@ $stmt = $db_conn->prepare("
     FROM shop s
     LEFT JOIN partner_location_nodes dn ON dn.id = s.district_id
     WHERE s.onboard_userID = ? AND s.onboard_userTYPE = ? AND s.deleted_at IS NULL
+      AND s.pending_review = 0
       AND ($whereWords)
     ORDER BY s.name ASC
     LIMIT 25

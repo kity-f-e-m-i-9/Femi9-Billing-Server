@@ -219,6 +219,52 @@ function getRawAchievedDailyByMsId($db_conn, array $ids, string $fromDate, strin
     return $out;
 }
 
+// Day-by-day version of just the CP/Company-fulfilled slice of "Achieved"
+// (the resCpCo half of getRawAchievedDailyByMsId() above) — standalone, NOT
+// merged with the TP-fulfilled portion. Needed so dashboard.php can show a
+// separate "CP Invoice Amount" figure (per week, per DM) and safely ADD it
+// into Achieve Total/Balance — unlike TP-fulfilled Get Orders (which land in
+// a real TP->shop invoice already counted under "TP Invoice Amount", see
+// marketing/dashboard.php's 2026-11-27 double-count fix), a CP/Company-
+// fulfilled invoice is from_user_type='channel_partner'/'company', never
+// 'territory_partner', so getTpInvoiceAmountForDistricts() never touches it
+// — no overlap, safe to add. 2026-11-27, user-requested.
+function getRawCpCompanyAchievedDailyByMsId($db_conn, array $ids, string $fromDate, string $toDate): array {
+    $out = [];
+    foreach ($ids as $id) { $out[(int)$id] = []; }
+    if (empty($ids)) return $out;
+
+    $idList = implode(',', array_map('intval', $ids));
+    $fromEsc = $db_conn->real_escape_string($fromDate);
+    $toEsc   = $db_conn->real_escape_string($toDate);
+    $cast    = _teamTargetCollationCast($db_conn);
+    $res = $db_conn->query("
+        SELECT x.ms_id, ui.date AS inv_date, COALESCE(SUM(uii.total), 0) AS achieved
+        FROM (
+            SELECT DISTINCT o.ms_id, ui.inv_id
+            FROM ms_orders o
+            JOIN user_invoice ui ON ui.source_ms_order_id = o.order_id
+            WHERE o.ms_id IN ($idList) AND o.new_order = 'yes'
+              AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
+        ) x
+        JOIN user_invoice ui ON ui.inv_id$cast = x.inv_id$cast
+        JOIN user_invoice_items uii ON uii.inv_id$cast = x.inv_id$cast
+        JOIN products p ON p.id = uii.pr_id
+        WHERE COALESCE(p.category,'') != 'diaper'
+        GROUP BY x.ms_id, ui.date
+        ORDER BY ui.date ASC
+    ");
+    if ($res) {
+        while ($r = $res->fetch_assoc()) {
+            $id = (int)$r['ms_id'];
+            if (!isset($out[$id])) { continue; }
+            $out[$id][$r['inv_date']] = (float)$r['achieved'];
+        }
+    }
+
+    return $out;
+}
+
 // The invoice ids each person's own Get Orders actually converted into, in
 // the date range — same (ms_id, invoiced_inv_id) pairing the "Achieved"
 // queries above are built on, just returned as ids instead of summed to an
@@ -261,6 +307,37 @@ function getGetOrderInvoiceIdsByMsId($db_conn, array $ids, string $fromDate, str
     ");
     if ($resCpCo) {
         while ($r = $resCpCo->fetch_assoc()) {
+            $id = (int)$r['ms_id'];
+            if (!isset($out[$id])) { continue; }
+            $out[$id][] = $r['inv_id'];
+        }
+    }
+
+    return $out;
+}
+
+// Just the CP/Company-fulfilled half of getGetOrderInvoiceIdsByMsId() above
+// (the resCpCo portion, standalone) — so dashboard.php can look up Return/
+// Removed amounts specifically for CP Invoice Amount's own invoice set,
+// the same way it already does for TP Invoice Amount's. 2026-11-27,
+// user-requested.
+function getCpCompanyGetOrderInvoiceIdsByMsId($db_conn, array $ids, string $fromDate, string $toDate): array {
+    $out = [];
+    foreach ($ids as $id) { $out[(int)$id] = []; }
+    if (empty($ids)) return $out;
+
+    $idList = implode(',', array_map('intval', $ids));
+    $fromEsc = $db_conn->real_escape_string($fromDate);
+    $toEsc   = $db_conn->real_escape_string($toDate);
+    $res = $db_conn->query("
+        SELECT DISTINCT o.ms_id, ui.inv_id
+        FROM ms_orders o
+        JOIN user_invoice ui ON ui.source_ms_order_id = o.order_id
+        WHERE o.ms_id IN ($idList) AND o.new_order = 'yes'
+          AND o.order_date BETWEEN '$fromEsc' AND '$toEsc'
+    ");
+    if ($res) {
+        while ($r = $res->fetch_assoc()) {
             $id = (int)$r['ms_id'];
             if (!isset($out[$id])) { continue; }
             $out[$id][] = $r['inv_id'];

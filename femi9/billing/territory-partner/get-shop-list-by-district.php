@@ -21,6 +21,8 @@
 require_once __DIR__ . '/../shared/db-helpers.php';
 include("checksession.php");
 require_once("include/TpDistrictScope.php");
+require_once __DIR__ . '/../shared/ShopPendingReview.php';
+ensureShopPendingReviewColumn($db_conn);
 header('Content-Type: application/json');
 error_reporting(0);
 
@@ -50,7 +52,10 @@ $stmtPending->close();
 // applies; without it a deleted shop (not shown in Manage Shop at all)
 // could still be picked here and invoiced. 2026-11-21, found while
 // verifying this dropdown's shop set matches Manage Shop's.
-$stmt = $db_conn->prepare("SELECT id, temp_id, name, mobile_number, address, district_id FROM shop WHERE onboard_userID=? AND onboard_userTYPE=? AND deleted_at IS NULL ORDER BY name ASC");
+// pending_review=1 — bridged from a new DM order shop, not yet
+// reviewed/saved by this TP (shared/ShopPendingReview.php) — stays out of
+// this dropdown the same as Manage Shop until that save clears the flag.
+$stmt = $db_conn->prepare("SELECT id, temp_id, name, mobile_number, address, district_id FROM shop WHERE onboard_userID=? AND onboard_userTYPE=? AND deleted_at IS NULL AND pending_review = 0 ORDER BY name ASC");
 $stmt->bind_param('is', $Login_user_IDvl, $Login_user_TYPEvl);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
