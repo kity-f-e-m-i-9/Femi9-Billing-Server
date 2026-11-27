@@ -917,6 +917,11 @@ $qparam = urlencode($search ?? '');
                                                 )";
                                             }
                                             
+                                            // All filters are saved to the session by now. Release its lock before
+                                            // the report queries: while it is held, every other page this login opens
+                                            // waits behind them (that is what showed as Cloudflare 524 on 2026-11-27).
+                                            session_write_close();
+
                                             // Get all products
                                             $products = [];
                                             $product_query = "SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC";

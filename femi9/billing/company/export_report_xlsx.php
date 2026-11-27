@@ -106,6 +106,10 @@ if ($selected_state_id <= 0) {
     exit;
 }
 
+// Filters are read; nothing below writes the session. Release its lock so a
+// long export can't make this login's other pages wait behind it.
+session_write_close();
+
 // --------- Load products (for dynamic columns) ----------
 $products = [];
 $stmt_products = $db_conn->prepare("SELECT id, productName FROM products WHERE (temp_id NOT LIKE 'NKS-%' OR temp_id IS NULL) ORDER BY id ASC");
