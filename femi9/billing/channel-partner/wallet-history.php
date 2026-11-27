@@ -252,12 +252,12 @@ while ($credit = mysqli_fetch_array($creditRes)):
                                                         <?php endif; ?>
                                                         <?php if ($commType === 'Cashback'): ?>
                                                         Cashback: <?php echo htmlspecialchars($credit['commission_percentage']); ?>%<br/>
-                                                        <?php echo htmlspecialchars($credit['remarks'] ?? ''); ?>
+                                                        <?php echo str_replace('&lt;br/&gt;', '<br/>', htmlspecialchars($credit['remarks'] ?? '')); ?>
                                                         <?php endif; ?>
                                                         <?php if ($commType === 'Website Order Commission'): ?>
-                                                        <span class="todo-item-subtitle">Website Order Commission (OT Sales)<br/><?php echo htmlspecialchars($credit['remarks'] ?? ''); ?></span>
+                                                        <span class="todo-item-subtitle">Website Order Commission (OT Sales)<br/><?php echo str_replace('&lt;br/&gt;', '<br/>', htmlspecialchars($credit['remarks'] ?? '')); ?></span>
                                                         <?php elseif ($commType === 'Shop Wallet'): ?>
-                                                        <span class="todo-item-subtitle"><?php echo $isReversal ? 'Return clawback' : 'Shop Invoice commission'; ?> (<?php echo htmlspecialchars($credit['commission_percentage']); ?>%)<br/><?php echo htmlspecialchars($credit['remarks'] ?? ''); ?></span>
+                                                        <span class="todo-item-subtitle"><?php echo $isReversal ? 'Return clawback' : 'Shop Invoice commission'; ?> (<?php echo htmlspecialchars($credit['commission_percentage']); ?>%)<br/><?php echo str_replace('&lt;br/&gt;', '<br/>', htmlspecialchars($credit['remarks'] ?? '')); ?></span>
                                                         <?php else: ?>
                                                         <span class="todo-item-subtitle"><?php echo htmlspecialchars($credit['month'] ?? ''); ?>, <?php echo htmlspecialchars($credit['year'] ?? ''); ?></span>
                                                         <?php endif; ?>

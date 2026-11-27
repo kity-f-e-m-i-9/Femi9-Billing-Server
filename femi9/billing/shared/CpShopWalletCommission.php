@@ -90,7 +90,19 @@ function maybeCreditShopWalletCommission(mysqli $db_conn, string $invId): void
     $shopTempId   = (string) $inv['to_user_id'];
     $commission   = round($total * SHOP_WALLET_COMMISSION_PERCENTAGE / 100, 2);
     $today        = date('Y-m-d');
-    $remarks      = "Invoice Number : " . $inv['inv_number'] . "<br/>Date : " . date('d/m/Y');
+    // Shop name on its own line in `remarks` — 2026-11-27, user-requested
+    // ("antha shop oda thani entry ahh kuda pottukulam"): wallet-history.php
+    // showed every Shop Wallet credit as just a percentage + invoice number,
+    // with no way to tell which SHOP it came from (user_id on this table row
+    // IS the shop's temp_id already, just never surfaced in the UI).
+    $shopNameRow  = null;
+    $stmtShopName = $db_conn->prepare("SELECT name FROM shop WHERE temp_id = ? LIMIT 1");
+    $stmtShopName->bind_param('s', $shopTempId);
+    $stmtShopName->execute();
+    $shopNameRow  = $stmtShopName->get_result()->fetch_assoc();
+    $stmtShopName->close();
+    $shopNameLine = !empty($shopNameRow['name']) ? ("Shop : " . trim($shopNameRow['name']) . "<br/>") : '';
+    $remarks      = $shopNameLine . "Invoice Number : " . $inv['inv_number'] . "<br/>Date : " . date('d/m/Y');
 
     $db_conn->begin_transaction();
     try {
@@ -161,7 +173,14 @@ function reverseShopWalletCommissionForReturn(mysqli $db_conn, string $invId, st
 
     $today    = date('Y-m-d');
     $negated  = -$clawback;
-    $remarks  = "Return against Invoice Number : " . $inv['inv_number'] . " (Return " . $returnId . ")<br/>Date : " . date('d/m/Y');
+    $shopTempIdForName = (string) $inv['to_user_id'];
+    $stmtShopName2 = $db_conn->prepare("SELECT name FROM shop WHERE temp_id = ? LIMIT 1");
+    $stmtShopName2->bind_param('s', $shopTempIdForName);
+    $stmtShopName2->execute();
+    $shopNameRow2  = $stmtShopName2->get_result()->fetch_assoc();
+    $stmtShopName2->close();
+    $shopNameLine2 = !empty($shopNameRow2['name']) ? ("Shop : " . trim($shopNameRow2['name']) . "<br/>") : '';
+    $remarks  = $shopNameLine2 . "Return against Invoice Number : " . $inv['inv_number'] . " (Return " . $returnId . ")<br/>Date : " . date('d/m/Y');
 
     $ins = $db_conn->prepare(
         "INSERT INTO wallet_monthly_sls_report
