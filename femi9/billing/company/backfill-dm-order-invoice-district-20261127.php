@@ -31,6 +31,7 @@
 // guesswork entirely.
 include("checksession.php");
 include("config.php");
+require_once __DIR__ . '/../marketing/include/TpInvoiceAmount.php';
 header('Content-Type: text/plain');
 
 $apply = (($_GET['apply'] ?? $argv[1] ?? '') === '1');
@@ -47,14 +48,30 @@ $res = mysqli_query($db_conn, "
     GROUP BY ui.inv_id
 ");
 
-$fixed = 0; $skippedNoDistrict = 0; $total = 0; $skippedRows = [];
+// Single-district-TP fallback — 2026-11-27 v2, found via the live run's own
+// "Skipped" list: a shop with NO district_id at all (district_id=0) still
+// has an unambiguous answer when its OWNING TP is assigned to exactly ONE
+// district (no other district that invoice could possibly belong to) —
+// same priority rule TpInvoiceAmount.php's own live fallback already uses
+// for exactly this reason. Only a MULTI-district TP's district-less shop
+// stays genuinely unresolvable (no reliable signal at all) and is reported
+// for manual review.
+$singleDistrictTpMap = getSingleDistrictTpMap($db_conn);
+
+$fixed = 0; $skippedNoDistrict = 0; $total = 0; $skippedRows = []; $fixedViaTpFallback = 0;
 while ($row = mysqli_fetch_assoc($res)) {
     $total++;
     $districtId = (int)$row['district_id'];
     if ($districtId <= 0) {
-        $skippedNoDistrict++;
-        $skippedRows[] = $row;
-        continue;
+        $tpFallbackDistrict = $singleDistrictTpMap[(int)$row['tp_id']] ?? 0;
+        if ($tpFallbackDistrict > 0) {
+            $districtId = $tpFallbackDistrict;
+            $fixedViaTpFallback++;
+        } else {
+            $skippedNoDistrict++;
+            $skippedRows[] = $row;
+            continue;
+        }
     }
     if ($apply) {
         $stmt = $db_conn->prepare("UPDATE user_invoice SET invoice_district_id = ? WHERE inv_id = ?");
@@ -67,7 +84,8 @@ while ($row = mysqli_fetch_assoc($res)) {
 
 echo "Total DM-order invoices with NULL invoice_district_id: $total\n";
 echo ($apply ? "Fixed (invoice_district_id set): " : "Would fix: ") . "$fixed\n";
-echo "Skipped (shop has no usable district_id, needs manual review): $skippedNoDistrict\n";
+echo "  ...of which via single-district-TP fallback (shop itself had no district_id): $fixedViaTpFallback\n";
+echo "Skipped (multi-district TP, shop has no usable district_id, needs manual review): $skippedNoDistrict\n";
 if (!$apply) {
     echo "\nDry run only — nothing written. Re-run with ?apply=1 (browser) or pass 1 as the first CLI argument to actually apply.\n";
 }
