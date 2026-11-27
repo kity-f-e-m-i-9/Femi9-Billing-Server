@@ -125,7 +125,9 @@ if (!empty($tpIdsInScope)) {
         )";
     }
 
-    $tpIdList = implode(',', $tpIdsInScope);
+    // Quoted: user_invoice.from_user_id and invoice.user_id are text columns, so
+    // comparing them with bare numbers stops MariaDB using their indexes.
+    $tpIdList = "'" . implode("','", array_map('intval', $tpIdsInScope)) . "'";
     $stmt = $db_conn->prepare("
         SELECT ui.inv_id, ui.inv_number, ui.to_user_id AS shop_temp_id, COALESCE(s.name,'(unknown shop)') AS shop_name,
             COALESCE(CONCAT(tp.tp_id, ' — ', CONVERT(tp.name USING utf8mb4) COLLATE utf8mb4_general_ci), '') AS tp_label,
