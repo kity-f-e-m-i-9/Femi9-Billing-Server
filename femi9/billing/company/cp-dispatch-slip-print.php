@@ -304,7 +304,7 @@ Terms of Delivery<br/>&nbsp;
 <div style="clear:both;"></div>
 </div>
 <div align="center">
-    This is a Computer Generated Dispatch Slip
+    This is a Computer Generated Dispatch Slip.
 </div>
 
                 </div><!--Print content end-->

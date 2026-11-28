@@ -41,6 +41,20 @@ try {
     error_log("salesbdm reward-points-tp error: " . $e->getMessage());
     $combined_users = [];
 }
+
+// June 2026 legacy role points — same "Stockist/Super Stockist/Distributor/
+// Super Distributor ID" chip the company view shows, ported here so a TP
+// whose mobile matches an old-role account looks the same in both views.
+require_once __DIR__ . '/../territory-partner/include/LegacyRolePoints.php';
+foreach ($combined_users as &$u) {
+    $mobile = $u['details']['mobile'] ?? '';
+    $u['legacy_all'] = $mobile ? getLegacyRolePointsAll($db_conn, $mobile) : [];
+    $u['legacy_total'] = array_sum(array_map(fn($l) => $l['purchase'] + $l['daily_login'], $u['legacy_all']));
+    $u['grand_total'] = $u['total_points'] + $u['legacy_total'];
+    $u['legacy_sales_total'] = array_sum(array_map(fn($l) => $l['sales'], $u['legacy_all']));
+    $u['sales_grand_total'] = $u['sales_points'] + $u['legacy_sales_total'];
+}
+unset($u);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -69,6 +83,13 @@ try {
         .badge-advance { background:#f59e0b; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         .badge-return { background:#ef4444; color:#fff; font-size:12px; padding:4px 10px; border-radius:12px; }
         table.dataTable thead th { background:#f8f9fa; font-weight:600; }
+        .legacy-chip { display:flex; align-items:center; width:fit-content; white-space:nowrap; font-size:13px; font-weight:600; border-radius:14px; padding:5px 12px; margin-top:6px; line-height:1.4; }
+        .legacy-chip-id { color:#92400e; background:#fef3c7; }
+        .legacy-chip-purchase { color:#fff; background:#10b981; }
+        .legacy-chip-daily { color:#fff; background:#3b82f6; }
+        .legacy-chip-total { color:#fff; background:#4f46e5; }
+        .legacy-chip-sales { color:#fff; background:#0ea5e9; }
+        .legacy-grand-total { display:block; font-size:11px; color:#111827; font-weight:700; margin-top:6px; border-top:1px dashed #d1d5db; padding-top:5px; white-space:nowrap; }
     </style>
 </head>
 <body>
@@ -165,18 +186,49 @@ try {
                                         <?php $d = $u['details']; ?>
                                         <tr>
                                             <td><?php echo $sr++; ?></td>
-                                            <td><?php echo htmlspecialchars($d['tp_id'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td>
+                                                <?php echo htmlspecialchars($d['tp_id'] ?? '–', ENT_QUOTES, 'UTF-8'); ?>
+                                                <?php foreach ($u['legacy_all'] as $l): ?>
+                                                <span class="legacy-chip legacy-chip-id"><?php echo htmlspecialchars($l['role_label'], ENT_QUOTES, 'UTF-8'); ?> ID: <?php echo htmlspecialchars($l['temp_id'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                                <?php endforeach; ?>
+                                            </td>
                                             <td><?php echo htmlspecialchars($d['name'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo htmlspecialchars($d['mobile'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo htmlspecialchars($u['district_names'] ?? '–', ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo $u['target_amount'] > 0 ? '₹' . inr_format($u['target_amount'], 2) : '–'; ?></td>
-                                            <td><span class="badge-purchase"><?php echo inr_format($u['purchase_points'], 2); ?></span></td>
-                                            <td><span class="badge-daily"><?php echo inr_format($u['daily_points'], 2); ?></span></td>
+                                            <td>
+                                                <span class="badge-purchase"><?php echo inr_format($u['purchase_points'], 2); ?></span>
+                                                <?php foreach ($u['legacy_all'] as $l): ?>
+                                                <span class="legacy-chip legacy-chip-purchase"><?php echo inr_format($l['purchase'], 2); ?></span>
+                                                <?php endforeach; ?>
+                                            </td>
+                                            <td>
+                                                <span class="badge-daily"><?php echo inr_format($u['daily_points'], 2); ?></span>
+                                                <?php foreach ($u['legacy_all'] as $l): ?>
+                                                <span class="legacy-chip legacy-chip-daily"><?php echo inr_format($l['daily_login'], 2); ?></span>
+                                                <?php endforeach; ?>
+                                            </td>
                                             <td><?php if ($u['team_points'] > 0): ?><span class="badge-team"><?php echo inr_format($u['team_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><?php if ($u['advance_points'] > 0): ?><span class="badge-advance"><?php echo inr_format($u['advance_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
                                             <td><?php if ($u['return_points'] > 0): ?><span class="badge-return"><?php echo inr_format($u['return_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
-                                            <td><span class="badge-total"><?php echo inr_format($u['total_points'], 2); ?></span></td>
-                                            <td><?php if ($u['sales_points'] > 0): ?><span class="badge-sales"><?php echo inr_format($u['sales_points'], 2); ?></span><?php else: ?>–<?php endif; ?></td>
+                                            <td>
+                                                <span class="badge-total"><?php echo inr_format($u['total_points'], 2); ?></span>
+                                                <?php foreach ($u['legacy_all'] as $l): ?>
+                                                <span class="legacy-chip legacy-chip-total"><?php echo inr_format($l['purchase'] + $l['daily_login'], 2); ?></span>
+                                                <?php endforeach; ?>
+                                                <?php if (!empty($u['legacy_all'])): ?>
+                                                <span class="legacy-grand-total">Grand Total: <?php echo inr_format($u['grand_total'], 2); ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if ($u['sales_points'] > 0): ?><span class="badge-sales"><?php echo inr_format($u['sales_points'], 2); ?></span><?php else: ?>–<?php endif; ?>
+                                                <?php foreach ($u['legacy_all'] as $l): ?>
+                                                <span class="legacy-chip legacy-chip-sales"><?php echo inr_format($l['sales'], 2); ?></span>
+                                                <?php endforeach; ?>
+                                                <?php if (!empty($u['legacy_all'])): ?>
+                                                <span class="legacy-grand-total">Grand Total: <?php echo inr_format($u['sales_grand_total'], 2); ?></span>
+                                                <?php endif; ?>
+                                            </td>
                                         </tr>
                                         <?php endforeach; ?>
                                     </tbody>

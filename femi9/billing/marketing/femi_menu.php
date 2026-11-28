@@ -147,6 +147,9 @@ if($LoginPasswordCheck=="12345678")
 					<li>
                         <a href="my-team"><i class="material-icons-two-tone">groups</i>My Team</a>
                     </li>
+					<li>
+                        <a href="my-team-tp-paid-vs-billed"><i class="material-icons-two-tone">account_balance_wallet</i>TP Paid vs Billed (Zone)</a>
+                    </li>
 					<?php endif; ?>
 
 					<li>

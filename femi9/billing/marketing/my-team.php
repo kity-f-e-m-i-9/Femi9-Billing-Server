@@ -4,6 +4,9 @@ include("config.php");
 require_once("include/TeamLevelColors.php");
 require_once("include/TeamSubtree.php");
 require_once __DIR__ . '/../company/include/TeamTargetRollup.php';
+require_once __DIR__ . '/include/AssignedLocations.php';
+require_once __DIR__ . '/include/MsDistrictScope.php';
+require_once __DIR__ . '/include/TpInvoiceAmount.php';
 error_reporting(0);
 
 $rootId = (int)$markeingSTFID;
@@ -165,11 +168,31 @@ $kpiOldShops = $kpiSum['oldshops'];
 $kpiGot      = $kpiSum['got'];
 $kpiNo       = $kpiSum['no'];
 
-function renderStatRow(array $row, array $byManager, array $rawStats, array $levelColorMap, int $rank = 0, bool $indent = false, string $dateParam = '', array $districtsByMs = [], string $ordersDateParam = ''): string {
+function renderStatRow(mysqli $db_conn, array $row, array $byManager, array $rawStats, array $levelColorMap, int $rank = 0, bool $indent = false, string $dateParam = '', array $districtsByMs = [], string $ordersDateParam = '', string $valueFromDate = '', string $valueToDate = ''): string {
     $id = (int)$row['id'];
     $color = $levelColorMap[(int)$row['team_level_id']] ?? '#999999';
     [$sum, $ids] = subtreeSumAndIds($id, $byManager, $rawStats);
     $idsParam = implode(',', $ids);
+
+    // Day Napkin Value / Day Lumi Value — this row's own + whole downline's
+    // napkin/diaper TP Invoice Amount for the selected range, same
+    // scope-node -> TP ids -> district ids resolution marketing/dashboard.php
+    // already uses per DM, just unioned across every id in this row's subtree.
+    $rowScopeNodeIds = [];
+    foreach ($ids as $memberId) {
+        foreach (getMsAssignedTargetScopeNodes($db_conn, $memberId) as $node) {
+            $rowScopeNodeIds[(int)$node['id']] = true;
+        }
+    }
+    $rowScopeNodeIds = array_keys($rowScopeNodeIds);
+    $rowTpIds = !empty($rowScopeNodeIds) ? getMsNodeTpIds($db_conn, $rowScopeNodeIds, true) : [];
+    $rowDistrictIds = !empty($rowScopeNodeIds) ? districtIdsFromScopeNodeIds($db_conn, $rowScopeNodeIds) : [];
+    $napkinValue = (!empty($rowTpIds) && !empty($rowDistrictIds))
+        ? getTpInvoiceAmountForDistricts($db_conn, $rowTpIds, $rowDistrictIds, $valueFromDate, $valueToDate)
+        : 0.0;
+    $lumiValue = (!empty($rowTpIds) && !empty($rowDistrictIds))
+        ? getTpDiaperInvoiceAmountForDistricts($db_conn, $rowTpIds, $rowDistrictIds, $valueFromDate, $valueToDate)
+        : 0.0;
     $district = $districtsByMs[$id] ?? '';
     // SM/ASM rows don't carry their own location assignment (only individual
     // DMs do) — show the union of districts their whole team covers instead
@@ -189,9 +212,11 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
     $html .= '<td style="max-width:220px;">' . ($district !== '' ? '<span style="display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;" title="' . htmlspecialchars($district) . '">' . htmlspecialchars($district) . '</span>' : '<span class="text-muted" style="font-size:11px;">&mdash;</span>') . '</td>';
     $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['shops']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['oldshops']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
     $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['got']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
+    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['oldshops']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
     $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['no']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
+    $html .= '<td><span class="stat-pill">&#8377;' . number_format($napkinValue, 2) . '</span></td>';
+    $html .= '<td><span class="stat-pill">&#8377;' . number_format($lumiValue, 2) . '</span></td>';
     $html .= '<td>';
     $html .= '<div class="actions-cell">';
     if ($sum['shops'] > 0) {
@@ -425,10 +450,12 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
                                                     <th>Name</th>
                                                     <th>Level</th>
                                                     <th>District</th>
-                                                    <th>Total Shops</th>
-                                                    <th>Old Shop</th>
-                                                    <th>Get Order</th>
-                                                    <th>No Order</th>
+                                                    <th>Day Total Shop</th>
+                                                    <th>Day Get Orders</th>
+                                                    <th>Day Old Shop</th>
+                                                    <th>Day No Order</th>
+                                                    <th>Day Napkin Value</th>
+                                                    <th>Day Lumi Value</th>
                                                     <th>Actions</th>
                                                 </tr>
                                             </thead>
@@ -436,9 +463,9 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
                                             <?php $rank = 0; foreach ($byManager[$rootId] as $asm):
                                                 $asmId = (int)$asm['id'];
                                                 $rank++;
-                                                echo renderStatRow($asm, $byManager, $rawStats, $levelColorMap, $rank, false, $dateParam, $districtsByMs, $ordersDateParam);
+                                                echo renderStatRow($db_conn, $asm, $byManager, $rawStats, $levelColorMap, $rank, false, $dateParam, $districtsByMs, $ordersDateParam, $targetFromDate, $targetToDate);
                                                 $dmList = $byManager[$asmId] ?? [];
-                                                foreach ($dmList as $dm): echo renderStatRow($dm, $byManager, $rawStats, $levelColorMap, 0, true, $dateParam, $districtsByMs, $ordersDateParam); endforeach;
+                                                foreach ($dmList as $dm): echo renderStatRow($db_conn, $dm, $byManager, $rawStats, $levelColorMap, 0, true, $dateParam, $districtsByMs, $ordersDateParam, $targetFromDate, $targetToDate); endforeach;
                                             endforeach; ?>
                                             </tbody>
                                         </table>

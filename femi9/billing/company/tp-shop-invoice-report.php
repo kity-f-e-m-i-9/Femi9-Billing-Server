@@ -21,7 +21,7 @@ error_reporting(0);
 
 if (isset($_POST['clear_all'])) {
     unset($_SESSION['tpsir_from_date'], $_SESSION['tpsir_to_date'], $_SESSION['tpsir_district_id'],
-          $_SESSION['tpsir_tp_id'], $_SESSION['tpsir_product_type']);
+          $_SESSION['tpsir_tp_id'], $_SESSION['tpsir_product_type'], $_SESSION['tpsir_category']);
     header('Location: ' . $_SERVER['PHP_SELF']);
     exit;
 }
@@ -58,6 +58,16 @@ if (isset($_POST['product_type'])) {
     else { unset($_SESSION['tpsir_product_type']); }
 } elseif (!empty($_SESSION['tpsir_product_type'])) {
     $selected_product_type = $_SESSION['tpsir_product_type'];
+}
+
+// Category filter — All (default) / Shop / Customer. 2026-12-XX, user-requested.
+$selected_category = '';
+if (isset($_POST['category_filter'])) {
+    $selected_category = in_array($_POST['category_filter'], ['shop', 'customer'], true) ? $_POST['category_filter'] : '';
+    if ($selected_category) { $_SESSION['tpsir_category'] = $selected_category; }
+    else { unset($_SESSION['tpsir_category']); }
+} elseif (!empty($_SESSION['tpsir_category'])) {
+    $selected_category = $_SESSION['tpsir_category'];
 }
 
 $Report_LABLE = "Territory Partner — Shop-wise Invoice Report";
@@ -118,6 +128,9 @@ if (!empty($tpIdsInScope)) {
         $tpNameForHeader = $districtLabel . ' — All TPs (' . count($tpIdsInScope) . ')';
     }
 
+    $tpIdList = implode(',', $tpIdsInScope);
+
+    if ($selected_category !== 'customer') {
     $catJoin = '';
     if ($selected_product_type !== '') {
         $catJoin = " AND EXISTS (
@@ -126,7 +139,6 @@ if (!empty($tpIdsInScope)) {
         )";
     }
 
-    $tpIdList = implode(',', $tpIdsInScope);
     $stmt = $db_conn->prepare("
         SELECT ui.inv_id, ui.inv_number, ui.to_user_id AS shop_temp_id, COALESCE(s.name,'(unknown shop)') AS shop_name,
             COALESCE(s.mobile_number, '') AS buyer_mobile,
@@ -171,6 +183,7 @@ if (!empty($tpIdsInScope)) {
         ];
         $invoiceTotal += $amt;
     }
+    } // end if ($selected_category !== 'customer')
 
     // Plain Customer invoices (the separate `invoice`/`invoice_items` table
     // — a TP's walk-in/customer sale, not a Shop one) — 2026-11-27 v4,
@@ -181,6 +194,7 @@ if (!empty($tpIdsInScope)) {
     // against real data that shop_invoice_change_log (the Removed-amount
     // source) never has a single row joining to this `invoice` table, i.e.
     // that tracking mechanism only ever existed for Shop invoices.
+    if ($selected_category !== 'shop') {
     $custCatJoin = '';
     if ($selected_product_type !== '') {
         $custCatJoin = " AND EXISTS (
@@ -232,6 +246,7 @@ if (!empty($tpIdsInScope)) {
         ];
         $invoiceTotal += $amt;
     }
+    } // end if ($selected_category !== 'shop')
 
     // Removed Amount per invoice — not category-split when a Product Type
     // filter is active (a Void row logs the whole invoice at once, no
@@ -427,6 +442,14 @@ $netGrandTotal = $invoiceTotal - $returnTotals['return_amount'] - $returnTotals[
                                                     <option value="diaper" <?php echo $selected_product_type === 'diaper' ? 'selected' : ''; ?>>Diaper</option>
                                                 </select>
                                             </div>
+                                            <div class="col-md-3 col-sm-6 mb-2">
+                                                <label class="form-label">Category</label>
+                                                <select name="category_filter" id="category_filter" class="form-control" style="width:100%;">
+                                                    <option value="">All (Shop + Customer)</option>
+                                                    <option value="shop" <?php echo $selected_category === 'shop' ? 'selected' : ''; ?>>Shop</option>
+                                                    <option value="customer" <?php echo $selected_category === 'customer' ? 'selected' : ''; ?>>Customer</option>
+                                                </select>
+                                            </div>
                                             <div class="col-md-3 col-sm-12 mb-2 d-flex align-items-end gap-2">
                                                 <button type="submit" class="btn btn-primary"><i class="material-icons">search</i> Search</button>
                                                 <button type="submit" name="clear_all" value="1" class="btn btn-secondary">Reset</button>
@@ -619,6 +642,7 @@ $netGrandTotal = $invoiceTotal - $returnTotals['return_amount'] - $returnTotals[
         $('#district_filter').select2({ placeholder: 'All Districts', allowClear: true, width: '100%' });
         $('#tp_filter').select2({ width: '100%' });
         $('#product_type_filter').select2({ width: '100%' });
+        $('#category_filter').select2({ width: '100%' });
 
         // Tab switch — plain show/hide, no extra assets needed.
         $('#tpsirTabs a').on('click', function (e) {
