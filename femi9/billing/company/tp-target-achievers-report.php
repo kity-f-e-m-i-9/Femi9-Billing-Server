@@ -318,9 +318,12 @@ foreach ($months as $ym) {
             $(this).DataTable({
                 order: [[5, 'desc']],
                 columnDefs: [{ targets: 7, orderable: false }],
-                paging: false,
-                info: false,
-                searching: false
+                paging: true,
+                pageLength: 25,
+                lengthMenu: [10, 25, 50, 100],
+                info: true,
+                searching: true,
+                dom: '<"d-flex flex-wrap justify-content-between align-items-center mb-2"lf>rt<"d-flex flex-wrap justify-content-between align-items-center mt-2"ip>'
             });
         });
     });
