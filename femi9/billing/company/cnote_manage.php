@@ -219,7 +219,13 @@ else if($getinvuser=="shop")
 	}else{
 										$select_userinvoice="select * from user_invoice where inv_id=?";
 										}
-									$fetch_userinvoice=db_q($db_conn,$select_userinvoice,[$invid]);
+									// The customer branch above already embeds $invid into the SQL text
+									// itself (no '?' placeholder) — passing [$invid] here too made db_q()
+									// see a param-count mismatch and return false, which crashed the whole
+									// page's return list the moment any customer-type return existed in it
+									// (found while testing company/cnote_finish.php's CP-fulfilled-return
+									// fix, 2026-11-13 — unrelated to that change, pre-existing).
+									$fetch_userinvoice=($getinvuser=="customer") ? db_q($db_conn,$select_userinvoice,[]) : db_q($db_conn,$select_userinvoice,[$invid]);
 									$result_userinvoice=mysqli_fetch_array($fetch_userinvoice);
 											
 ?>

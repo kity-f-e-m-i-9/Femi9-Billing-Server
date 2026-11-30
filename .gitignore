@@ -32,6 +32,7 @@ error_log
 **/error_log
 **/*.log
 femi9/billing/company/logs/rate_limit.json
+femi9/billing/company/logs/login_rate_limit.json
 femi9/billing/login/logs/login_rate_limit.json
 # Never commit secrets, archives or backups
 *.zip

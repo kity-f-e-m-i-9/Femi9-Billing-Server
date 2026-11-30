@@ -70,7 +70,7 @@ $smRoots = $byManager[0] ?? [];
 
 // ── Raw per-person shop/order counts, in one pass ───────────────────────────
 $rawStats = [];
-foreach ($allIds as $id) { $rawStats[$id] = ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0]; }
+foreach ($allIds as $id) { $rawStats[$id] = ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0, 'achTp' => 0.0, 'achCp' => 0.0, 'achCompany' => 0.0]; }
 if (!empty($allIds)) {
     $idList = implode(',', $allIds);
     $shopDateWhere = $hasDateFilter ? " AND DATE(created_at) BETWEEN '$fromDate' AND '$toDate'" : '';
@@ -102,6 +102,12 @@ if (!empty($allIds)) {
         $rawStats[$id]['target']   = $t['target'];
         $rawStats[$id]['achieved'] = $t['achieved'];
     }
+    $_achievedBreakdown = getAchievedChannelBreakdown($db_conn, $allIds, $targetFromDate, $targetToDate);
+    foreach ($_achievedBreakdown as $id => $b) {
+        $rawStats[$id]['achTp']      = $b['tp'];
+        $rawStats[$id]['achCp']      = $b['cp'];
+        $rawStats[$id]['achCompany'] = $b['company'];
+    }
 }
 
 // Memoized — renderRowsRecursive() calls this once per row in the whole
@@ -110,7 +116,7 @@ if (!empty($allIds)) {
 // managers). $cache is keyed by id and shared across the whole render pass.
 function subtreeSumAndIds(int $id, array $byManager, array $rawStats, array &$cache): array {
     if (isset($cache[$id])) { return $cache[$id]; }
-    $sum = $rawStats[$id] ?? ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0];
+    $sum = $rawStats[$id] ?? ['shops' => 0, 'oldshops' => 0, 'got' => 0, 'no' => 0, 'target' => 0.0, 'achieved' => 0.0, 'achTp' => 0.0, 'achCp' => 0.0, 'achCompany' => 0.0];
     $ids = [$id];
     $children = $byManager[$id] ?? [];
     // A manager's own raw target only counts when they have no team below
@@ -119,12 +125,15 @@ function subtreeSumAndIds(int $id, array $byManager, array $rawStats, array &$ca
     if (!empty($children)) { $sum['target'] = 0.0; }
     foreach ($children as $child) {
         [$childSum, $childIds] = subtreeSumAndIds((int)$child['id'], $byManager, $rawStats, $cache);
-        $sum['shops']    += $childSum['shops'];
-        $sum['oldshops'] += $childSum['oldshops'];
-        $sum['got']      += $childSum['got'];
-        $sum['no']       += $childSum['no'];
-        $sum['target']   += $childSum['target'];
-        $sum['achieved'] += $childSum['achieved'];
+        $sum['shops']      += $childSum['shops'];
+        $sum['oldshops']   += $childSum['oldshops'];
+        $sum['got']        += $childSum['got'];
+        $sum['no']         += $childSum['no'];
+        $sum['target']     += $childSum['target'];
+        $sum['achieved']   += $childSum['achieved'];
+        $sum['achTp']      += $childSum['achTp'];
+        $sum['achCp']      += $childSum['achCp'];
+        $sum['achCompany'] += $childSum['achCompany'];
         $ids = array_merge($ids, $childIds);
     }
     $cache[$id] = [$sum, $ids];
@@ -163,9 +172,14 @@ function renderStatRow(array $row, array $byManager, array $rawStats, array $lev
     $html .= '<td><span class="tp-tag" style="color:' . $color . ';background:' . $color . '1a;">' . htmlspecialchars($row['level_name'] ?: '-') . '</span></td>';
     $balance = max(0, $sum['target'] - $sum['achieved']);
     $html .= '<td class="msv-target">' . '<span class="stat-pill">&#8377;' . number_format($sum['target'], 0) . '</span></td>';
-    $html .= '<td><span class="stat-pill" style="color:#0ca30c;">&#8377;' . number_format($sum['achieved'], 0) . '</span></td>';
+    $html .= '<td><span class="stat-pill achv-clickable" style="color:#0ca30c;cursor:pointer;text-decoration:underline dotted;"'
+        . ' data-name="' . htmlspecialchars($row['ms_name'], ENT_QUOTES) . '"'
+        . ' data-tp="' . number_format($sum['achTp'], 0) . '"'
+        . ' data-cp="' . number_format($sum['achCp'], 0) . '"'
+        . ' data-company="' . number_format($sum['achCompany'], 0) . '"'
+        . ' data-total="' . number_format($sum['achieved'], 0) . '"'
+        . ' onclick="showAchievedModal(this)">&#8377;' . number_format($sum['achieved'], 0) . '</span></td>';
     $html .= '<td><span class="stat-pill" style="color:' . ($balance > 0 ? '#dc2626' : '#0ca30c') . ';">&#8377;' . number_format($balance, 0) . '</span></td>';
-    $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['oldshops']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
     $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['got']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
     $html .= '<td><span class="stat-pill">' . htmlspecialchars((string)($sum['no']), ENT_QUOTES, 'ISO-8859-1', false) . '</span></td>';
     $html .= '<td><span class="stat-pill">' . ($sum['got'] + $sum['no']) . '</span></td>';
@@ -399,7 +413,6 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
                                                     <th>Target</th>
                                                     <th>Achieved</th>
                                                     <th>Balance</th>
-                                                    <th>Old Shop</th>
                                                     <th>Get Order</th>
                                                     <th>No Order</th>
                                                     <th>Total Order Shop</th>
@@ -426,6 +439,39 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
     </div>
 </div>
 
+<!-- Achieved breakdown (TP / CP / Company) modal -->
+<div class="modal fade" id="achievedBreakdownModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="achvModalName">Achieved Breakdown</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:8px;background:#eef1fd;">
+                        <span style="font-weight:600;color:#374151;">TP Shop Invoice</span>
+                        <span id="achvTp" style="font-weight:700;color:#4f46e5;">&#8377;0</span>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:8px;background:#fff7ed;">
+                        <span style="font-weight:600;color:#374151;">CP Invoice</span>
+                        <span id="achvCp" style="font-weight:700;color:#9a3412;">&#8377;0</span>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:8px;background:#e8f8e8;">
+                        <span style="font-weight:600;color:#374151;">Company Invoice</span>
+                        <span id="achvCompany" style="font-weight:700;color:#0ca30c;">&#8377;0</span>
+                    </div>
+                    <hr style="margin:4px 0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;">
+                        <span style="font-weight:700;color:#111827;">Total Achieved</span>
+                        <span id="achvTotal" style="font-weight:800;font-size:16px;color:#111827;">&#8377;0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/popper.min.js"></script>
 <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>
@@ -434,6 +480,16 @@ function renderRowsRecursive(array $row, array $byManager, array $rawStats, arra
 <script src="../../assets/js/main.min.js"></script>
 <script src="../../assets/js/custom.js"></script>
 <script>
+function showAchievedModal(el) {
+    document.getElementById('achvModalName').textContent = el.getAttribute('data-name') + ' — Achieved Breakdown';
+    document.getElementById('achvTp').innerHTML = '&#8377;' + el.getAttribute('data-tp');
+    document.getElementById('achvCp').innerHTML = '&#8377;' + el.getAttribute('data-cp');
+    document.getElementById('achvCompany').innerHTML = '&#8377;' + el.getAttribute('data-company');
+    document.getElementById('achvTotal').innerHTML = '&#8377;' + el.getAttribute('data-total');
+    var modalEl = document.getElementById('achievedBreakdownModal');
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+}
 (function () {
     var searchBox = document.getElementById('msvSearchBox');
     if (!searchBox) return;

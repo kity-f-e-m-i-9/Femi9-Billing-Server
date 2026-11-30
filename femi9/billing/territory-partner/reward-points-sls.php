@@ -114,10 +114,17 @@ function safeQuery_tpsls(mysqli $conn, string $sql): float {
     }
 }
 
-// 1. Shop (user-to-user) Sales Points — invoice sub_total / 100
+// 1. Shop (user-to-user) Sales Points — invoice sub_total / 100. Gated by
+// rwpoints_enable=1, same as the company-side view (TpRewardPointsData.php's
+// Sales Points query) and this TP's own reward-points.php dashboard — without
+// it, an invoice the company explicitly disabled for reward points (TP
+// Invoice "Enable/Disable" toggle) still counted here, showing MORE points
+// on this page than the company's own "Reward Points — Territory Partners"
+// report for the same TP/period. 2026-11-21, user-reported.
 $total_points_users = safeQuery_tpsls($db_conn,
     "SELECT COALESCE(SUM(sub_total) / 100, 0) FROM user_invoice
      WHERE from_user_type = '$user_type' AND from_user_id = '$user_id'
+     AND rwpoints_enable = 1
      AND date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."'"
 );
 
@@ -130,12 +137,15 @@ $total_points_customers = safeQuery_tpsls($db_conn,
 
 $total_combined_points = $total_points_users + $total_points_customers;
 
-// 3. Return Deductions (shop invoices)
+// 3. Return Deductions (shop invoices) — same rwpoints_enable=1 gate: a
+// return against an invoice that never earned points (reward points
+// disabled on it) shouldn't be able to deduct points either.
 $user_return_points = safeQuery_tpsls($db_conn,
     "SELECT COALESCE(SUM(r.subtotal) / 100, 0) FROM user_return_stock_items r
      WHERE r.invnumber IN (
          SELECT inv_id FROM user_invoice
          WHERE from_user_type = '$user_type' AND from_user_id = '$user_id'
+         AND rwpoints_enable = 1
          AND date BETWEEN '".db_esc($current_from_date)."' AND '".db_esc($current_to_date)."'
      ) AND r.to_usertype = '$user_type' AND r.to_userid = '$user_id'"
 );

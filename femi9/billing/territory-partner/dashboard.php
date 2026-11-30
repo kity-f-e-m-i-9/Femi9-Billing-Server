@@ -5,8 +5,63 @@ include("insert_wallet_referral.php");
 require_once(__DIR__ . '/../shared/TpApproverContext.php');
 require_once(__DIR__ . '/../shared/TpProductType.php');
 require_once(__DIR__ . '/../shared/AgreementService.php');
+require_once("include/ShopInvoiceHistory.php");
+
+// Tomorrow's Firka reminder — a dismissable (non-blocking) "heads up" once
+// it's past 4:30pm, same as the DM's own tomorrow reminder on marketing/
+// dashboard.php (2026-11-12, user request). Shown only ONCE per fresh login
+// — a session flag is set the moment it's rendered, so reloading/navigating
+// this same dashboard again later tonight won't re-show it; logging out
+// (session destroyed) and back in clears the flag, showing it again on that
+// next login, same as the user asked. Wrapped in try/catch: tp_daily_
+// assignments is a one-time-schema table that may not exist yet everywhere,
+// and this must never be able to break the whole dashboard over it.
+$tpTomorrowFirkas = [];
+try {
+    $__wsHour = (int) date('H'); $__wsMin = (int) date('i');
+    $__wsPastHalfFour = $__wsHour >= 17 || ($__wsHour === 16 && $__wsMin >= 30);
+    $__wsAlreadyShown = ($_SESSION['tp_tomorrow_reminder_date'] ?? '') === date('Y-m-d');
+    if ($__wsPastHalfFour && !$__wsAlreadyShown) {
+        require_once(__DIR__ . '/../shared/TpWorkStart.php');
+        $tpTomorrowFirkas = fetchTpTomorrowFirkas($db_conn, (int) $Login_user_IDvl, date('Y-m-d', strtotime('+1 day')));
+        if (!empty($tpTomorrowFirkas)) {
+            $_SESSION['tp_tomorrow_reminder_date'] = date('Y-m-d');
+        }
+    }
+} catch (\Throwable $e) {
+    $tpTomorrowFirkas = [];
+}
 
 $agreementNeedsResign = agreement_needs_resign(get_or_create_tp_agreement($db_conn, (int) $Login_user_IDvl));
+
+// Month-end "rate your DM/SalesBDM" feedback — shown on the last calendar
+// day of every month (date('j')===date('t') handles 28/29/30/31
+// automatically) until this TP has submitted for every DM/SalesBDM they
+// actually have this month; re-shown on every login that day since it's a
+// DB-backed check, not a session flag, so submitting mid-day on the last
+// day stops it showing again for the rest of that day too. 2026-11-24,
+// user-requested ("month last la tp login panna udaney... share your
+// feedback about our work").
+$tpFeedbackPending = [];
+try {
+    if ((int)date('j') === (int)date('t')) {
+        require_once(__DIR__ . '/../shared/TpStaffFeedback.php');
+        $__tpId = (int)$Login_user_IDvl;
+        $__ym = date('Y-m');
+        foreach (getTpAssignedDmRows($db_conn, $__tpId) as $__dm) {
+            if (!hasSubmittedTpFeedbackThisMonth($db_conn, $__tpId, 'dm', (int)$__dm['id'], $__ym)) {
+                $tpFeedbackPending[] = ['target_type' => 'dm', 'target_id' => (int)$__dm['id'], 'name' => $__dm['ms_name'], 'questions' => tpStaffFeedbackQuestions('dm')];
+            }
+        }
+        foreach (getTpAssignedSalesBdmRows($db_conn, $__tpId) as $__bdm) {
+            if (!hasSubmittedTpFeedbackThisMonth($db_conn, $__tpId, 'salesbdm', (int)$__bdm['id'], $__ym)) {
+                $tpFeedbackPending[] = ['target_type' => 'salesbdm', 'target_id' => (int)$__bdm['id'], 'name' => $__bdm['ms_name'], 'questions' => tpStaffFeedbackQuestions('salesbdm')];
+            }
+        }
+    }
+} catch (\Throwable $e) {
+    $tpFeedbackPending = [];
+}
 
 // ── Safe defaults (used if try block below fails for any reason) ─────────────
 $locCount    = 0; $invCount    = 0; $advBalance = 0; $totalTarget = 0;
@@ -191,6 +246,22 @@ $shopRevenue = (float)(mysqli_stmt_get_result($shopRevStmt)->fetch_assoc()['tota
 mysqli_stmt_close($shopRevStmt);
 
 $paidRevenue = $custRevenue + $shopRevenue;
+
+// Shop Invoice Return Amount / Removed (Deleted) Amount — lifetime, shop
+// invoices only (this TP's own Manage Invoice -> Return/Remove actions).
+// 2026-11-21, user-requested: so a TP can see, at a glance, how much ₹
+// value has gone out via Return vs. how much has been taken off invoices
+// via Remove/qty-reduction/Void, next to their Paid Revenue card.
+// 2026-11-23, user-reported: both figures silently dropped back to ₹0 once
+// a TP removed every line of an invoice and then deleted the now-empty
+// invoice itself — querying by "this TP's current list of shop invoice ids"
+// stopped including that invoice's history the moment it stopped existing
+// in user_invoice. Fixed by summing straight from who made the change /
+// who received the return (shop_invoice_change_log.changed_by_user_id,
+// user_return_stock_items.to_userid) instead — both are immune to the
+// originating invoice later being deleted.
+$shopReturnAmount  = array_sum(getShopInvoiceReturnAmountByUser($db_conn, [(int)$Login_user_IDvl]));
+$shopRemovedAmount = array_sum(getShopInvoiceRemovedAmountByUser($db_conn, 'territory_partner', [(int)$Login_user_IDvl]));
 
 // All stock products sorted by qty sold from TP-created invoices
 // return_qty = units the shop/customer sent back to THIS TP (user_return_stock_items,
@@ -476,6 +547,45 @@ mysqli_stmt_close($stockListStmt);
                                         </div>
                                         <!-- End Row 2 -->
 
+                                        <!-- Row 3: Shop Invoice Return Amount / Removed (Deleted) Amount -->
+                                        <div class="row">
+
+                                            <div class="col-xl-6 col-md-6">
+                                                <div class="card widget widget-stats">
+                                                    <div class="card-body">
+                                                        <div class="widget-stats-container d-flex">
+                                                            <div class="widget-stats-icon widget-stats-icon-warning">
+                                                                <i class="material-icons-outlined">assignment_return</i>
+                                                            </div>
+                                                            <div class="widget-stats-content flex-fill">
+                                                                <span class="widget-stats-title">Shop Invoice Return Amount</span>
+                                                                <span class="widget-stats-amount">₹<?php echo inr_format($shopReturnAmount, 2); ?></span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="col-xl-6 col-md-6">
+                                                <div class="card widget widget-stats">
+                                                    <div class="card-body">
+                                                        <div class="widget-stats-container d-flex">
+                                                            <div class="widget-stats-icon widget-stats-icon-danger">
+                                                                <i class="material-icons-outlined">delete_sweep</i>
+                                                            </div>
+                                                            <div class="widget-stats-content flex-fill">
+                                                                <span class="widget-stats-title">Shop Invoice Removed Amount</span>
+                                                                <span class="widget-stats-amount">₹<?php echo inr_format($shopRemovedAmount, 2); ?></span>
+                                                                <div style="font-size:11px;color:#6b7280;margin-top:2px;">From Remove / qty-edit / Void (from 21 Nov 2026 onward)</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                        <!-- End Row 3 -->
+
                                     </div>
                                 </div>
                             </div>
@@ -545,6 +655,106 @@ mysqli_stmt_close($stockListStmt);
             </div>
         </div>
     </div>
+
+    <?php if (!empty($tpTomorrowFirkas)): ?>
+    <div class="modal fade" id="tpTomorrowReminderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#eef2ff;">
+                    <h5 class="modal-title" style="color:#3730a3;">Tomorrow's Area</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin:0 0 10px;font-size:13.5px;color:#374151;">Your DM has assigned you to the following area<?php echo count($tpTomorrowFirkas) > 1 ? 's' : ''; ?> tomorrow (<?php echo date('d M Y', strtotime('+1 day')); ?>):</p>
+                    <ul style="margin:0;padding-left:20px;">
+                        <?php foreach ($tpTomorrowFirkas as $_tf): ?>
+                        <li style="font-size:14px;font-weight:600;color:#1f2937;"><?php echo htmlspecialchars($_tf['firka_name']); ?> <span style="font-weight:400;color:#6b7280;">(<?php echo htmlspecialchars($_tf['district_name']); ?>)</span></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var _tpTomorrowEl = document.getElementById('tpTomorrowReminderModal');
+            if (_tpTomorrowEl && window.bootstrap) { new bootstrap.Modal(_tpTomorrowEl).show(); }
+        });
+    </script>
+    <?php endif; ?>
+
+    <?php if (!empty($tpFeedbackPending)): ?>
+    <!-- Month-end "rate your DM/SalesBDM" feedback — one star-rating form per
+         pending target, 5 questions each (1-5 stars = 1-5 points).
+         2026-11-24, user-requested. -->
+    <style>
+        .tp-star-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+        .tp-star-q { font-size:13px; color:#374151; flex:1; }
+        .tp-star-set { display:flex; gap:2px; flex-shrink:0; }
+        .tp-star { font-size:26px; color:#d1d5db; cursor:pointer; user-select:none; }
+        .tp-star.active { color:#f59e0b; }
+    </style>
+    <div class="modal fade" id="tpFeedbackModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#eef2ff;">
+                    <h5 class="modal-title" style="color:#3730a3;">It's your SalesBDM &amp; DM scoring time!</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:13px;color:#6b7280;margin-bottom:14px;">Share your feedback about our work this month — rate each question 1 to 5 stars.</p>
+                    <?php foreach ($tpFeedbackPending as $_fbIdx => $_fb): ?>
+                    <form method="post" action="submit-tp-staff-feedback.php" class="tp-feedback-form" style="margin-bottom:18px;<?php echo $_fbIdx > 0 ? 'border-top:2px solid #e1e0d9;padding-top:14px;' : ''; ?>">
+                        <input type="hidden" name="target_type" value="<?php echo htmlspecialchars($_fb['target_type']); ?>">
+                        <input type="hidden" name="target_id" value="<?php echo (int)$_fb['target_id']; ?>">
+                        <h6 style="font-weight:700;color:#1f2937;margin-bottom:4px;">
+                            Rate your <?php echo $_fb['target_type'] === 'salesbdm' ? 'SalesBDM' : 'DM'; ?> — <?php echo htmlspecialchars($_fb['name']); ?>
+                        </h6>
+                        <?php foreach ($_fb['questions'] as $_qIdx => $_qText): ?>
+                        <div class="tp-star-row">
+                            <span class="tp-star-q"><?php echo htmlspecialchars($_qText); ?></span>
+                            <input type="hidden" name="q<?php echo $_qIdx + 1; ?>" class="tp-star-value" value="0" required>
+                            <div class="tp-star-set">
+                                <?php for ($_s = 1; $_s <= 5; $_s++): ?>
+                                <span class="tp-star material-icons-outlined" data-val="<?php echo $_s; ?>">star</span>
+                                <?php endfor; ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                        <button type="submit" class="btn btn-primary btn-sm mt-2">Submit Rating</button>
+                    </form>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.tp-star-set').forEach(function (set) {
+                var stars = Array.prototype.slice.call(set.querySelectorAll('.tp-star'));
+                var valueInput = set.previousElementSibling;
+                stars.forEach(function (star) {
+                    star.addEventListener('click', function () {
+                        var val = parseInt(star.getAttribute('data-val'), 10);
+                        valueInput.value = val;
+                        stars.forEach(function (s) { s.classList.toggle('active', parseInt(s.getAttribute('data-val'), 10) <= val); });
+                    });
+                });
+            });
+            document.querySelectorAll('.tp-feedback-form').forEach(function (form) {
+                form.addEventListener('submit', function (e) {
+                    var unrated = form.querySelectorAll('.tp-star-value[value="0"]');
+                    if (unrated.length) {
+                        e.preventDefault();
+                        alert('Please rate all 5 questions before submitting.');
+                    }
+                });
+            });
+            var _tpFeedbackEl = document.getElementById('tpFeedbackModal');
+            if (_tpFeedbackEl && window.bootstrap) { new bootstrap.Modal(_tpFeedbackEl).show(); }
+        });
+    </script>
+    <?php endif; ?>
 
     <script src="../../assets/plugins/jquery/jquery-3.5.1.min.js"></script>
     <script src="../../assets/plugins/bootstrap/js/bootstrap.min.js"></script>

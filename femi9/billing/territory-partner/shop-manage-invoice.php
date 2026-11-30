@@ -2,6 +2,7 @@
 include("checksession.php");
 include("config.php");
 require_once __DIR__ . '/../shared/TpShopInvoiceActionRequest.php';
+require_once("include/ShopInvoiceHistory.php");
 error_reporting(0);
 
 $getinvuser       = "shop";
@@ -87,6 +88,8 @@ $i          = $start_from;
                                                 <th><?php echo $lablenamedisplay; ?></th>
                                                 <th>Invoice Date</th>
                                                 <th>Invoice Amount</th>
+                                                <th>Return Amount</th>
+                                                <th>Removed Amount</th>
                                                 <th>Print</th>
                                                 <th>Status</th>
                                                 <th>Edit</th>
@@ -101,13 +104,32 @@ $i          = $start_from;
 <?php
 $fetch_invoices = mysqli_query($db_conn,
     "SELECT * FROM user_invoice WHERE from_user_id='".db_esc($Login_user_IDvl)."' AND from_user_type='".db_esc($Login_user_TYPEvl)."' AND to_user_type='".db_esc($getinvuser)."' ORDER BY id DESC");
+$invoiceRowsAll = mysqli_fetch_all($fetch_invoices, MYSQLI_ASSOC);
+
+// Return Amount / Removed Amount — batched (not per-row) across every
+// invoice on this page, same N+1-avoidance pattern used elsewhere in this
+// codebase. Return Amount = accepted-or-not return value raised against
+// this invoice (user_return_stock_items.invnumber actually holds inv_id,
+// same convention as marketing/dashboard.php's own $returnByInv); Removed
+// Amount = ₹ value taken off via Remove / qty-reduction / Void (only
+// populated for changes made after 2026-11-21 — see ShopInvoiceHistory.php).
+// 2026-11-21, user-requested.
+$_allInvIds = array_column($invoiceRowsAll, 'inv_id');
+$returnAmountByInv = [];
+if (!empty($_allInvIds)) {
+    $_idListRa = "'" . implode("','", array_map(fn($v) => $db_conn->real_escape_string($v), $_allInvIds)) . "'";
+    $resRa = $db_conn->query("SELECT invnumber, COALESCE(SUM(subtotal),0) AS amt FROM user_return_stock_items WHERE invnumber IN ($_idListRa) GROUP BY invnumber");
+    if ($resRa) { while ($r = $resRa->fetch_assoc()) { $returnAmountByInv[$r['invnumber']] = (float)$r['amt']; } }
+}
+$removedAmountByInv = getShopInvoiceRemovedAmountByInvId($db_conn, $_allInvIds);
+
 // Delivery-note modals are buffered here and printed once, after </table>,
 // instead of inline inside each <tr> — a <div> nested directly between two
 // <td>s is invalid HTML that browsers silently "fix" by relocating it out
 // of the table, which was corrupting the row/column structure DataTables
 // parses on init and made it fail silently (no pagination, no search box).
 $dlModalsHtml = '';
-while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
+foreach ($invoiceRowsAll as $result_product_list) {
     $CuSTID       = $result_product_list['to_user_id'];
     $result_cust  = mysqli_fetch_array(mysqli_query($db_conn, "SELECT * FROM $tablename WHERE temp_id='".db_esc($CuSTID)."'"));
     $Cust_Name    = $result_cust['name']          ?? '---';
@@ -208,6 +230,16 @@ while ($result_product_list = mysqli_fetch_array($fetch_invoices)) {
 
                                                 <td><?php echo inr_format($result_product_list["total"], 2); ?>
                                                 <br/><a href="add-receipt.php?invid=<?php echo htmlspecialchars((string)($result_product_list["inv_id"]), ENT_QUOTES, 'ISO-8859-1', false); ?>&&invuser=<?php echo $getinvuser; ?>"><?php echo $msgpayment; ?></a>
+                                                </td>
+
+                                                <td>
+                                                <?php $_retAmt = $returnAmountByInv[$result_product_list["inv_id"]] ?? 0.0; ?>
+                                                <?php echo $_retAmt > 0 ? inr_format($_retAmt, 2) : '---'; ?>
+                                                </td>
+
+                                                <td>
+                                                <?php $_remAmt = $removedAmountByInv[$result_product_list["inv_id"]] ?? 0.0; ?>
+                                                <?php echo $_remAmt > 0 ? inr_format($_remAmt, 2) : '---'; ?>
                                                 </td>
 
                                                 <td style="white-space:nowrap;">

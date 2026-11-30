@@ -122,5 +122,89 @@ if (!isset($_SESSION['LOGIN_USER_NAME'])) {
     $_SESSION['LOGIN_USER_NAME'] = $result_LoGuserDtails['ms_name'];
 }
 
+// If this DM has any of today's own Firka assignments still unresolved
+// (nothing chosen yet, or chosen but not yet Accepted by the TP / Resolved
+// by ASM/Company), lock the whole portal to daily-work-start.php until it
+// clears -- same gate pattern as territory-partner/checksession.php's own
+// Accept/Deny block, mirrored here so the DM-side half of the chain is
+// enforced just as hard (2026-11-20, user request). Wrapped in try/catch and
+// behind a table-exists check for the same reason that one is: this must
+// never be able to lock everyone out just because the self-migrating
+// tp_daily_assignments table/columns are missing somewhere.
+// work-start-requests.php / work-start-resolve-action.php — the ONLY pages
+// that can resolve a subordinate DM's escalated "Ask ASM/Company" request —
+// were missing from this list. dmHasBlockingWorkStartToday() walks the
+// recursive subtree under this person's own scope nodes, so an ASM/SM gets
+// gated the moment ANY subordinate DM has an unresolved firka assignment,
+// not just their own. Without these two here, that ASM/SM had no way to
+// ever reach the one page that could clear the block — a deadlock, since
+// daily-work-start.php itself only lets a DM review their own direct
+// roster, with no UI for a subordinate's escalation. 2026-11-21,
+// code-review finding.
+//
+// manage-daily-assign-district-tps.php and its own AJAX endpoints — the
+// SAME deadlock class, one step earlier in the chain: the moment an ASM
+// uses this page to assign a TP to a Firka for today, that very row is
+// "pending"/"none" (tp_approval_status/company_request_status) until the
+// TP accepts or someone resolves it — which immediately satisfies
+// dmHasBlockingWorkStartToday() for the ASM's OWN session (the new row sits
+// inside their own subtree), gating every subsequent AJAX call this same
+// page makes. The "get-*" endpoints below already got the JSON error
+// response instead of a raw HTML redirect (see the AJAX detection further
+// down), but still silently lost their real assigned_tp_id/assigned_tp_name
+// payload — the frontend then reads that as "nothing assigned" and renders
+// "Vacant Area", even though the assignment it just saved is sitting right
+// there in the DB. Confirmed live: saving an assignment for Firka "Erode A"
+// (location_id 972, TP Thilagavathy.D) immediately re-showed "Vacant Area"
+// on the very next lookup. 2026-11-23, user-reported.
+$__dwsExemptPages = [
+    'daily-work-start.php', 'daily-work-start-action.php', 'work-start-requests.php', 'work-start-resolve-action.php',
+    'change-password.php', 'logout.php',
+    'manage-daily-assign-district-tps.php', 'get-tp-assign-staff.php', 'get-tp-assign-districts.php',
+    'get-tp-assign-divisions.php', 'get-tp-assign-firkas.php', 'get-tp-assign-tp-for-firka.php', 'tp-assign-firka-action.php',
+];
+$__dwsCurrentPage = basename($_SERVER['PHP_SELF'] ?? '');
+if (!in_array($__dwsCurrentPage, $__dwsExemptPages, true)) {
+    try {
+        $__dwsChk = $db_conn->query("SHOW TABLES LIKE 'tp_daily_assignments'");
+        if ($__dwsChk && $__dwsChk->num_rows > 0) {
+            $__dwsColChk = $db_conn->query("SHOW COLUMNS FROM tp_daily_assignments LIKE 'tp_approval_status'");
+            if ($__dwsColChk && $__dwsColChk->num_rows > 0) {
+                require_once __DIR__ . '/include/AssignedLocations.php';
+                require_once __DIR__ . '/../shared/TpWorkStart.php';
+                $__dwsScopeNodes = getMsAssignedTargetScopeNodes($db_conn, (int) $Login_user_IDvl);
+                $__dwsScopeIds = array_column($__dwsScopeNodes, 'id');
+                if (dmHasBlockingWorkStartToday($db_conn, $__dwsScopeIds)) {
+                    // An AJAX/action/export endpoint hit from an already-open tab
+                    // while blocked otherwise got this HTML redirect instead of
+                    // the JSON/binary payload its caller expects — JSON.parse on
+                    // the redirect's HTML body throws, so the save/lookup just
+                    // silently does nothing with no visible error. Detected by
+                    // filename convention (same "get-*.php" / "*-action.php"
+                    // naming this codebase already uses for its JSON endpoints)
+                    // or an explicit XMLHttpRequest header, whichever fires
+                    // first. 2026-11-21, code-review finding.
+                    $__dwsIsAjax = (strpos($__dwsCurrentPage, 'get-') === 0)
+                        || (substr($__dwsCurrentPage, -11) === '-action.php')
+                        || (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
+                    if ($__dwsIsAjax) {
+                        header('Content-Type: application/json');
+                        echo json_encode([
+                            'success' => false,
+                            'error'   => 'blocked_daily_work_start',
+                            'message' => "Today's Firka assignment needs to be resolved first — go to daily-work-start.php.",
+                        ]);
+                        exit;
+                    }
+                    header('Location: daily-work-start.php');
+                    exit;
+                }
+            }
+        }
+    } catch (\Throwable $e) {
+        // Fail open — never block the whole portal over this check.
+    }
+}
+
 // All checks passed - user is authenticated
 ?>

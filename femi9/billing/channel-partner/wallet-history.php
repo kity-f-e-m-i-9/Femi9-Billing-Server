@@ -228,12 +228,21 @@ while ($credit = mysqli_fetch_array($creditRes)):
             $whomMobile = $wr['mobile_number'] ?? '';
         }
     }
+    // A return against an already-credited Shop Wallet invoice writes a
+    // negative row here (see shared/CpShopWalletCommission.php) -- show it
+    // as a Reversal, not a Credit, so a negative rupee amount next to a
+    // "Credit" badge doesn't read as a mistake.
+    $isReversal = (float) $credit['commission_amount'] < 0;
 ?>
                                                 <li class="todo-item">
                                                     <div class="todo-item-content">
                                                         <span class="todo-item-title">
-                                                            &#8377;<?php echo inr_format($credit['commission_amount'], 2); ?>
+                                                            &#8377;<?php echo inr_format(abs((float) $credit['commission_amount']), 2); ?>
+                                                            <?php if ($isReversal): ?>
+                                                            <span class="badge badge-style-light rounded-pill badge-danger">Reversal (<?php echo htmlspecialchars($commType); ?>)</span>
+                                                            <?php else: ?>
                                                             <span class="badge badge-style-light rounded-pill badge-success">Credit (<?php echo htmlspecialchars($commType); ?>)</span>
+                                                            <?php endif; ?>
                                                         </span>
                                                         <?php if ($commType === 'Refferral' && $whomName): ?>
                                                         <span><b><?php echo htmlspecialchars(ucwords($whomName)); ?></b>
@@ -245,10 +254,12 @@ while ($credit = mysqli_fetch_array($creditRes)):
                                                         Cashback: <?php echo htmlspecialchars($credit['commission_percentage']); ?>%<br/>
                                                         <?php echo htmlspecialchars($credit['remarks'] ?? ''); ?>
                                                         <?php endif; ?>
-                                                        <?php if ($commType !== 'Website Order Commission'): ?>
-                                                        <span class="todo-item-subtitle"><?php echo htmlspecialchars($credit['month'] ?? ''); ?>, <?php echo htmlspecialchars($credit['year'] ?? ''); ?></span>
-                                                        <?php else: ?>
+                                                        <?php if ($commType === 'Website Order Commission'): ?>
                                                         <span class="todo-item-subtitle">Website Order Commission (OT Sales)<br/><?php echo htmlspecialchars($credit['remarks'] ?? ''); ?></span>
+                                                        <?php elseif ($commType === 'Shop Wallet'): ?>
+                                                        <span class="todo-item-subtitle"><?php echo $isReversal ? 'Return clawback' : 'Shop Invoice commission'; ?> (<?php echo htmlspecialchars($credit['commission_percentage']); ?>%)<br/><?php echo htmlspecialchars($credit['remarks'] ?? ''); ?></span>
+                                                        <?php else: ?>
+                                                        <span class="todo-item-subtitle"><?php echo htmlspecialchars($credit['month'] ?? ''); ?>, <?php echo htmlspecialchars($credit['year'] ?? ''); ?></span>
                                                         <?php endif; ?>
                                                     </div>
                                                 </li>

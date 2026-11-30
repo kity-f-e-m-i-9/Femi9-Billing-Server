@@ -19,9 +19,8 @@ $_tp_can_invoice = $_menu_tp_row && (int)$_menu_tp_row['stock_initialized'] === 
         </li>
 
         <li>
-            <a href="#"><i class="material-icons-two-tone">assignment_turned_in</i>Field Order<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
+            <a href="#"><i class="material-icons-two-tone">assignment_turned_in</i>DM Orders<i class="material-icons has-sub-menu">keyboard_arrow_right</i></a>
             <ul class="sub-menu">
-                <li><a href="add-order.php">Add Order</a></li>
                 <li><a href="manage-orders.php">Manage Orders</a></li>
             </ul>
         </li>

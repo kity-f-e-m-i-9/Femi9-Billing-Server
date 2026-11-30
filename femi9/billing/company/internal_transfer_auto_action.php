@@ -319,6 +319,19 @@ try {
         // WRONG order purely by PO-id order, leaving the order the user
         // actually meant to exclude falsely shown as (partly) fulfilled
         // while the one they wanted transferred stayed untouched.
+        // Shop (DM Get Order invoices) deliberately excluded from this walk —
+        // user request, 2026-11-17: "Transfer Now" (this TP/CP/OT
+        // replenishment action) must never touch Shop Invoice stock at all,
+        // not even when a replenishment run happens to bring in enough for
+        // both. Shop Invoices only ever release via their own dedicated
+        // "Release Shop Invoice Stock" button/action
+        // (release-shop-invoice-stock-action.php), which checks each
+        // invoice's own warehouse's current stock independently — including
+        // whatever this replenishment just brought into LLP. Any stock this
+        // run pulls in on Shop's behalf (it's still part of $available/
+        // $legTwoQty's sizing) simply sits in LLP until that separate button
+        // is clicked; OT picks up whatever Shop would otherwise have claimed
+        // here, same lowest-priority-last ordering as before.
         $remaining = $legTwoQty;
         foreach (['tp', 'cp', 'ot'] as $sourceType) {
             foreach ($contributingOrders[$sourceType] as $order) {

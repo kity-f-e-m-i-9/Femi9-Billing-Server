@@ -29,6 +29,25 @@
 
     <link rel="icon" type="image/png" sizes="32x32" href="../../assets/images/neptune.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../../assets/images/neptune.png" />
+    <style>
+        .tp-tag { font-size:11px; padding:3px 9px; border-radius:6px; font-weight:600; white-space:nowrap; display:inline-block; }
+        .tp-tag-good    { background:#e5f7e5; color:#0ca30c; }
+        .tp-tag-bad     { background:#fbe6e6; color:#d03b3b; }
+        .tp-tag-neutral { background:#f0f1f2; color:#52525b; }
+        .tp-stat-hoverable { position:relative; cursor:default; }
+        .tp-stat-tooltip {
+            display:none; position:absolute; top:100%; left:0; margin-top:6px;
+            z-index:50; background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+            box-shadow:0 8px 24px rgba(16,24,40,.14); padding:10px 12px;
+            min-width:180px; max-width:260px; max-height:240px; overflow-y:auto; text-align:left;
+            font-size:12.5px; color:#374151;
+        }
+        .tp-stat-hoverable:hover .tp-stat-tooltip,
+        .tp-stat-hoverable:focus-within .tp-stat-tooltip,
+        .tp-stat-hoverable:focus .tp-stat-tooltip { display:block; }
+        .tp-stat-tooltip-row { padding:3px 0; border-bottom:1px solid #f8fafc; }
+        .tp-stat-tooltip-row:last-child { border-bottom:none; }
+    </style>
 
     <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
     <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
@@ -69,6 +88,27 @@
 								}
 						
 						$se_msid=$_REQUEST['se_msid'];
+						$mt_filter = $_REQUEST['mt_filter'] ?? '';
+						if (!in_array($mt_filter, ['', 'available', 'not_available'], true)) { $mt_filter = ''; }
+
+						// Same marketing_tool parsing as territory-partner/manage-orders.php's
+						// mt_filter (add_order.php's Available/Not Available toggle + tool
+						// checkboxes, 2026-11-30) — kept as a separate copy here since this
+						// page has no shared include to pull it from, matching this
+						// portal's existing per-folder helper convention (see
+						// RemoveSpecialChar.php). 2026-11-30, user-requested.
+						function parseMarketingTool(?string $raw): array {
+						    $raw = trim((string)$raw);
+						    if ($raw === '') { return ['status' => null, 'tools' => [], 'raw' => '']; }
+						    foreach (['Available', 'Not Available'] as $prefix) {
+						        if (stripos($raw, $prefix . ':') === 0) {
+						            $toolsPart = substr($raw, strlen($prefix) + 1);
+						            $tools = array_values(array_filter(array_map('trim', explode(',', $toolsPart)), fn($t) => $t !== ''));
+						            return ['status' => $prefix, 'tools' => $tools, 'raw' => $raw];
+						        }
+						    }
+						    return ['status' => null, 'tools' => [], 'raw' => $raw];
+						}
 						//
 						$select_msDetails12="select * from marketing_staff where id=?";
 $fetch_msDetails12=db_q($db_conn,$select_msDetails12,[$se_msid]);
@@ -116,6 +156,14 @@ while($result_msDetailsOPT=mysqli_fetch_array($fetch_msDetailsOPT))
 ?>
 <option value="<?=htmlspecialchars((string)($result_msDetailsOPT['id']), ENT_QUOTES, 'ISO-8859-1', false);?>"><?=htmlspecialchars((string)(strtoupper($result_msDetailsOPT['ms_name'])), ENT_QUOTES, 'ISO-8859-1', false);?>, <?=htmlspecialchars((string)($result_msDetailsOPT['ms_mobile']), ENT_QUOTES, 'ISO-8859-1', false);?></option>
 <?php }?>
+</select>
+</div>
+<div id="searchleftcont">
+<label class="form-label">Marketing Tool</label>
+<select name="mt_filter" class="form-control">
+<option value="" <?=$mt_filter===''?'selected':''?>>All</option>
+<option value="available" <?=$mt_filter==='available'?'selected':''?>>Available</option>
+<option value="not_available" <?=$mt_filter==='not_available'?'selected':''?>>Not Available</option>
 </select>
 </div>
 <div id="searchbuttoncont">
@@ -174,9 +222,23 @@ if($from_date!=NULL && $se_msid!=NULL)
 {
 $select_product_list="select * from ms_orders where new_order='no' and order_date between ? and ? and ms_id=? order by id desc";
 }
-$fetch_product_list=db_q($db_conn,$select_product_list,[$from_date,$to_date,$se_msid]);
-while($result_product_list12=mysqli_fetch_array($fetch_product_list))
-{						
+// db_q() only takes params when the SQL actually has that many '?'
+// placeholders (branch 3 above) — the other two branches already inline
+// their values via db_esc(), so passing params there made db_q() return
+// false (0 placeholders !== 3 values), which crashed this page with a
+// TypeError on PHP 8.1+ the moment someone searched by date range without
+// picking a Marketing Staff. Pre-existing bug, found while adding the
+// Marketing Tool filter below (which also needed the result set as a plain
+// array instead of a row-at-a-time while-loop). 2026-11-30.
+$_noorderParams = ($from_date!=NULL && $se_msid!=NULL) ? [$from_date,$to_date,$se_msid] : [];
+$fetch_product_list=db_q($db_conn,$select_product_list,$_noorderParams);
+$_noorder_rows = $fetch_product_list ? mysqli_fetch_all($fetch_product_list, MYSQLI_ASSOC) : [];
+if ($mt_filter !== '') {
+    $_wantStatus = $mt_filter === 'available' ? 'Available' : 'Not Available';
+    $_noorder_rows = array_filter($_noorder_rows, fn($r) => parseMarketingTool($r['marketing_tool'] ?? '')['status'] === $_wantStatus);
+}
+foreach ($_noorder_rows as $result_product_list12)
+{
 
 
 //shop category
@@ -203,7 +265,36 @@ $result_msDetails=mysqli_fetch_array($fetch_msDetails);
 					
 					<td><?=date("d/m/Y",strtotime($result_product_list12["order_date"]));?></td>
 					<td><?=htmlspecialchars((string)($result_product_list12["noorder_reason"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
-					<td><?=htmlspecialchars((string)($result_product_list12["marketing_tool"]), ENT_QUOTES, 'ISO-8859-1', false);?></td>
+					<td>
+					<?php $mtp = parseMarketingTool($result_product_list12["marketing_tool"] ?? ''); ?>
+					<?php if ($mtp['status'] === 'Available'): ?>
+					<span class="tp-tag tp-tag-good tp-stat-hoverable" tabindex="0">Available
+						<div class="tp-stat-tooltip">
+							<?php if (empty($mtp['tools'])): ?>
+							<div class="tp-stat-tooltip-row text-muted">None listed.</div>
+							<?php else: foreach ($mtp['tools'] as $tool): ?>
+							<div class="tp-stat-tooltip-row"><?=htmlspecialchars($tool)?></div>
+							<?php endforeach; endif; ?>
+						</div>
+					</span>
+					<?php elseif ($mtp['status'] === 'Not Available'): ?>
+					<span class="tp-tag tp-tag-bad tp-stat-hoverable" tabindex="0">Not Available
+						<div class="tp-stat-tooltip">
+							<?php if (empty($mtp['tools'])): ?>
+							<div class="tp-stat-tooltip-row text-muted">None listed.</div>
+							<?php else: foreach ($mtp['tools'] as $tool): ?>
+							<div class="tp-stat-tooltip-row"><?=htmlspecialchars($tool)?></div>
+							<?php endforeach; endif; ?>
+						</div>
+					</span>
+					<?php elseif ($mtp['raw'] !== ''): ?>
+					<span class="tp-tag tp-tag-neutral tp-stat-hoverable" tabindex="0">Noted
+						<div class="tp-stat-tooltip"><div class="tp-stat-tooltip-row"><?=htmlspecialchars($mtp['raw'])?></div></div>
+					</span>
+					<?php else: ?>
+					<span class="text-muted">-</span>
+					<?php endif; ?>
+					</td>
 													
 	
                                                 </tr>

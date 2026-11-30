@@ -1,6 +1,7 @@
 <?php
 include("checksession.php");
 include("config.php");
+require_once(__DIR__ . '/../shared/TpOrderInvoiceLookup.php');
 error_reporting(0);
 
 date_default_timezone_set("Asia/Kolkata");
@@ -10,12 +11,45 @@ $to_date   = $_REQUEST['todate'] ?? $today;
 $status_filter = $_REQUEST['status_filter'] ?? 'pending';
 if (!in_array($status_filter, ['pending', 'incomplete', 'completed'], true)) { $status_filter = 'pending'; }
 $shop_search = trim($_REQUEST['shop_search'] ?? '');
+$mt_filter = $_REQUEST['mt_filter'] ?? '';
+if (!in_array($mt_filter, ['', 'available', 'not_available'], true)) { $mt_filter = ''; }
+
+// marketing_tool is stored as "Available: Tool1, Tool2" / "Not Available:
+// Tool1, Tool2" (add_order.php's Available/Not Available toggle + tool
+// checkboxes, 2026-11-30) — parsed back into a status + tool list for the
+// badge/tooltip and the mt_filter dropdown below. A pre-2026-11-30 order's
+// plain free-text value matches neither prefix — shown as-is with no status
+// badge (status null), and never matches an Available/Not Available filter.
+function parseMarketingTool(?string $raw): array {
+    $raw = trim((string)$raw);
+    if ($raw === '') { return ['status' => null, 'tools' => [], 'raw' => '']; }
+    foreach (['Available', 'Not Available'] as $prefix) {
+        if (stripos($raw, $prefix . ':') === 0) {
+            $toolsPart = substr($raw, strlen($prefix) + 1);
+            $tools = array_values(array_filter(array_map('trim', explode(',', $toolsPart)), fn($t) => $t !== ''));
+            return ['status' => $prefix, 'tools' => $tools, 'raw' => $raw];
+        }
+    }
+    return ['status' => null, 'tools' => [], 'raw' => $raw];
+}
+
+// invoiced_at — when the Convert button actually linked this order to an
+// invoice (separate from the invoice's own created_at, which is when that
+// invoice itself was first raised — could be a much earlier date for an
+// invoice that already existed). Self-migrating, same pattern as every
+// other ad-hoc column added this session. 2026-11-24, user-requested
+// ("invoice potta time anga varanum... convert ah click panna time also
+// varanum").
+$_chkInvoicedAt = $db_conn->query("SHOW COLUMNS FROM tp_orders LIKE 'invoiced_at'");
+if ($_chkInvoicedAt && $_chkInvoicedAt->num_rows === 0) {
+    $db_conn->query("ALTER TABLE tp_orders ADD COLUMN invoiced_at DATETIME NULL DEFAULT NULL AFTER invoiced_inv_id");
+}
 
 $stmt = mysqli_prepare($db_conn,
     "SELECT o.id, o.order_id, o.order_date, o.new_order, o.noorder_reason, o.marketing_tool,
-            o.pr_id, o.qty, o.invoiced_inv_id, o.assigned_by_ms_id, o.voided_at, o.void_reason,
-            s.name shop_name, s.latitude shop_lat, s.longitude shop_lng, s.mobile_number shop_mobile,
-            p.productName, p.gst AS p_gst, dm.ms_name, mo.dm_lat, mo.dm_lng, ui.inv_number
+            o.pr_id, o.qty, o.invoiced_inv_id, o.invoiced_at, o.assigned_by_ms_id, o.voided_at, o.void_reason,
+            s.name shop_name, s.latitude shop_lat, s.longitude shop_lng, s.mobile_number shop_mobile, s.temp_id shop_temp_id,
+            p.productName, p.gst AS p_gst, dm.ms_name, mo.dm_lat, mo.dm_lng, ui.inv_number, ui.created_at AS inv_created_at
      FROM tp_orders o
      LEFT JOIN shop s ON s.id=o.shop_id
      LEFT JOIN products p ON p.id=o.pr_id
@@ -40,9 +74,12 @@ foreach ($rows as $r) {
             'shop_name'  => $r['shop_name'],
             'shop_lat'   => $r['shop_lat'],
             'shop_lng'   => $r['shop_lng'],
+            'shop_temp_id' => $r['shop_temp_id'],
             'new_order'  => $r['new_order'],
             'noorder_reason' => $r['noorder_reason'],
+            'marketing_tool' => $r['marketing_tool'],
             'invoiced_inv_id' => $r['invoiced_inv_id'],
+            'invoiced_at' => $r['invoiced_at'],
             'assigned_by_ms_id' => $r['assigned_by_ms_id'],
             'voided_at'  => $r['voided_at'],
             'void_reason' => $r['void_reason'],
@@ -51,6 +88,7 @@ foreach ($rows as $r) {
             'dm_name'    => $r['ms_name'],
             'shop_mobile' => $r['shop_mobile'],
             'inv_number' => $r['inv_number'],
+            'inv_created_at' => $r['inv_created_at'],
             'lines'      => [],
         ];
     }
@@ -97,6 +135,32 @@ $visits = array_filter($visits, fn($v) => $v['invoice_status'] === $status_filte
 if ($shop_search !== '') {
     $visits = array_filter($visits, fn($v) => stripos($v['shop_name'] ?? '', $shop_search) !== false);
 }
+
+foreach ($visits as $oid => &$v) {
+    $v['marketing_tool_parsed'] = parseMarketingTool($v['marketing_tool'] ?? '');
+}
+unset($v);
+
+if ($mt_filter === 'available') {
+    $visits = array_filter($visits, fn($v) => $v['marketing_tool_parsed']['status'] === 'Available');
+} elseif ($mt_filter === 'not_available') {
+    $visits = array_filter($visits, fn($v) => $v['marketing_tool_parsed']['status'] === 'Not Available');
+}
+
+// Shop invoices this TP can link a "pending" Get Order to, via the Convert
+// button — every invoice this TP has already raised to that shop (not just
+// ones auto-created from a field order), batched by shop temp_id so the
+// Convert modal needs no extra round trip. Only built for shops that
+// actually have a pending (not yet invoiced/voided) visit, since that's the
+// only state the Convert button shows for. Duplicate-shop-aware (see
+// shared/TpOrderInvoiceLookup.php). 2026-11-24, user-requested.
+$_pendingShopsForLookup = [];
+foreach ($visits as $v) {
+    if ($v['invoice_status'] === 'pending' && !empty($v['shop_temp_id'])) {
+        $_pendingShopsForLookup[$v['shop_temp_id']] = ['name' => $v['shop_name'] ?? '', 'mobile' => $v['shop_mobile'] ?? ''];
+    }
+}
+$invoicesByShopTempId = getInvoicesByShopTempIdForTp($db_conn, (int)$Login_user_IDvl, $_pendingShopsForLookup);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -104,7 +168,7 @@ if ($shop_search !== '') {
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Manage Field Orders : <?php echo $business_name;?></title>
+    <title>Manage DM Orders : <?php echo $business_name;?></title>
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Two+Tone|Material+Icons+Round|Material+Icons+Sharp" rel="stylesheet">
@@ -154,6 +218,24 @@ if ($shop_search !== '') {
         .tp-location-link:hover { color:#1a5eb0; background:#dcebfb; }
         .tp-line-item { font-size:12.5px; color:#3a3a38; }
         .tp-line-item + .tp-line-item { margin-top:2px; }
+
+        /* Marketing Tool badge hover — click/tap or hover shows which tools
+           the DM actually noted (Available: what's there / Not Available:
+           what's needed), same popover pattern as the dashboard's own
+           hoverable stat cards. 2026-11-30, user-requested. */
+        .tp-stat-hoverable { position:relative; cursor:default; }
+        .tp-stat-tooltip {
+            display:none; position:absolute; top:100%; left:0; margin-top:6px;
+            z-index:50; background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+            box-shadow:0 8px 24px rgba(16,24,40,.14); padding:10px 12px;
+            min-width:180px; max-width:260px; max-height:240px; overflow-y:auto; text-align:left;
+            font-size:12.5px; color:#374151;
+        }
+        .tp-stat-hoverable:hover .tp-stat-tooltip,
+        .tp-stat-hoverable:focus-within .tp-stat-tooltip,
+        .tp-stat-hoverable:focus .tp-stat-tooltip { display:block; }
+        .tp-stat-tooltip-row { padding:3px 0; border-bottom:1px solid #f8fafc; }
+        .tp-stat-tooltip-row:last-child { border-bottom:none; }
     </style>
 </head>
 <body>
@@ -169,17 +251,11 @@ if ($shop_search !== '') {
                     <div class="container-fluid">
 
                         <div class="row">
-                            <div class="col">
+                            <div class="col d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div class="page-description">
-                                    <h1>
-                                        <table class="headertble">
-                                            <tr>
-                                                <td>Manage Field Orders</td>
-                                                <td><a href="add-order.php" title="Add Order"><i class="material-icons">add</i></a></td>
-                                            </tr>
-                                        </table>
-                                    </h1>
+                                    <h1>Manage DM Orders</h1>
                                 </div>
+                                <a href="export-field-orders-xlsx.php?frdate=<?=urlencode($from_date)?>&todate=<?=urlencode($to_date)?>&status_filter=<?=urlencode($status_filter)?>&shop_search=<?=urlencode($shop_search)?>&mt_filter=<?=urlencode($mt_filter)?>" class="btn btn-sm btn-outline-success"><i class="material-icons" style="font-size:15px;vertical-align:middle;">download</i> Export Excel</a>
                             </div>
                         </div>
 
@@ -208,6 +284,14 @@ if ($shop_search !== '') {
                                 </select>
                             </div>
                             <div class="col-auto">
+                                <label class="form-label">Marketing Tool</label>
+                                <select name="mt_filter" class="form-control">
+                                    <option value="" <?=$mt_filter===''?'selected':''?>>All</option>
+                                    <option value="available" <?=$mt_filter==='available'?'selected':''?>>Available</option>
+                                    <option value="not_available" <?=$mt_filter==='not_available'?'selected':''?>>Not Available</option>
+                                </select>
+                            </div>
+                            <div class="col-auto">
                                 <label class="form-label">Shop Name</label>
                                 <input type="text" name="shop_search" value="<?=htmlspecialchars($shop_search)?>" placeholder="Search shop..." class="form-control">
                             </div>
@@ -228,23 +312,19 @@ if ($shop_search !== '') {
                                                     <th>Shop</th>
                                                     <th>Status</th>
                                                     <th>Details</th>
+                                                    <th>Marketing Tool</th>
+                                                    <th>Location</th>
                                                     <th>Invoice</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <?php if (empty($visits)): ?>
-                                                <tr><td colspan="5" class="text-center text-muted">No field order entries in this date range.</td></tr>
+                                                <tr><td colspan="7" class="text-center text-muted">No field order entries in this date range.</td></tr>
                                                 <?php else: foreach ($visits as $oid => $v): ?>
                                                 <tr>
                                                     <td><?=htmlspecialchars(date("d-m-Y", strtotime($v['order_date'])))?></td>
                                                     <td>
                                                         <?=htmlspecialchars($v['shop_name'] ?? '-')?>
-                                                        <?php if (!empty($v['shop_lat']) && !empty($v['shop_lng'])): ?>
-                                                        <br/><a href="https://www.google.com/maps?q=<?=htmlspecialchars($v['shop_lat'])?>,<?=htmlspecialchars($v['shop_lng'])?>" target="_blank" class="tp-location-link">Shop Location</a>
-                                                        <?php endif; ?>
-                                                        <?php if (!empty($v['dm_lat']) && !empty($v['dm_lng'])): ?>
-                                                        <br/><a href="https://www.google.com/maps?q=<?=htmlspecialchars($v['dm_lat'])?>,<?=htmlspecialchars($v['dm_lng'])?>" target="_blank" class="tp-location-link">Order Location (DM)</a>
-                                                        <?php endif; ?>
                                                     </td>
                                                     <td>
                                                         <?php if ($v['new_order'] === 'yes'): ?>
@@ -266,19 +346,79 @@ if ($shop_search !== '') {
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
+                                                        <?php $mtp = $v['marketing_tool_parsed']; ?>
+                                                        <?php if ($mtp['status'] === 'Available'): ?>
+                                                        <span class="tp-tag tp-tag-good tp-stat-hoverable" tabindex="0">Available
+                                                            <div class="tp-stat-tooltip">
+                                                                <?php if (empty($mtp['tools'])): ?>
+                                                                <div class="tp-stat-tooltip-row text-muted">None listed.</div>
+                                                                <?php else: foreach ($mtp['tools'] as $tool): ?>
+                                                                <div class="tp-stat-tooltip-row"><?=htmlspecialchars($tool)?></div>
+                                                                <?php endforeach; endif; ?>
+                                                            </div>
+                                                        </span>
+                                                        <?php elseif ($mtp['status'] === 'Not Available'): ?>
+                                                        <span class="tp-tag tp-tag-bad tp-stat-hoverable" tabindex="0">Not Available
+                                                            <div class="tp-stat-tooltip">
+                                                                <?php if (empty($mtp['tools'])): ?>
+                                                                <div class="tp-stat-tooltip-row text-muted">None listed.</div>
+                                                                <?php else: foreach ($mtp['tools'] as $tool): ?>
+                                                                <div class="tp-stat-tooltip-row"><?=htmlspecialchars($tool)?></div>
+                                                                <?php endforeach; endif; ?>
+                                                            </div>
+                                                        </span>
+                                                        <?php elseif ($mtp['raw'] !== ''): ?>
+                                                        <span class="tp-tag tp-tag-neutral tp-stat-hoverable" tabindex="0">Noted
+                                                            <div class="tp-stat-tooltip"><div class="tp-stat-tooltip-row"><?=htmlspecialchars($mtp['raw'])?></div></div>
+                                                        </span>
+                                                        <?php else: ?>
+                                                        <span class="text-muted">-</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if (!empty($v['dm_lat']) && !empty($v['dm_lng'])): ?>
+                                                        <div style="margin-bottom:6px;">
+                                                            <span class="text-muted" style="font-size:11px;display:block;">DM Order Location</span>
+                                                            <a href="javascript:void(0);" onclick="copyLatLng(this,'<?=htmlspecialchars($v['dm_lat'], ENT_QUOTES)?>','<?=htmlspecialchars($v['dm_lng'], ENT_QUOTES)?>');" class="tp-location-link">Copy</a>
+                                                        </div>
+                                                        <?php else: ?>
+                                                        <div style="margin-bottom:6px;"><span class="text-muted" style="font-size:11px;display:block;">DM Order Location</span><span class="text-muted">&mdash;</span></div>
+                                                        <?php endif; ?>
+                                                        <?php if (!empty($v['shop_lat']) && !empty($v['shop_lng'])): ?>
+                                                        <div>
+                                                            <span class="text-muted" style="font-size:11px;display:block;">Shop Location</span>
+                                                            <a href="javascript:void(0);" onclick="copyLatLng(this,'<?=htmlspecialchars($v['shop_lat'], ENT_QUOTES)?>','<?=htmlspecialchars($v['shop_lng'], ENT_QUOTES)?>');" class="tp-location-link">Copy</a>
+                                                        </div>
+                                                        <?php else: ?>
+                                                        <div><span class="text-muted" style="font-size:11px;display:block;">Shop Location</span><span class="text-muted">&mdash;</span></div>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
                                                         <?php if ($v['new_order'] === 'yes'): ?>
                                                             <?php if (!empty($v['voided_at'])): ?>
-                                                            <span class="tp-tag tp-tag-bad" <?php if (!empty($v['void_reason'])): ?>title="<?=htmlspecialchars($v['void_reason'])?>"<?php endif; ?>>Cancelled</span>
+                                                            <span class="tp-tag tp-tag-bad" <?php if (!empty($v['void_reason'])): ?>title="<?=htmlspecialchars($v['void_reason'])?>"<?php endif; ?>>Not Converted</span>
                                                             <?php if (!empty($v['void_reason'])): ?>
                                                             <div class="text-muted" style="font-size:11px;margin-top:3px;">Reason: <?=htmlspecialchars($v['void_reason'])?></div>
                                                             <?php endif; ?>
                                                             <?php elseif (!empty($v['invoiced_inv_id']) && isset($completedInvIds[$v['invoiced_inv_id']])): ?>
                                                             <a href="shop-invoice-print.php?invoiceid=<?=base64_encode($v['invoiced_inv_id'])?>" class="tp-action-link tp-action-success" target="_blank">Completed Invoice</a>
+                                                            <?php if (!empty($v['inv_created_at'])): ?>
+                                                            <div class="text-muted" style="font-size:11px;margin-top:3px;">Invoice placed: <?=htmlspecialchars(date('d-m-Y h:i A', strtotime($v['inv_created_at'])))?></div>
+                                                            <?php endif; ?>
+                                                            <?php if (!empty($v['invoiced_at'])): ?>
+                                                            <div class="text-muted" style="font-size:11px;">Converted: <?=htmlspecialchars(date('d-m-Y h:i A', strtotime($v['invoiced_at'])))?></div>
+                                                            <?php endif; ?>
                                                             <?php elseif (!empty($v['invoiced_inv_id'])): ?>
                                                             <a href="shop-invoice-add.php?InvoiceID=<?=base64_encode($v['invoiced_inv_id'])?>&invuser=shop&action=edit" class="tp-action-link tp-action-primary">Continue Invoice</a>
+                                                            <?php if (!empty($v['inv_created_at'])): ?>
+                                                            <div class="text-muted" style="font-size:11px;margin-top:3px;">Invoice placed: <?=htmlspecialchars(date('d-m-Y h:i A', strtotime($v['inv_created_at'])))?></div>
+                                                            <?php endif; ?>
+                                                            <?php if (!empty($v['invoiced_at'])): ?>
+                                                            <div class="text-muted" style="font-size:11px;">Converted: <?=htmlspecialchars(date('d-m-Y h:i A', strtotime($v['invoiced_at'])))?></div>
+                                                            <?php endif; ?>
                                                             <?php else: ?>
-                                                            <a href="order-to-invoice.php?order_id=<?=urlencode($oid)?>" onclick="return confirm('Create an invoice for this order, using the shop and product/qty exactly as captured here?');" class="tp-action-link tp-action-primary">Invoice</a>
-                                                            <a href="javascript:void(0);" onclick="openCancelOrderModal('<?=htmlspecialchars($oid, ENT_QUOTES)?>');" class="tp-action-link tp-action-danger" style="margin-left:6px;">Cancel</a>
+                                                            <a href="javascript:void(0);" onclick="openConvertModal('<?=htmlspecialchars($oid, ENT_QUOTES)?>','<?=htmlspecialchars($v['shop_temp_id'] ?? '', ENT_QUOTES)?>','<?=htmlspecialchars($v['shop_name'] ?? '', ENT_QUOTES)?>');" class="tp-action-link tp-action-primary">Convert</a>
+                                                            <a href="javascript:void(0);" onclick="openCancelOrderModal('<?=htmlspecialchars($oid, ENT_QUOTES)?>');" class="tp-action-link tp-action-danger" style="margin-left:6px;">Not Convert</a>
                                                             <?php endif; ?>
                                                         <?php else: ?>
                                                             <span class="text-muted">&mdash;</span>
@@ -300,23 +440,47 @@ if ($shop_search !== '') {
         </div>
     </div>
 
-    <!-- Cancel Order modal — a reason is required before the order is voided -->
+    <!-- Not Convert modal — a reason is required before the order is marked Not Converted -->
     <div class="modal fade" id="cancelOrderModal" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <form method="post" action="void-order.php" id="cancelOrderForm">
                     <div class="modal-header">
-                        <h5 class="modal-title">Cancel Order</h5>
+                        <h5 class="modal-title">Not Convert</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="order_id" id="cancelOrderIdField" value="">
-                        <label class="form-label">Reason for cancelling the order <span style="color:red;">*</span></label>
+                        <label class="form-label">Reason for not converting this order <span style="color:red;">*</span></label>
                         <textarea name="void_reason" id="cancelOrderReasonField" class="form-control" rows="3" required maxlength="255" placeholder="e.g. Shop no longer wants this product"></textarea>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-danger">Confirm Cancel</button>
+                        <button type="submit" class="btn btn-danger">Confirm</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Convert modal — pick one of this shop's already-raised invoices to
+         link this Get Order to. 2026-11-24, user-requested. -->
+    <div class="modal fade" id="convertOrderModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" action="convert-order-invoice.php" id="convertOrderForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Convert — <span id="convertShopName"></span></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="order_id" id="convertOrderIdField" value="">
+                        <label class="form-label">Pick the invoice already raised to this shop</label>
+                        <div id="convertInvoiceList" style="max-height:300px;overflow-y:auto;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" id="convertConfirmBtn" class="tp-action-link tp-action-primary" style="border:none;font-size:14px;padding:8px 16px;" disabled>Confirm Convert</button>
                     </div>
                 </form>
             </div>
@@ -337,6 +501,55 @@ if ($shop_search !== '') {
         var modalEl = document.getElementById('cancelOrderModal');
         var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
         modal.show();
+    }
+
+    var invoicesByShopTempId = <?php echo json_encode($invoicesByShopTempId); ?>;
+
+    function openConvertModal(orderId, shopTempId, shopName) {
+        document.getElementById('convertOrderIdField').value = orderId;
+        document.getElementById('convertShopName').textContent = shopName;
+        var listEl = document.getElementById('convertInvoiceList');
+        var invoices = invoicesByShopTempId[shopTempId] || [];
+        if (!invoices.length) {
+            listEl.innerHTML = '<p class="text-muted">No invoices found for this shop yet.</p>';
+        } else {
+            listEl.innerHTML = invoices.map(function (inv) {
+                var badge = inv.completed
+                    ? '<span class="tp-tag tp-tag-good" style="margin-left:6px;">Completed</span>'
+                    : '<span class="tp-tag tp-tag-neutral" style="margin-left:6px;">Draft</span>';
+                var placedLine = inv.placed_at ? '<div class="text-muted" style="font-size:11px;">Invoice placed: ' + inv.placed_at + '</div>' : '';
+                return '<label style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #e1e0d9;cursor:pointer;">' +
+                    '<input type="radio" name="inv_id" value="' + inv.inv_id + '" required>' +
+                    '<div><span>' + inv.inv_number + ' &mdash; ' + inv.date + '</span>' + badge + placedLine + '</div>' +
+                    '</label>';
+            }).join('');
+        }
+        // Single Confirm Convert button lives in the modal-footer (not
+        // duplicated inside the list) — disabled until a radio is picked, or
+        // whenever there's nothing to convert to. 2026-11-24, user-reported
+        // ("rendu close button... confirm convert button venum size ku").
+        var confirmBtn = document.getElementById('convertConfirmBtn');
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            listEl.onchange = function () { confirmBtn.disabled = false; };
+        }
+        var modalEl = document.getElementById('convertOrderModal');
+        var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+
+    function copyLatLng(el, lat, lng) {
+        var text = lat + ',' + lng;
+        var done = function () {
+            var orig = el.textContent;
+            el.textContent = 'Copied!';
+            setTimeout(function () { el.textContent = orig; }, 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done, function () { window.prompt('Copy this location:', text); });
+        } else {
+            window.prompt('Copy this location:', text);
+        }
     }
     </script>
 </body>

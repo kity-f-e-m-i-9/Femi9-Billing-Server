@@ -1,6 +1,7 @@
 <?php include("checksession.php");
 include("config.php");
 require_once("include/TeamSubtree.php");
+require_once(__DIR__ . '/../shared/TpOrderInvoiceLookup.php');
 error_reporting(0);
 
 // A manager (SM/ASM) can view a report scoped to any person in their own
@@ -123,6 +124,20 @@ $successMessage = $_SESSION['successMessage'];
                         });
 					</script>
 <?php  unset($_SESSION['successMessage']); } ?>
+<?php
+if (isset($_SESSION['errorMessage'])) {
+$errorMessageMop = $_SESSION['errorMessage'];
+?>
+                      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+                      <script>
+                        Swal.fire({
+                          icon: 'error',
+                          title: 'Error',
+                          text: '<?php echo htmlspecialchars($errorMessageMop, ENT_QUOTES); ?>',
+                          confirmButtonText: 'OK'
+                        });
+					</script>
+<?php  unset($_SESSION['errorMessage']); } ?>
 
     <div class="app align-content-stretch d-flex flex-wrap">
 	
@@ -152,6 +167,13 @@ $successMessage = $_SESSION['successMessage'];
 										$from_date=$_REQUEST['frdate'];
 										$to_date=$_REQUEST['todate'];
 									}
+
+// TP Status filter — same Pending/Incomplete/Completed split as the TP's
+// own manage-orders.php, so a DM can narrow this list the same way. Default
+// stays 'all' so existing links/bookmarks to this page keep showing
+// everything. 2026-11-24, user-requested.
+$tp_status_filter = $_REQUEST['tp_status_filter'] ?? 'all';
+if (!in_array($tp_status_filter, ['all', 'pending', 'incomplete', 'completed'], true)) { $tp_status_filter = 'all'; }
 
 // ── Date-range summary cards ────────────────────────────────────────────────
 // Get Order vs No Order counts (this DM's own submissions in range).
@@ -316,8 +338,15 @@ $qtyMap = [];
 $shopIds = [];
 $msIdsInRange = [];
 $orderValueMap = [];
+// assigned_cp_id is a self-migrating column (added by order_action_get.php
+// on its first use) -- guard here too so this report never 500s on an
+// environment where no vacant-area order has ever been saved yet.
+$chkCpCol = $db_conn->query("SHOW COLUMNS FROM ms_orders LIKE 'assigned_cp_id'");
+if ($chkCpCol && $chkCpCol->num_rows === 0) {
+    $db_conn->query("ALTER TABLE ms_orders ADD COLUMN assigned_cp_id INT UNSIGNED NULL DEFAULT NULL AFTER tp_id");
+}
 $resOrders = $db_conn->query(
-    "SELECT order_id, shop_id, ms_id, order_date, marketing_tool, latitude, longitude, pr_id, qty, discount_percentage
+    "SELECT order_id, shop_id, ms_id, order_date, marketing_tool, latitude, longitude, pr_id, qty, discount_percentage, assigned_cp_id
      FROM ms_orders
      WHERE ms_id IN ($msIdListSql) AND new_order='yes' AND order_date BETWEEN '$from_date' AND '$to_date'
      ORDER BY order_date DESC, order_id DESC"
@@ -356,10 +385,81 @@ if ($isTeamMode && !empty($msIdsInRange)) {
 $tpOrderMeta = [];
 if (!empty($orderIdsInRange)) {
     $oidList = "'" . implode("','", array_map(fn($v) => mysqli_real_escape_string($db_conn, $v), $orderIdsInRange)) . "'";
-    $resTp = $db_conn->query("SELECT order_id, tp_id, invoiced_inv_id, voided_at, void_reason FROM tp_orders WHERE order_id IN ($oidList)");
+    // tp.shop_id/s.temp_id/s.name/s.mobile_number — the TP-side `shop` (billing)
+    // record this order is bridged to, NOT ms_shop above (a different table) —
+    // needed for the Convert button's invoice lookup, same as
+    // territory-partner/manage-orders.php. invoiced_at — when Convert was
+    // actually clicked, self-migrating (see shared/TpOrderInvoiceLookup.php).
+    // 2026-11-24, user-requested.
+    $_chkInvoicedAt2 = $db_conn->query("SHOW COLUMNS FROM tp_orders LIKE 'invoiced_at'");
+    if ($_chkInvoicedAt2 && $_chkInvoicedAt2->num_rows === 0) {
+        $db_conn->query("ALTER TABLE tp_orders ADD COLUMN invoiced_at DATETIME NULL DEFAULT NULL AFTER invoiced_inv_id");
+    }
+    $resTp = $db_conn->query(
+        "SELECT t.order_id, t.tp_id, t.invoiced_inv_id, t.invoiced_at, t.voided_at, t.void_reason,
+                s.temp_id AS shop_temp_id, s.name AS shop_name, s.mobile_number AS shop_mobile
+         FROM tp_orders t
+         LEFT JOIN shop s ON s.id=t.shop_id
+         WHERE t.order_id IN ($oidList)"
+    );
     while ($trow = mysqli_fetch_assoc($resTp)) {
         if (!isset($tpOrderMeta[$trow['order_id']])) { $tpOrderMeta[$trow['order_id']] = $trow; }
     }
+}
+
+// Per-order TP status bucket (pending/incomplete/completed/cancelled/null),
+// same definition as territory-partner/manage-orders.php's own
+// $v['invoice_status'] — used both by the new TP Status filter above and to
+// know which orders get the Convert/Not Convert buttons below.
+$received = $received ?? [];
+$orderStatusMap = [];
+foreach ($orderIdsInRange as $_oid) {
+    $_tp = $tpOrderMeta[$_oid] ?? null;
+    if (!$_tp) { $orderStatusMap[$_oid] = null; continue; }
+    if (!empty($_tp['voided_at'])) { $orderStatusMap[$_oid] = 'cancelled'; continue; }
+    if (empty($_tp['invoiced_inv_id'])) { $orderStatusMap[$_oid] = 'pending'; continue; }
+    // Same "has a receipt row at all" rule as territory-partner/manage-orders.php's
+    // $completedInvIds (a receipt can exist with received=0 and still counts).
+    $orderStatusMap[$_oid] = array_key_exists($_tp['invoiced_inv_id'], $received) ? 'completed' : 'incomplete';
+}
+
+if ($tp_status_filter !== 'all') {
+    $orderIdsInRange = array_values(array_filter($orderIdsInRange, fn($_oid) => $orderStatusMap[$_oid] === $tp_status_filter));
+}
+
+// Shop invoices the assigned TP has already raised to a "Pending with TP"
+// order's own shop — lets the DM Convert it too, same button/modal as the
+// TP's own manage-orders.php, via the shared duplicate-shop-aware lookup
+// (shared/TpOrderInvoiceLookup.php). Grouped by tp_id since different orders
+// here can be assigned to different TPs. 2026-11-24, user-requested
+// ("dm ku location pakkathula convert aprm not convert nu button vechuru...
+// ithey tp pannitangalum saei ivarey pannitalum saei").
+$invoicesByShopTempId = [];
+$_pendingShopsByTp = [];
+foreach ($orderIdsInRange as $_oid) {
+    if (($orderStatusMap[$_oid] ?? null) !== 'pending') { continue; }
+    $_tp = $tpOrderMeta[$_oid] ?? null;
+    if (!$_tp || empty($_tp['tp_id']) || empty($_tp['shop_temp_id'])) { continue; }
+    $_pendingShopsByTp[(int)$_tp['tp_id']][$_tp['shop_temp_id']] = ['name' => $_tp['shop_name'] ?? '', 'mobile' => $_tp['shop_mobile'] ?? ''];
+}
+// shop_temp_id is unique regardless of TP, so this flattens to one map —
+// simpler for the Convert modal's JS to look up by shop_temp_id alone.
+foreach ($_pendingShopsByTp as $_tpId => $_shops) {
+    $invoicesByShopTempId += getInvoicesByShopTempIdForTp($db_conn, $_tpId, $_shops);
+}
+
+// Which CP (if any) a Vacant Area order was attributed to — record only, see
+// add_order.php's "Assign To CP" block (2026-11-12, user request).
+$cpNameMap = [];
+$cpIdsSeen = [];
+foreach ($orderIdsInRange as $oid) {
+    $cpid = $orderMeta[$oid]['assigned_cp_id'] ?? null;
+    if (!empty($cpid)) { $cpIdsSeen[(int)$cpid] = true; }
+}
+if (!empty($cpIdsSeen)) {
+    $cpIdList = implode(',', array_map('intval', array_keys($cpIdsSeen)));
+    $resCpNames = $db_conn->query("SELECT id, name FROM channel_partners WHERE id IN ($cpIdList)");
+    while ($cnr = mysqli_fetch_assoc($resCpNames)) { $cpNameMap[$cnr['id']] = $cnr['name']; }
 }
 
 // ── New Shop stats — shops added in this same date range (same "New Shop"
@@ -412,9 +512,11 @@ foreach (array_keys($newShopInvoiceIds) as $iid) {
 // "TP Status" column already gives the fuller picture (payment status,
 // diff counts, etc.) for whichever single order is being looked at, so
 // these two extra columns are additive, not a replacement.
+// Built unconditionally (not just $showAllOrders) — also used by the
+// default Product Orders view's TP Status box, 2026-11-13.
 $tpNameMap = [];
 $tpInvoiceStatusMap = [];
-if ($showAllOrders && !empty($orderIdsInRange)) {
+if (!empty($orderIdsInRange)) {
     $tpIdsSeen = [];
     foreach ($orderIdsInRange as $oid) {
         $tpid = $tpOrderMeta[$oid]['tp_id'] ?? null;
@@ -425,6 +527,8 @@ if ($showAllOrders && !empty($orderIdsInRange)) {
         $resTpNames = $db_conn->query("SELECT id, name FROM territory_partners WHERE id IN ($tpIdList)");
         while ($tnr = mysqli_fetch_assoc($resTpNames)) { $tpNameMap[$tnr['id']] = $tnr['name']; }
     }
+}
+if ($showAllOrders && !empty($orderIdsInRange)) {
 
     $tpInvIds = [];
     foreach ($orderIdsInRange as $oid) {
@@ -481,14 +585,28 @@ if ($daysInRange < 1) { $daysInRange = 1; }
 $targetForPeriod = $perDayTarget * $daysInRange;
 $targetAchievedAmt = $totalInvoiceValue;
 $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetForPeriod) * 100) : 0;
+
+// Shared query string for the xlsx export + WhatsApp share (2026-11-12,
+// user request) — same date-range/view scoping as this page's own filters.
+$exportQS = 'frdate=' . urlencode($from_date) . '&todate=' . urlencode($to_date);
+if (!$viewingSelf) {
+    $exportQS .= $isTeamMode ? '&view_ms_ids=' . urlencode(implode(',', $viewMsIds)) : '&view_ms_id=' . (int)$viewMsId;
+}
+$exportUrl = 'export-manage-orders-xlsx.php?' . $exportQS;
+$exportFilename = 'Product_Orders_' . $from_date . '_to_' . $to_date . '.xlsx';
+$waShareText = 'Product Orders (' . date('d M Y', strtotime($from_date)) . ' to ' . date('d M Y', strtotime($to_date)) . ')';
 					?>
 
                                     <h1>
 									<table class="headertble">
 									<tr>
 									<td>Manage Orders <font size="3">(<?php echo $showAllOrders ? 'All Get Orders, incl. TP-assigned' : 'Product Orders'; ?>)</font><?php if ($isTeamMode): ?> &mdash; <?php echo htmlspecialchars($teamRootName ?: 'Team'); ?>'s team (<?php echo count($viewMsIds); ?>)<?php endif; ?></td>
-									<td>
-									<a href="manager_order_csv?frd=<?=$from_date;?>&&tod=<?=$to_date;?><?=!$viewingSelf ? ($isTeamMode ? '&&view_ms_ids='.htmlspecialchars(implode(',', $viewMsIds)) : '&&view_ms_id='.(int)$viewMsId) : '';?>" title="Export"><img src="../../assets/images/excel-3-32.png"></a>
+									<td style="white-space:nowrap;">
+									<a href="<?=htmlspecialchars($exportUrl);?>" title="Export Excel"><img src="../../assets/images/excel-3-32.png"></a>
+									&nbsp;
+									<a href="#" id="whatsappShareOrdersBtn" title="Share via WhatsApp" style="text-decoration:none;">
+										<i class="material-icons-outlined" style="font-size:28px;vertical-align:middle;color:#25D366;">share</i>
+									</a>
 									</td>
 									</tr>
 									</table>
@@ -525,6 +643,15 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
 <div id="searchleftcont">
 <label class="form-label">To Date</label>
 <input type="date" required="" name="todate" value="<?=$to_date;?>" class="form-control" onkeypress="restrictSpecialChars(event)">
+</div>
+<div id="searchleftcont">
+<label class="form-label">TP Status</label>
+<select name="tp_status_filter" class="form-control">
+    <option value="all" <?=$tp_status_filter==='all'?'selected':''?>>All</option>
+    <option value="pending" <?=$tp_status_filter==='pending'?'selected':''?>>Pending</option>
+    <option value="incomplete" <?=$tp_status_filter==='incomplete'?'selected':''?>>Incomplete</option>
+    <option value="completed" <?=$tp_status_filter==='completed'?'selected':''?>>Completed</option>
+</select>
 </div>
 <div id="searchbuttoncont">
 <button type="submit" name="sedatas" class="btn btn-primary"><i class="material-icons">search</i>Search</button>
@@ -601,61 +728,6 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
 
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="kpi-card">
-            <i class="material-icons-outlined kpi-ico">delete_outline</i>
-            <div class="kpi-t">Deleted Invoice Amount</div>
-            <div class="kpi-v">&#8377;<?php echo inr_format($deletedInvoiceAmt, 2); ?></div>
-        </div>
-    </div>
-
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="kpi-card">
-            <i class="material-icons-outlined kpi-ico">check_circle</i>
-            <div class="kpi-t">Fully Paid</div>
-            <div class="kpi-v"><?php echo (int)$fullyPaidCount; ?></div>
-            <div class="kpi-sub">&#8377;<?php echo inr_format($fullyPaidValue, 2); ?></div>
-        </div>
-    </div>
-
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="kpi-card-wrap">
-            <div class="kpi-card kpi-card-clickable">
-                <i class="material-icons-outlined kpi-ico">hourglass_bottom</i>
-                <div class="kpi-t">Partially Paid</div>
-                <div class="kpi-v"><?php echo (int)$partiallyPaidCount; ?></div>
-                <div class="kpi-sub">&#8377;<?php echo inr_format($partiallyPaidReceived, 2); ?> received &middot; hover / tap for details</div>
-            </div>
-            <div class="kpi-detail-panel">
-                <div class="kpi-detail-title">Products in these invoices</div>
-                <?php if (empty($partiallyPaidProducts)): ?>
-                    <div class="kpi-detail-empty">No partially paid invoices in this range.</div>
-                <?php else: foreach ($partiallyPaidProducts as $pp): ?>
-                    <div class="kpi-detail-row"><span><?php echo htmlspecialchars($pp['name']); ?></span><span class="kpi-detail-qty"><?php echo (int)$pp['qty']; ?></span></div>
-                <?php endforeach; endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="kpi-card-wrap">
-            <div class="kpi-card kpi-card-clickable">
-                <i class="material-icons-outlined kpi-ico">cancel</i>
-                <div class="kpi-t">Voided</div>
-                <div class="kpi-v"><?php echo (int)$voidedCount; ?></div>
-                <div class="kpi-sub">&#8377;<?php echo inr_format($voidedValue, 2); ?> voided &middot; hover / tap for details</div>
-            </div>
-            <div class="kpi-detail-panel">
-                <div class="kpi-detail-title">Products in voided invoices</div>
-                <?php if (empty($voidedProducts)): ?>
-                    <div class="kpi-detail-empty">No voided invoices in this range.</div>
-                <?php else: foreach ($voidedProducts as $vp): ?>
-                    <div class="kpi-detail-row"><span><?php echo htmlspecialchars($vp['name']); ?></span><span class="kpi-detail-qty"><?php echo (int)$vp['qty']; ?></span></div>
-                <?php endforeach; endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="kpi-card">
             <i class="material-icons-outlined kpi-ico">assignment_turned_in</i>
             <div class="kpi-t">Get Order / No Order</div>
             <div class="kpi-v"><span style="color:#0ca30c;"><?php echo (int)$getOrderCount; ?></span> / <span style="color:#d03b3b;"><?php echo (int)$noOrderCount; ?></span></div>
@@ -680,39 +752,6 @@ $targetPercent = $targetForPeriod > 0 ? min(100, ($targetAchievedAmt / $targetFo
         </div>
     </div>
 
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="kpi-card" style="--kpi-accent:#8b5cf6;">
-            <i class="material-icons-outlined kpi-ico">storefront</i>
-            <div class="kpi-t">New Shop</div>
-            <div class="kpi-v"><?php echo (int)$newShopCount; ?></div>
-        </div>
-    </div>
-
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="kpi-card" style="--kpi-accent:#8b5cf6;">
-            <i class="material-icons-outlined kpi-ico">shopping_cart</i>
-            <div class="kpi-t">New Shop &rarr; Get Order</div>
-            <div class="kpi-v"><?php echo (int)$newShopGetOrderCount; ?></div>
-            <div class="kpi-sub">Estimated &#8377;<?php echo inr_format($newShopGetOrderValue, 2); ?></div>
-        </div>
-    </div>
-
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="kpi-card" style="--kpi-accent:#8b5cf6;">
-            <i class="material-icons-outlined kpi-ico">receipt_long</i>
-            <div class="kpi-t">Converted New Shop Get Order</div>
-            <div class="kpi-v"><?php echo (int)$newShopInvoicedCount; ?></div>
-        </div>
-    </div>
-
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="kpi-card" style="--kpi-accent:#8b5cf6;">
-            <i class="material-icons-outlined kpi-ico">compare_arrows</i>
-            <div class="kpi-t">New Shop Order Amount</div>
-            <div class="kpi-v" style="font-size:16px;">&#8377;<?php echo inr_format($newShopGetOrderValue, 0); ?> <span style="font-size:13px;color:#9ca3af;">/ &#8377;<?php echo inr_format($newShopInvoicedValue, 0); ?></span></div>
-            <div class="kpi-sub">Get Order amount / Invoiced amount</div>
-        </div>
-    </div>
 </div>
 
 <style>
@@ -813,6 +852,7 @@ $i= $start_from;
 													<th>Order Value</th>
 
 													<th>Location</th>
+													<th>Assigned CP</th>
 													<th>TP Status</th>
 													<?php if ($showAllOrders): ?>
 													<th>Assigned TP</th>
@@ -848,6 +888,14 @@ $tpRow = $tpOrderMeta[$orderid] ?? null;
 $headerAmt = '';
 $detailLines = [];
 
+// TP's own name — previously only visible in the "Assigned TP" column of
+// the "Total Orders" (view=all) listing; shown here too so the default
+// Product Orders view doesn't leave "who's this TP?" unanswered, 2026-11-13.
+if ($tpRow && !empty($tpRow['tp_id'])) {
+    $tpNameForStatus = $tpNameMap[$tpRow['tp_id']] ?? ('TP #' . $tpRow['tp_id']);
+    $detailLines[] = "<div class='tp-status-pending'>TP: " . htmlspecialchars($tpNameForStatus) . "</div>";
+}
+
 if (!$tpRow) {
     $headerBadge = "<span class='tp-status-pending'>&mdash;</span>";
     $detailLines[] = "<div class='tp-status-pending'>Not assigned to a TP</div>";
@@ -863,11 +911,25 @@ if (!$tpRow) {
 } elseif (empty($tpRow['invoiced_inv_id'])) {
     $headerBadge = "<span class='badge badge-style-bordered badge-warning'>Pending with TP</span>";
     $detailLines[] = "<div class='tp-status-pending'>Not yet invoiced</div>";
+    // Convert/Not Convert — the DM can do this too, same as the TP's own
+    // manage-orders.php (pick one of the TP's already-raised invoices for
+    // this shop, or mark it Not Converted). 2026-11-24, user-requested.
+    $_momShopTempId = $tpRow['shop_temp_id'] ?? '';
+    $detailLines[] = "<div class='tp-status-link' style='margin-top:4px;'>"
+        . "<a href='javascript:void(0);' onclick=\"openMopConvertModal('" . htmlspecialchars($orderid, ENT_QUOTES) . "','" . htmlspecialchars($_momShopTempId, ENT_QUOTES) . "','" . htmlspecialchars($tpRow['shop_name'] ?? '', ENT_QUOTES) . "');\" class='btn btn-sm btn-primary' style='margin-right:4px;'>Convert</a>"
+        . "<a href='javascript:void(0);' onclick=\"openMopNotConvertModal('" . htmlspecialchars($orderid, ENT_QUOTES) . "');\" class='btn btn-sm btn-outline-danger'>Not Convert</a>"
+        . "</div>";
 } else {
     $invId = $tpRow['invoiced_inv_id'];
     $invTotal = $invTotals[$invId] ?? 0.0;
     $invStatusVal = $invStatus[$invId] ?? '';
     $hasReceipt = isset($received[$invId]);
+    if (!empty($invCreatedAt[$invId])) {
+        $detailLines[] = "<div class='tp-status-pending'>Invoice placed: " . htmlspecialchars(date('d-m-Y h:i A', strtotime($invCreatedAt[$invId]))) . "</div>";
+    }
+    if (!empty($tpRow['invoiced_at'])) {
+        $detailLines[] = "<div class='tp-status-pending'>Converted: " . htmlspecialchars(date('d-m-Y h:i A', strtotime($tpRow['invoiced_at']))) . "</div>";
+    }
 
     $diffCounts = $diffCountsByInv[$invId] ?? [];
     $diffParts = [];
@@ -985,6 +1047,16 @@ $tpStatusHtml = "<div class='tp-status-box'>{$headerHtml}{$detailHtml}</div>";
 					<?php }else{ echo "---"; }?>
 					</td>
 
+					<td>
+					<?php if ($tpRow): ?>
+					<span class="text-muted">&mdash;</span>
+					<?php else:
+						$cpid = $result_product_list['assigned_cp_id'] ?? null;
+					?>
+					<?=htmlspecialchars(!empty($cpid) ? ($cpNameMap[$cpid] ?? ('CP #' . $cpid)) : 'Company');?>
+					<?php endif; ?>
+					</td>
+
 					<td><?=$tpStatusHtml;?></td>
 
 					<?php if ($showAllOrders):
@@ -1043,6 +1115,131 @@ $tpStatusHtml = "<div class='tp-status-box'>{$headerHtml}{$detailHtml}</div>";
     <script src="../../assets/js/pages/datatables.js"></script>
 	<script src="../../assets/plugins/lightbox/fslightbox.js"></script>
 	<script src="../../assets/js/pages/lightbox.js"></script>
+	<script>
+	// Same fetch-blob-then-navigator.share pattern as company/tp-invoice-print.php's
+	// WhatsApp share — generates the real .xlsx (not just a download link) and
+	// hands it to the native share sheet so WhatsApp gets the file attached
+	// directly, instead of the user having to download then manually attach it.
+	document.getElementById('whatsappShareOrdersBtn').addEventListener('click', function (e) {
+		e.preventDefault();
+		var url      = <?php echo json_encode($exportUrl); ?>;
+		var fileName = <?php echo json_encode($exportFilename); ?>;
+		var waText   = <?php echo json_encode($waShareText); ?>;
+
+		fetch(url).then(function (res) {
+			if (!res.ok) { throw new Error('Export fetch failed'); }
+			return res.blob();
+		}).then(function (blob) {
+			var file = new File([blob], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+			if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+				navigator.share({ files: [file], text: waText }).catch(function () {});
+			} else {
+				var blobUrl = URL.createObjectURL(blob);
+				var a = document.createElement('a');
+				a.href = blobUrl;
+				a.download = fileName;
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 10000);
+				alert('Excel downloaded as ' + fileName + '. Open WhatsApp and attach it from your Downloads.');
+			}
+		}).catch(function () {
+			alert('Could not generate the Excel file. Please try again.');
+		});
+	});
+	</script>
+
+	<!-- Convert / Not Convert — same capability as the TP's own
+		 manage-orders.php, usable from the DM side too. 2026-11-24,
+		 user-requested. -->
+	<div class="modal fade" id="mopConvertModal" tabindex="-1" role="dialog" aria-hidden="true">
+		<div class="modal-dialog modal-dialog-centered" role="document">
+			<div class="modal-content">
+				<form method="post" action="convert-order-invoice.php" id="mopConvertForm">
+					<div class="modal-header">
+						<h5 class="modal-title">Convert — <span id="mopConvertShopName"></span></h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+					<div class="modal-body">
+						<input type="hidden" name="order_id" id="mopConvertOrderIdField" value="">
+						<label class="form-label">Pick the invoice already raised to this shop</label>
+						<div id="mopConvertInvoiceList" style="max-height:300px;overflow-y:auto;"></div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+						<button type="submit" id="mopConvertConfirmBtn" class="btn" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;" disabled>Confirm Convert</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal fade" id="mopNotConvertModal" tabindex="-1" role="dialog" aria-hidden="true">
+		<div class="modal-dialog modal-dialog-centered" role="document">
+			<div class="modal-content">
+				<form method="post" action="void-order.php" id="mopNotConvertForm">
+					<div class="modal-header">
+						<h5 class="modal-title">Not Convert</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+					<div class="modal-body">
+						<input type="hidden" name="order_id" id="mopNotConvertOrderIdField" value="">
+						<label class="form-label">Reason for not converting this order <span style="color:red;">*</span></label>
+						<textarea name="void_reason" id="mopNotConvertReasonField" class="form-control" rows="3" required maxlength="255" placeholder="e.g. Shop no longer wants this product"></textarea>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+						<button type="submit" class="btn btn-danger">Confirm</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+
+	<script>
+	var mopInvoicesByShopTempId = <?php echo json_encode($invoicesByShopTempId); ?>;
+
+	function openMopConvertModal(orderId, shopTempId, shopName) {
+		document.getElementById('mopConvertOrderIdField').value = orderId;
+		document.getElementById('mopConvertShopName').textContent = shopName;
+		var listEl = document.getElementById('mopConvertInvoiceList');
+		var invoices = mopInvoicesByShopTempId[shopTempId] || [];
+		if (!invoices.length) {
+			listEl.innerHTML = '<p class="text-muted">No invoices found for this shop yet.</p>';
+		} else {
+			listEl.innerHTML = invoices.map(function (inv) {
+				var badge = inv.completed
+					? '<span class="badge badge-style-bordered badge-success" style="margin-left:6px;">Completed</span>'
+					: '<span class="badge badge-style-bordered badge-secondary" style="margin-left:6px;">Draft</span>';
+				var placedLine = inv.placed_at ? '<div class="text-muted" style="font-size:11px;">Invoice placed: ' + inv.placed_at + '</div>' : '';
+				return '<label style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #e1e0d9;cursor:pointer;">' +
+					'<input type="radio" name="inv_id" value="' + inv.inv_id + '" required>' +
+					'<div><span>' + inv.inv_number + ' &mdash; ' + inv.date + '</span>' + badge + placedLine + '</div>' +
+					'</label>';
+			}).join('');
+		}
+		// Single Confirm Convert button lives in the modal-footer (not
+		// duplicated inside the list) — disabled until a radio is picked, or
+		// whenever there's nothing to convert to. 2026-11-24, user-reported.
+		var mopConfirmBtn = document.getElementById('mopConvertConfirmBtn');
+		if (mopConfirmBtn) {
+			mopConfirmBtn.disabled = true;
+			listEl.onchange = function () { mopConfirmBtn.disabled = false; };
+		}
+		var modalEl = document.getElementById('mopConvertModal');
+		var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+		modal.show();
+	}
+
+	function openMopNotConvertModal(orderId) {
+		document.getElementById('mopNotConvertOrderIdField').value = orderId;
+		document.getElementById('mopNotConvertReasonField').value = '';
+		var modalEl = document.getElementById('mopNotConvertModal');
+		var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+		modal.show();
+	}
+	</script>
 </body>
 
 </html>

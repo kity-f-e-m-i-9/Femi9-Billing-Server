@@ -50,6 +50,16 @@ foreach ($districtNames as $dn) {
 }
 $scopeDistricts = $matchedDistrict !== null ? [$matchedDistrict] : $districtNames;
 
+// Same Product Type filter as the on-screen dropdown (shopInvProductFilter
+// in dashboard.php) — '', 'napkin' or 'diaper'. 2026-11-23, user-reported:
+// this export's "Invoice Amount" was always the invoice's FULL total
+// (both categories), so a Napkin+Diaper "Mixed" invoice overstated the
+// Napkin figure (and a pure-Diaper invoice was wrongly included at all)
+// whenever this export was meant to represent Napkin-only sales, same as
+// every other Napkin/Diaper split fix already made on this dashboard.
+$productFilter = trim((string)($_GET['product'] ?? ''));
+if (!in_array($productFilter, ['napkin', 'diaper'], true)) { $productFilter = ''; }
+
 $allTpIds = getMsDistrictTpIds($db_conn, $scopeDistricts, true);
 
 $rows = [];
@@ -57,18 +67,30 @@ $tpSplit = [];
 if (!empty($allTpIds)) {
     $idList = implode(',', $allTpIds);
     $stmt = $db_conn->prepare(
-        "SELECT ui.inv_number, ui.date, ui.total, ui.from_user_id AS tp_db_id,
+        "SELECT ui.inv_id, ui.inv_number, ui.date, ui.total, ui.from_user_id AS tp_db_id,
                 tp.name AS tp_name, tp.tp_id AS tp_code, tp.mobile AS tp_mobile,
                 COALESCE((
                     SELECT SUM(pln.target_amount) FROM territory_partner_locations tpl
                     JOIN partner_location_nodes pln ON pln.id = tpl.location_id
                     WHERE tpl.territory_partner_id = tp.id
                 ), 0) AS tp_target,
-                sd.dist_name AS shop_district
+                sd.dist_name AS shop_district,
+                idn.name AS inv_district,
+                COALESCE((
+                    SELECT SUM(uii.total) FROM user_invoice_items uii
+                    JOIN products p ON p.id = uii.pr_id
+                    WHERE uii.inv_id = ui.inv_id AND p.category = 'napkin'
+                ), 0) AS napkin_total,
+                COALESCE((
+                    SELECT SUM(uii.total) FROM user_invoice_items uii
+                    JOIN products p ON p.id = uii.pr_id
+                    WHERE uii.inv_id = ui.inv_id AND p.category = 'diaper'
+                ), 0) AS diaper_total
          FROM user_invoice ui
          JOIN territory_partners tp ON tp.id = ui.from_user_id
          LEFT JOIN shop s ON s.temp_id = ui.to_user_id
          LEFT JOIN district sd ON sd.id = s.district_id
+         LEFT JOIN partner_location_nodes idn ON idn.id = COALESCE(ui.invoice_district_id, s.district_id)
          WHERE ui.from_user_type='territory_partner' AND ui.from_user_id IN ($idList)
            AND ui.`date` BETWEEN ? AND ?
          ORDER BY ui.date DESC, ui.inv_number DESC"
@@ -77,6 +99,30 @@ if (!empty($allTpIds)) {
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
+
+    // Restrict to invoices actually attributed (COALESCE(invoice_district_id,
+    // shop.district_id), resolved to a real partner_location_nodes name) to
+    // one of this person's own district(s) — same allow-list dashboard.php's
+    // $_myOwnInvoiceRows uses. Without this, a TP's invoice to a shop OUTSIDE
+    // the DM's district (or with an unresolvable/orphaned shop.district_id)
+    // still got summed here just because the TP herself is assigned to this
+    // district — overstating the export above the dashboard's own "Your TPs'
+    // Invoice Amount" card for the exact same period. 2026-11-23, user-
+    // reported (export total higher than the on-screen ₹5,13,823).
+    $_scopeDistrictsLower = array_map('mb_strtolower', $scopeDistricts);
+    $rows = array_values(array_filter($rows, function ($r) use ($_scopeDistrictsLower) {
+        return in_array(mb_strtolower($r['inv_district'] ?? ''), $_scopeDistrictsLower, true);
+    }));
+
+    // diaper_total now comes straight from the query above (real Diaper line
+    // items) — NOT "total minus napkin_total", which used to misread any
+    // non-product charge (e.g. Courier Charges) on a pure-Napkin invoice as
+    // Diaper. 2026-11-23, same fix as marketing/dashboard.php.
+    if ($productFilter === 'napkin') {
+        $rows = array_values(array_filter($rows, fn($r) => $r['napkin_total'] > 0));
+    } elseif ($productFilter === 'diaper') {
+        $rows = array_values(array_filter($rows, fn($r) => $r['diaper_total'] > 0));
+    }
 
     // District + Firka coverage per TP (a TP can cover more than one of
     // each), for the District/Firka columns below.
@@ -101,12 +147,16 @@ $headers = [
     'G' => 'Shop Invoice District',
     'H' => 'Invoice Number',
     'I' => 'Invoice Date',
-    'J' => 'Invoice Amount',
+    'J' => 'Product',
+    'K' => 'Napkin Amount',
+    'L' => 'Diaper Amount',
+    'M' => 'Invoice Amount (Total)',
 ];
-$lastCol = 'J';
+$lastCol = 'M';
 
+$productSuffix = $productFilter !== '' ? ' | Product: ' . ucfirst($productFilter) : '';
 $sheet->mergeCells("A1:{$lastCol}1");
-$sheet->setCellValue('A1', 'Shop Invoices | ' . $from . ' to ' . $to . ($matchedDistrict !== null ? ' | District: ' . $matchedDistrict : ''));
+$sheet->setCellValue('A1', 'Shop Invoices | ' . $from . ' to ' . $to . ($matchedDistrict !== null ? ' | District: ' . $matchedDistrict : '') . $productSuffix);
 $sheet->getStyle('A1')->applyFromArray([
     'font' => ['bold' => true, 'size' => 12, 'color' => ['argb' => 'FFFFFFFF']],
     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF667EEA']],
@@ -154,7 +204,25 @@ foreach ($rows as $r) {
 
     $sheet->setCellValue("H{$rowNum}", $r['inv_number']);
     $sheet->setCellValue("I{$rowNum}", date('d-m-Y', strtotime($r['date'])));
-    $sheet->setCellValue("J{$rowNum}", (float)$r['total']);
+
+    // Product + Napkin/Diaper split — 2026-11-23, user-reported: this export
+    // previously only had one "Invoice Amount" column using the invoice's
+    // FULL total, so a Napkin+Diaper "Mixed" invoice overstated the Napkin
+    // figure (and a pure-Diaper invoice was wrongly included at all) in any
+    // Napkin-only total built from this export, inconsistent with the
+    // on-screen table's own Napkin/Diaper split.
+    $hasNapkin = $r['napkin_total'] > 0;
+    $hasDiaper = $r['diaper_total'] > 0;
+    $productLabel = ($hasNapkin && $hasDiaper) ? 'Mixed' : ($hasNapkin ? 'Napkin' : ($hasDiaper ? 'Diaper' : '-'));
+    $sheet->setCellValue("J{$rowNum}", $productLabel);
+    $sheet->setCellValue("K{$rowNum}", (float)$r['napkin_total']);
+    $sheet->setCellValue("L{$rowNum}", (float)$r['diaper_total']);
+    // napkin_total + diaper_total, NOT $r['total'] — ui.total includes
+    // non-product charges (e.g. Courier Charges), which used to inflate this
+    // "Invoice Amount (Total)" column above K+L and confuse it with the
+    // invoice's real product value. 2026-11-24, same fix as the on-screen
+    // Shop Invoices table's "Invoice Amount" column.
+    $sheet->setCellValue("M{$rowNum}", (float)$r['napkin_total'] + (float)$r['diaper_total']);
 
     $bgColor = (($rowNum - 2) % 2 === 0) ? 'FFF0F4FF' : 'FFFFFFFF';
     $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->applyFromArray([
@@ -162,9 +230,9 @@ foreach ($rows as $r) {
         'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FFDDDDDD']]],
     ]);
     $sheet->getStyle("D{$rowNum}")->getNumberFormat()->setFormatCode('#,##0.00');
-    $sheet->getStyle("J{$rowNum}")->getNumberFormat()->setFormatCode('#,##0.00');
+    $sheet->getStyle("K{$rowNum}:M{$rowNum}")->getNumberFormat()->setFormatCode('#,##0.00');
     $sheet->getStyle("D{$rowNum}:D{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-    $sheet->getStyle("J{$rowNum}:J{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+    $sheet->getStyle("K{$rowNum}:M{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
     // Wrapped (not left to overflow into the next column) so a long,
     // comma-separated Firka list stays contained inside its own cell.
     $sheet->getStyle("E{$rowNum}:G{$rowNum}")->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_CENTER);
@@ -177,12 +245,14 @@ $dataStart = 3;
 $dataEnd   = $rowNum - 1;
 
 $sheet->setCellValue("A{$totalsRow}", 'TOTAL');
-$sheet->mergeCells("A{$totalsRow}:I{$totalsRow}");
+$sheet->mergeCells("A{$totalsRow}:J{$totalsRow}");
 if ($dataEnd >= $dataStart) {
-    $sheet->setCellValue("J{$totalsRow}", "=SUM(J{$dataStart}:J{$dataEnd})");
+    $sheet->setCellValue("K{$totalsRow}", "=SUM(K{$dataStart}:K{$dataEnd})");
+    $sheet->setCellValue("L{$totalsRow}", "=SUM(L{$dataStart}:L{$dataEnd})");
+    $sheet->setCellValue("M{$totalsRow}", "=SUM(M{$dataStart}:M{$dataEnd})");
 }
-$sheet->getStyle("J{$totalsRow}")->getNumberFormat()->setFormatCode('#,##0.00');
-$sheet->getStyle("J{$totalsRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+$sheet->getStyle("K{$totalsRow}:M{$totalsRow}")->getNumberFormat()->setFormatCode('#,##0.00');
+$sheet->getStyle("K{$totalsRow}:M{$totalsRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 $sheet->getStyle("A{$totalsRow}:{$lastCol}{$totalsRow}")->applyFromArray([
     'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF667EEA']],
@@ -198,13 +268,17 @@ $sheet->getColumnDimension('F')->setWidth(32);
 $sheet->getColumnDimension('G')->setWidth(20);
 $sheet->getColumnDimension('H')->setWidth(18);
 $sheet->getColumnDimension('I')->setWidth(14);
-$sheet->getColumnDimension('J')->setWidth(16);
+$sheet->getColumnDimension('J')->setWidth(12);
+$sheet->getColumnDimension('K')->setWidth(16);
+$sheet->getColumnDimension('L')->setWidth(16);
+$sheet->getColumnDimension('M')->setWidth(18);
 
 $sheet->freezePane('A3');
 $sheet->setAutoFilter("A2:{$lastCol}2");
 
 $districtSuffix = $matchedDistrict !== null ? '_' . preg_replace('/[^A-Za-z0-9]+/', '_', $matchedDistrict) : '';
-$filename = 'shop_invoices_' . $from . '_to_' . $to . $districtSuffix . '.xlsx';
+$productSuffixFile = $productFilter !== '' ? '_' . $productFilter : '';
+$filename = 'shop_invoices_' . $from . '_to_' . $to . $districtSuffix . $productSuffixFile . '.xlsx';
 
 if (ob_get_length()) { ob_end_clean(); }
 

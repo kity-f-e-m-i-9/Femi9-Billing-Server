@@ -37,6 +37,7 @@ $current_date = date("Y-m-d");
 error_reporting(0);
 require_once("advance-payment-functions.php");
 require_once("receipt-stock-reversal.php");
+require_once(__DIR__ . '/../shared/CpShopWalletCommission.php');
 
 // ── CSRF ──────────────────────────────────────────────────────────────────────
 if (session_status() === PHP_SESSION_NONE) { session_name('femi9_company_sess'); session_start(); }
@@ -438,6 +439,13 @@ if (isset($_POST['addreceipt'])) {
         );
         $ins->execute();
         $ins->close();
+
+            // CP 3% Shop Wallet commission — no-op unless this is a
+            // CP-fulfilled DM-order Shop Invoice (fulfilled_by_cp_id set)
+            // that is now fully paid; safe to call on every shop receipt.
+            if ($post_invuser === 'shop') {
+                maybeCreditShopWalletCommission($db_conn, $post_invid);
+            }
 
             // ── Apply stock for SS / Stockist advance_product receipts ────────
             // Stock for distributors is applied at invoice submission time.

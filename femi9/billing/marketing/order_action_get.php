@@ -127,6 +127,23 @@ if (isset($_REQUEST['add_order_get'])) {
 	}
 	$tp_id_sql = $tp_id > 0 ? "'".$tp_id."'" : "NULL";
 
+	// Assign To CP — only meaningful for a Vacant Area (no TP), where
+	// add_order.php's form shows this instead of the TP select. Record-only:
+	// which Channel Partner the DM says is handling this order, or NULL for
+	// "Company" (also NULL for a normal TP-covered order, same as before
+	// this feature existed). Self-migrating column, same pattern as every
+	// other new column in this app (2026-11-12, user request).
+	$assigned_cp_id = (int)($_POST["assigned_cp_id"] ?? 0);
+	if ($assigned_cp_id > 0) {
+		$cpCheck = mysqli_query($db_conn, "select id from channel_partners where id='".db_esc($assigned_cp_id)."' and is_active=1 limit 1");
+		if (!$cpCheck || mysqli_num_rows($cpCheck) === 0) { $assigned_cp_id = 0; }
+	}
+	$chkCpCol = mysqli_query($db_conn, "SHOW COLUMNS FROM ms_orders LIKE 'assigned_cp_id'");
+	if ($chkCpCol && mysqli_num_rows($chkCpCol) === 0) {
+		mysqli_query($db_conn, "ALTER TABLE ms_orders ADD COLUMN assigned_cp_id INT UNSIGNED NULL DEFAULT NULL AFTER tp_id");
+	}
+	$assigned_cp_id_sql = $assigned_cp_id > 0 ? "'".$assigned_cp_id."'" : "NULL";
+
 	$product_id = implode("#",$_REQUEST['pr_id']);
 $qty = implode("#",$_REQUEST['qty']);
 $discount_pct = implode("#", $_REQUEST['discount_percentage'] ?? []);
@@ -155,7 +172,7 @@ $result_count_dist=mysqli_fetch_array($fetc_count_dist);
 if($result_count_dist['numShop']==0)
 	{
 
-        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,discount_percentage,latitude,longitude) values (?,?,?,$tp_id_sql,?,'yes','nil',?,
+        $sql="insert into ms_orders (order_id,shop_id,ms_id,tp_id,assigned_cp_id,order_date,new_order,noorder_reason,marketing_tool,pr_id,qty,discount_percentage,latitude,longitude) values (?,?,?,$tp_id_sql,$assigned_cp_id_sql,?,'yes','nil',?,
 		?,?,?,$latitude_sql,$longitude_sql)";
 		db_q($db_conn,$sql,[$order_id,$shop_id,$ms_id,$order_date,$marketing_tool,$product_id_value,$qty_value,$discount_value]);
 		$insertedLines[] = ['pr_id' => (int)$product_id_value, 'qty' => (int)$qty_value, 'discount_percentage' => $discount_value];

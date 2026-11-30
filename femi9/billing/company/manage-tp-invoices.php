@@ -225,7 +225,7 @@ $sql = "
            COALESCE(cp_src.name, cp_old.name) AS cp_name,
            COALESCE(cp_src.cp_id, cp_old.cp_id) AS cp_code,
            COALESCE(rcpt.collected, 0) AS courier_collected,
-           po.id AS po_id
+           po.id AS po_id, COALESCE(gstsub.total_gst_amount, 0) AS total_gst_amount
     FROM tp_invoices tpi
     JOIN territory_partners tp             ON tp.id  = tpi.territory_partner_id
     LEFT JOIN partner_location_nodes pln   ON pln.id = tpi.source_location_id
@@ -239,6 +239,23 @@ $sql = "
         FROM tp_invoice_receipts
         GROUP BY tp_invoice_id
     ) rcpt ON rcpt.tp_invoice_id = tpi.id
+    LEFT JOIN (
+        -- Per-invoice GST total — same inclusive/exclusive split
+        -- TpInvoiceData.php uses for the Print page's own SGST/CGST rows,
+        -- aggregated here (not per-row PHP loop) so the list page doesn't
+        -- run one extra query per invoice.
+        SELECT tpii.tp_invoice_id,
+               SUM(
+                   CASE WHEN p.gst_type = 'inclusive' AND p.gst > 0
+                       THEN (tpii.amount - COALESCE(tpii.discount_amount, 0))
+                            - (tpii.amount - COALESCE(tpii.discount_amount, 0)) * 100 / (100 + p.gst)
+                       ELSE (tpii.amount - COALESCE(tpii.discount_amount, 0)) * p.gst / 100
+                   END
+               ) AS total_gst_amount
+        FROM tp_invoice_items tpii
+        JOIN products p ON p.id = tpii.product_id
+        GROUP BY tpii.tp_invoice_id
+    ) gstsub ON gstsub.tp_invoice_id = tpi.id
     $where_sql
     ORDER BY tpi.created_at DESC
 ";
@@ -316,6 +333,8 @@ $i = 0;
         .action-btn.print  { color:#0369a1; } .action-btn.print:hover  { background:#e0f2fe; }
         .action-btn.delete { color:#dc2626; } .action-btn.delete:hover { background:#fee2e2; }
         .courier-chip { display:inline-block; background:#fef3c7; color:#92400e; border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600; }
+        .gst-hover-cell { cursor:pointer; }
+        #gstTipBox { position:fixed; z-index:9999; background:#111827; color:#fff; font-size:12.5px; line-height:1.7; padding:8px 12px; border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,.3); pointer-events:none; white-space:nowrap; display:none; }
         .pay-badge { display:inline-flex; align-items:center; gap:3px; border-radius:5px; padding:3px 9px; font-size:11px; font-weight:700; text-decoration:none; white-space:nowrap; transition:opacity .15s; }
         .pay-badge:hover { opacity:.8; }
         .pay-badge.not-collected { background:#fee2e2; color:#991b1b; }
@@ -656,7 +675,29 @@ $i = 0;
                                             </td>
                                             <td style="font-size:13px;color:#6b7280;"><?php echo date('d M Y', strtotime($inv['invoice_date'])); ?></td>
                                             <td>
-                                                <span style="font-weight:700;color:#10b981;font-size:13.5px;">₹<?php echo inr_format($subtotal, 2); ?></span>
+                                                <?php
+                                                // Diaper invoices only, per explicit request: hovering the
+                                                // Amount shows this invoice's SGST/CGST split (half the
+                                                // invoice's total GST each) without opening the invoice.
+                                                $_invGst = (float)($inv['total_gst_amount'] ?? 0);
+                                                $_amtStyle = 'font-weight:700;color:#10b981;font-size:13.5px;';
+                                                $_amtClass = '';
+                                                $_amtTip = '';
+                                                if ($_invType === 'diaper' && $_invGst > 0) {
+                                                    $_half = $_invGst / 2;
+                                                    // A custom hover box (#gstTipBox, script at the bottom of
+                                                    // this page) instead of the native `title` tooltip — the
+                                                    // OS-native tooltip renders with its own system font, which
+                                                    // doesn't reliably carry the ₹ glyph (showed as "?"), and
+                                                    // gives no control over also showing the Amount.
+                                                    $_amtTip = 'SGST: ₹' . number_format($_half, 2)
+                                                        . '<br>CGST: ₹' . number_format($_half, 2)
+                                                        . '<br>Amount: ₹' . inr_format($subtotal, 2);
+                                                    $_amtClass = ' gst-hover-cell';
+                                                    $_amtStyle .= 'cursor:pointer;border-bottom:1px dotted #10b981;';
+                                                }
+                                                ?>
+                                                <span class="<?php echo trim($_amtClass); ?>" style="<?php echo $_amtStyle; ?>"<?php if ($_amtTip): ?> data-gst-tip="<?php echo htmlspecialchars($_amtTip, ENT_QUOTES); ?>"<?php endif; ?>>₹<?php echo inr_format($subtotal, 2); ?></span>
                                                 <?php if ($courier > 0): ?>
                                                     <br><small style="color:#94a3b8;font-size:11px;">+₹<?php echo inr_format($courier, 2); ?> courier</small>
                                                 <?php endif; ?>
@@ -916,6 +957,30 @@ document.addEventListener('click', function(e) {
 document.addEventListener('DOMContentLoaded', function() {
     cascadeLocations();
 });
+</script>
+
+<div id="gstTipBox"></div>
+<script>
+// Diaper invoice Amount hover — SGST/CGST/Amount box. One shared box reused
+// for every row (event delegation would also work, but the row count here
+// is small enough that per-element listeners are simpler).
+(function(){
+    var box = document.getElementById('gstTipBox');
+    if (!box) return;
+    document.querySelectorAll('.gst-hover-cell').forEach(function(el){
+        el.addEventListener('mouseenter', function(){
+            box.innerHTML = el.getAttribute('data-gst-tip');
+            box.style.display = 'block';
+        });
+        el.addEventListener('mousemove', function(e){
+            box.style.left = (e.clientX + 14) + 'px';
+            box.style.top = (e.clientY + 14) + 'px';
+        });
+        el.addEventListener('mouseleave', function(){
+            box.style.display = 'none';
+        });
+    });
+})();
 </script>
 </body>
 </html>

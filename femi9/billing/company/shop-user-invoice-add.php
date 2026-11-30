@@ -60,6 +60,14 @@ $result_Godown=mysqli_fetch_array($fetch_Godowndetails);
 </head>
 
 <body>
+    <?php if (isset($_SESSION['errorMessage'])): ?>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>Swal.fire({icon:'error',title:'Error',text:'<?php echo htmlspecialchars((string)($_SESSION['errorMessage']), ENT_QUOTES, 'ISO-8859-1', false); ?>',confirmButtonText:'OK'});</script>
+    <?php unset($_SESSION['errorMessage']); endif; ?>
+    <?php if (isset($_SESSION['successMessage'])): ?>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>Swal.fire({icon:'success',title:'Success',text:'<?php echo htmlspecialchars((string)($_SESSION['successMessage']), ENT_QUOTES, 'ISO-8859-1', false); ?>',confirmButtonText:'OK'});</script>
+    <?php unset($_SESSION['successMessage']); endif; ?>
     <div class="app align-content-stretch d-flex flex-wrap">
         <div class="app-sidebar">
             <?php include("logo.php");?>
@@ -545,8 +553,34 @@ if($get_action=="edit") { $sumbitlable="Update Invoice";}else{$sumbitlable="Subm
 		<?php }else{?>
 		<span class='badge badge-style-bordered badge-success'>Not editable ! Fully Paid Invoices</span>
 		<?php }?>
-													
+
 		</form>
+
+		<?php
+		// "Convert Invoice" / release stock, right here on the invoice itself —
+		// same action ms_prorders.php's per-row checkbox posts to. Only shown
+		// for a DM-order (source_ms_order_id set) Company-fulfilled
+		// (fulfilled_by_cp_id empty — a CP-fulfilled invoice deducts the CP's
+		// own stock immediately at creation and is never in this gate) invoice
+		// that hasn't been receipted yet. 2026-11-17, user request — staff
+		// kept landing here via "View Invoice" / "Update Invoice" and had no
+		// way to actually release stock without going back to Product Orders.
+		if ($get_action === "edit" && !empty($result_InvoieDetails['source_ms_order_id']) && empty($result_InvoieDetails['fulfilled_by_cp_id'])) {
+			$chkReceiptExists = mysqli_query($db_conn, "SELECT COUNT(*) c FROM receipt WHERE receiptid='" . db_esc($Invoice_ID) . "'");
+			$receiptExistsRow = mysqli_fetch_assoc($chkReceiptExists);
+			if ((int)($receiptExistsRow['c'] ?? 0) === 0) {
+			?>
+			<form method="post" action="release-shop-invoice-stock-action.php" style="margin-top:14px;" onsubmit="return confirm('Release stock for this invoice now? If the warehouse is short on any product, that line is left pending.');">
+				<input type="hidden" name="inv_ids[]" value="<?=htmlspecialchars((string)($Invoice_ID), ENT_QUOTES, 'UTF-8', false);?>">
+				<input type="hidden" name="return_to" value="ms_prorders.php">
+				<button type="submit" class="btn" style="width:100%;background:#9a3412;color:#fff;">
+					<i class="material-icons" style="font-size:16px;vertical-align:middle;">local_shipping</i> Convert Invoice (Release Stock)
+				</button>
+			</form>
+			<?php
+			}
+		}
+		?>
 													
                                                 </div>
                                             </div>

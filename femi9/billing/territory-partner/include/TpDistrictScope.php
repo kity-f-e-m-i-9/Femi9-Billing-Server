@@ -12,6 +12,62 @@
 // districts, so this always returns a list (usually of length 1) rather than
 // assuming one.
 
+// Same walk-up-to-district logic as getTpAssignedDistrictNames() below, but
+// keeps the district id alongside the name — needed to filter the Shop Name
+// list by shop.district_id on the Invoice - Shop page (a TP whose Firka
+// assignments span two districts was otherwise shown every one of their
+// shops in a single unfiltered dropdown, with no way to tell which district
+// a same-named shop belonged to). 2026-11-20, user-requested.
+function getTpAssignedDistricts($db_conn, int $tpId): array {
+    $districtDepthRow = $db_conn->query("SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'district%' ORDER BY depth ASC LIMIT 1")->fetch_assoc();
+    if (!$districtDepthRow) return [];
+    $districtDepth = (int)$districtDepthRow['depth'];
+
+    $stmt = $db_conn->prepare("
+        SELECT n.id, n.name, n.depth, n.parent_id
+        FROM territory_partner_locations tpl
+        JOIN partner_location_nodes n ON n.id = tpl.location_id
+        WHERE tpl.territory_partner_id = ?
+    ");
+    $stmt->bind_param('i', $tpId);
+    $stmt->execute();
+    $assigned = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $districts = [];
+    foreach ($assigned as $node) {
+        $depth = (int)$node['depth'];
+        if ($depth === $districtDepth) {
+            $districts[(int)$node['id']] = $node['name'];
+        } elseif ($depth < $districtDepth) {
+            continue;
+        } else {
+            $currentId = (int)$node['parent_id'];
+            $currentDepth = $depth - 1;
+            $guard = 0;
+            while ($currentId > 0 && $currentDepth >= $districtDepth && $guard < 10) {
+                $upStmt = $db_conn->prepare("SELECT id, name, depth, parent_id FROM partner_location_nodes WHERE id = ?");
+                $upStmt->bind_param('i', $currentId);
+                $upStmt->execute();
+                $up = $upStmt->get_result()->fetch_assoc();
+                $upStmt->close();
+                if (!$up) break;
+                $currentId = (int)$up['parent_id'];
+                $currentDepth = (int)$up['depth'] - 1;
+                $guard++;
+                if ((int)$up['depth'] === $districtDepth) { $districts[(int)$up['id']] = $up['name']; break; }
+            }
+        }
+    }
+
+    $result = [];
+    foreach ($districts as $id => $name) {
+        $result[] = ['id' => $id, 'name' => $name];
+    }
+    usort($result, fn($a, $b) => strcmp($a['name'], $b['name']));
+    return $result;
+}
+
 function getTpAssignedDistrictNames($db_conn, int $tpId): array {
     $districtDepthRow = $db_conn->query("SELECT depth FROM partner_location_layers WHERE LOWER(layer_name) LIKE 'district%' ORDER BY depth ASC LIMIT 1")->fetch_assoc();
     if (!$districtDepthRow) return [];

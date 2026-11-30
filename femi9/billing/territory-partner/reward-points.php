@@ -63,12 +63,16 @@ if (strtotime($currentFromDate) > strtotime($currentToDate)) {
 $userType = mysqli_real_escape_string($db_conn, $Login_user_TYPEvl);
 $userId   = mysqli_real_escape_string($db_conn, $Login_user_IDvl);
 
-// 1. Purchase Points — total_amount of company stock bills to this TP / 100
+// 1. Purchase Points — total_amount of company stock bills to this TP / 100.
+// Only invoices with reward points enabled count — same rwpoints_enable=1
+// gate the company-side view (reward_points_tp.php / TpRewardPointsData.php)
+// applies; without it this page overcounts against invoices the company
+// explicitly excluded from earning points.
 $purchaseQuery = "
     SELECT COALESCE(SUM(total_amount) / 100, 0) AS purchase_points,
            COUNT(*) AS invoice_count
     FROM tp_invoices
-    WHERE territory_partner_id = ? AND invoice_date BETWEEN ? AND ?
+    WHERE territory_partner_id = ? AND invoice_date BETWEEN ? AND ? AND rwpoints_enable = 1
 ";
 $purchaseResult = executeQueryRow_tp($db_conn, $purchaseQuery, [(int)$userId, $currentFromDate, $currentToDate], 'iss');
 $purchasePoints = (float)($purchaseResult['purchase_points'] ?? 0);
@@ -129,13 +133,20 @@ mysqli_stmt_execute($dailyRowsStmt);
 $dailyRewardRows = mysqli_stmt_get_result($dailyRowsStmt)->fetch_all(MYSQLI_ASSOC);
 mysqli_stmt_close($dailyRowsStmt);
 
-// 3. Return Deductions — returns against tp_invoices received in this date range
+// 3. Return Deductions — returns against tp_invoices received in this date range.
+// Same rwpoints_enable=1 gate as the company-side view: a return against an
+// invoice that never earned points shouldn't be able to deduct points either.
+// The explicit COLLATE also matches the company-side query — without it this
+// comparison throws a collation-mismatch error (user_return_stock_items.
+// invnumber vs tp_invoices.invoice_number are on different collations), which
+// executeQueryRow_tp() silently swallows, so Return Deductions always showed
+// as 0 here regardless of actual returns.
 $returnQuery = "
     SELECT COALESCE(SUM(r.subtotal) / 100, 0) AS return_points, COUNT(DISTINCT r.invnumber) AS return_count
     FROM user_return_stock_items r
-    WHERE r.invnumber IN (
+    WHERE r.invnumber COLLATE utf8mb4_unicode_ci IN (
         SELECT invoice_number FROM tp_invoices
-        WHERE territory_partner_id = ? AND invoice_date BETWEEN ? AND ?
+        WHERE territory_partner_id = ? AND invoice_date BETWEEN ? AND ? AND rwpoints_enable = 1
     ) AND r.from_usertype = ? AND r.from_userid = ?
 ";
 $returnResult = executeQueryRow_tp($db_conn, $returnQuery, [(int)$userId, $currentFromDate, $currentToDate, $userType, $userId], 'issss');

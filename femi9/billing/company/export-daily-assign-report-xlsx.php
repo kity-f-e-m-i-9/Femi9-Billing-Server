@@ -49,8 +49,8 @@ $spreadsheet = new Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Daily Assign Report');
 
-$headers = ['A' => 'Date', 'B' => 'District', 'C' => 'Division', 'D' => 'Firka', 'E' => 'TP Name', 'F' => 'Assigned By'];
-$lastCol = 'F';
+$headers = ['A' => 'Date', 'B' => 'District', 'C' => 'Division', 'D' => 'Firka', 'E' => 'DM Name', 'F' => 'TP Name', 'G' => 'Assigned By'];
+$lastCol = 'G';
 
 $titleText = 'Daily Assign Report | ' . $from . ' to ' . $to . ($staffName !== '' ? ' | Staff: ' . $staffName : '');
 $sheet->mergeCells("A1:{$lastCol}1");
@@ -76,8 +76,9 @@ foreach ($rows as $r) {
     $sheet->setCellValue("B{$rowNum}", $r['district_name']);
     $sheet->setCellValue("C{$rowNum}", $r['division_name']);
     $sheet->setCellValue("D{$rowNum}", $r['firka_name']);
-    $sheet->setCellValue("E{$rowNum}", $r['tp_name']);
-    $sheet->setCellValue("F{$rowNum}", $r['assigned_by'] ?? '');
+    $sheet->setCellValue("E{$rowNum}", $r['dm_name'] ?? 'Unassigned');
+    $sheet->setCellValue("F{$rowNum}", $r['tp_name']);
+    $sheet->setCellValue("G{$rowNum}", $r['assigned_by'] ?? '');
     $rowNum++;
 }
 if ($rowNum === 3) {
@@ -85,7 +86,7 @@ if ($rowNum === 3) {
     $sheet->mergeCells("A3:{$lastCol}3");
 }
 
-foreach (['A' => 14, 'B' => 20, 'C' => 24, 'D' => 20, 'E' => 24, 'F' => 18] as $col => $w) {
+foreach (['A' => 14, 'B' => 20, 'C' => 24, 'D' => 20, 'E' => 22, 'F' => 24, 'G' => 18] as $col => $w) {
     $sheet->getColumnDimension($col)->setWidth($w);
 }
 

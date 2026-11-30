@@ -5,6 +5,7 @@ require_once __DIR__ . '/../shared/env-loader.php';
 // Then include session check
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('st');
+$canEditSt = hasPermission('st_edit');
 
 // Now load encryption service
 require_once __DIR__ . '/../shared/EncryptionService.php';
@@ -314,6 +315,7 @@ $xlurl="ex_overallusers";
                                                         <th>Referred&nbsp;Name</th>
                                                         <th>Referred&nbsp;Mobile</th>
                                                         <th>Edit</th>
+                                                        <th>Login</th>
                                                     </tr>
                                                 </thead>
                                                 
@@ -512,11 +514,21 @@ $xlurl="ex_overallusers";
 
                                                     <!-- Edit Column -->
                                                     <td class="text-center">
-                                                        <a href="stockist-edit-ss?prid=<?php echo $rowid; ?>" 
-                                                           class="edit-btn" 
+                                                        <a href="stockist-edit-ss?prid=<?php echo $rowid; ?>"
+                                                           class="edit-btn"
                                                            title="Edit Stockist">
                                                             <i class="material-icons-outlined">edit</i>
                                                         </a>
+                                                    </td>
+
+                                                    <!-- Login Column -->
+                                                    <td class="text-center">
+                                                        <?php if ($canEditSt): ?>
+                                                        <a href="login-as-stockist?stid=<?php echo $rowid; ?>"
+                                                           class="edit-btn" title="Login as this Stockist" target="_blank" rel="noopener">
+                                                            <i class="material-icons-outlined" style="color:#059669;">login</i>
+                                                        </a>
+                                                        <?php endif; ?>
                                                     </td>
 
                                                 </tr>

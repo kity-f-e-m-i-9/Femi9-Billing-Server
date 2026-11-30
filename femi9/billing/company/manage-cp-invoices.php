@@ -115,7 +115,7 @@ $i = 0;
         .stat-card.amber  .stat-icon { color:#f59e0b; }
 
         .card { border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.07); border:none; margin-bottom:20px; }
-        .card-header { background:#fff; border-bottom:1px solid #f0f0f0; border-radius:10px 10px 0 0 !important; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+        .card-header { background:#fff; border-bottom:1px solid #f0f0f0; border-radius:10px 10px 0 0 !important; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
         .card-header-title { font-size:14px; font-weight:600; color:#2c3e50; margin:0; display:flex; align-items:center; gap:8px; }
         .card-header-title i { font-size:18px; color:#667eea; }
 
@@ -265,7 +265,7 @@ $i = 0;
                                     'date_from'   => $filter_date_from,
                                     'date_to'     => $filter_date_to,
                                     'type_filter' => $filter_type,
-                                ]); ?>" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:#10b981;color:#fff;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;">
+                                ]); ?>" class="btn btn-sm btn-success" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
                                 <i class="material-icons-outlined" style="font-size:16px;">download</i>
                                 Export Excel
                             </a>

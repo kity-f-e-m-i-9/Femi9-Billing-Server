@@ -12,6 +12,7 @@
 // reassignment still happens, just only through the actual TP edit page.
 include("checksession.php");
 require_once("include/PermissionCheck.php"); requirePermission('ms_edit');
+require_once __DIR__ . '/../shared/TpWorkStart.php';
 header('Content-Type: application/json');
 error_reporting(0);
 
@@ -37,13 +38,12 @@ if (!$firka_id) {
 // One row per (date, firka) — this IS the record now, not just a history
 // log of some other live mapping. NULL territory_partner_id means "Vacant
 // Area" for that date.
-$stmt = $db_conn->prepare("
-    INSERT INTO tp_daily_assignments (assign_date, location_id, territory_partner_id, assigned_by)
-    VALUES (?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE territory_partner_id = VALUES(territory_partner_id), assigned_by = VALUES(assigned_by)
-");
-$stmt->bind_param('siis', $assign_date, $firka_id, $tp_id, $assigned_by);
-$stmt->execute();
-$stmt->close();
+//
+// A save that actually CHANGES the TP (or is brand new) resets the whole
+// work-start chain back to 'none' — a re-assignment means any earlier
+// request/response/escalation was about the previous TP/date combination,
+// not this one. Re-saving the SAME TP leaves the chain untouched (see
+// tpDailyAssignSave()'s own comment) (2026-11-12, user request).
+tpDailyAssignSave($db_conn, $assign_date, $firka_id, $tp_id, $assigned_by);
 
 echo json_encode(['success' => true, 'assigned_tp_id' => $tp_id]);
